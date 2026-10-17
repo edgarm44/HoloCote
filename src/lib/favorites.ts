@@ -16,6 +16,7 @@ export interface Favorite extends FavoriteInfo {
   cardId: string;
   lang: Lang;
   addedAt: number;
+  refPrice?: number;        // cours de référence des alertes (dernière alerte vue), sinon priceAtAdd
 }
 
 const KEY = 'holocote.favorites.v1';
@@ -50,6 +51,15 @@ export function addFavorite(cardId: string, lang: Lang, info: FavoriteInfo) {
 
 export function removeFavorite(cardId: string, lang: Lang) {
   save(load().filter((f) => !same(f, cardId, lang)));
+}
+
+/** Met à jour le cours de référence des alertes (après que l'utilisateur les a vues). */
+export function setRefPrices(prices: { cardId: string; lang: Lang; price: number }[]) {
+  const list = load().map((f) => {
+    const p = prices.find((x) => same(f, x.cardId, x.lang));
+    return p ? { ...f, refPrice: p.price } : f;
+  });
+  save(list);
 }
 
 /** Prévient quand les favoris changent (dans cet onglet ou un autre). */
@@ -124,6 +134,7 @@ function validate(data: unknown): Favorite[] {
       rarity: str(r.rarity, 80),
       priceAtAdd: typeof r.priceAtAdd === 'number' && r.priceAtAdd > 0 ? r.priceAtAdd : undefined,
       unit: r.unit === 'USD' ? 'USD' : r.unit === 'EUR' ? 'EUR' : undefined,
+      refPrice: typeof r.refPrice === 'number' && r.refPrice > 0 ? r.refPrice : undefined,
       addedAt: typeof r.addedAt === 'number' ? r.addedAt : Date.now(),
     });
   }

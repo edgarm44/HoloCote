@@ -29,6 +29,63 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     </div>
   </section>
 
+
+  <section class="wallet" id="wallet" hidden>
+    <div class="wallet-head">
+      <p class="eyebrow">Mon portefeuille</p>
+      <h2>Si je vendais tout aujourd'hui</h2>
+    </div>
+    <div class="wallet-grid">
+      <div class="panel wcard" id="w-coll">
+        <span class="w-label">Ma collection</span>
+        <span class="w-value" data-w="value">—</span>
+        <span class="w-sub" data-w="quick"></span>
+        <span class="w-sub" data-w="count"></span>
+      </div>
+      <div class="panel wcard" id="w-fav">
+        <span class="w-label">Mes favoris (1 de chaque)</span>
+        <span class="w-value" data-w="value">—</span>
+        <span class="w-sub" data-w="quick"></span>
+        <span class="w-sub" data-w="count"></span>
+      </div>
+    </div>
+    <p class="muted small">Valeur estimée = cote du jour × état × quantité. « Vente rapide » = prix le plus bas constaté sur Cardmarket : ce que tu obtiendrais en vendant vite. Avant frais de vente et d'envoi.</p>
+  </section>
+
+  <section class="panel alerts" id="alertes">
+    <div class="al-head">
+      <div>
+        <h2>Alertes de prix</h2>
+        <p class="muted small">Quand un favori monte ou baisse au-delà de ton seuil, une alerte s'affiche dès que tu viens sur HoloCote. Sans e-mail ni compte : tout reste dans ton navigateur.</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="al-on" />
+        <span>Activées</span>
+      </label>
+    </div>
+    <div class="al-settings">
+      <div class="field">
+        <label for="al-th">Seuil</label>
+        <select id="al-th">
+          <option value="5">± 5 %</option>
+          <option value="10">± 10 %</option>
+          <option value="20">± 20 %</option>
+          <option value="50">± 50 %</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="al-dir">Me prévenir</label>
+        <select id="al-dir">
+          <option value="both">Hausse et baisse</option>
+          <option value="up">Seulement en hausse</option>
+          <option value="down">Seulement en baisse</option>
+        </select>
+      </div>
+      <button class="btn" type="button" id="al-check">Vérifier maintenant</button>
+    </div>
+    <div id="al-list" class="al-list"></div>
+  </section>
+
   <div class="fv-bar" id="bar" hidden>
     <div class="chips" role="group" aria-label="Filtrer">
       <button type="button" data-f="all" aria-pressed="true">Toutes</button>
@@ -70,6 +127,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     import { getCard, priceFor, formatPrice, formatDate } from '../lib/tcgdex';
     import { toQuote, sparkline, formatChange, changeClass, type Quote } from '../lib/market';
     import { el, url, toast } from '../lib/ui';
+    /* ---------- Alertes ---------- */
+    import { getSettings, setSettings, checkAlerts, currentAlerts, acknowledge, onAlertsChange } from '../lib/alerts';
+    import { getItems } from '../lib/collection';
+    import { conditionFactor } from '../lib/condition';
+
 
     interface Row {
       fav: Favorite;
@@ -186,9 +248,128 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     render();
     loadPrices();
+
+    const alOn = $('al-on') as HTMLInputElement;
+    const alTh = $('al-th') as HTMLSelectElement;
+    const alDir = $('al-dir') as HTMLSelectElement;
+    const st0 = getSettings();
+    alOn.checked = st0.enabled; alTh.value = String(st0.threshold); alDir.value = st0.direction;
+    const saveSettings = () => {
+      setSettings({ enabled: alOn.checked, threshold: Number(alTh.value), direction: alDir.value as 'both' | 'up' | 'down' });
+      alTh.disabled = alDir.disabled = !alOn.checked;
+      if (alOn.checked) checkAlerts(true); else renderAlerts();
+    };
+    alTh.disabled = alDir.disabled = !alOn.checked;
+    [alOn, alTh, alDir].forEach((x) => x.addEventListener('change', saveSettings));
+    $('al-check').addEventListener('click', async () => {
+      const b = $('al-check') as HTMLButtonElement;
+      b.disabled = true; b.textContent = 'Vérification…';
+      await checkAlerts(true).catch(() => {});
+      b.disabled = false; b.textContent = 'Vérifier maintenant';
+      if (!currentAlerts().length) toast('Aucune variation au-delà de ton seuil');
+    });
+
+    function renderAlerts() {
+      const list = getSettings().enabled ? currentAlerts() : [];
+      const box = $('al-list');
+      if (!getFavorites().length) { box.replaceChildren(el('p', { class: 'muted small' }, ['Ajoute des favoris pour recevoir des alertes.'])); return; }
+      if (!list.length) { box.replaceChildren(el('p', { class: 'muted small' }, [getSettings().enabled ? 'Aucune alerte pour le moment : tes favoris sont stables.' : 'Alertes désactivées.'])); return; }
+      const rowsEls = list.map((a) => {
+        const seen = el('button', { type: 'button', class: 'btn al-seen' }, ["J'ai vu"]);
+        seen.addEventListener('click', () => acknowledge([a]));
+        return el('div', { class: `al-row ${a.pct > 0 ? 'up' : 'down'}` }, [
+          el('span', { class: 'al-arrow' }, [a.pct > 0 ? '▲' : '▼']),
+          el('a', { class: 'al-name', href: url(`/carte/?id=${encodeURIComponent(a.cardId)}&lang=${a.lang}`) }, [a.name]),
+          el('span', { class: 'al-detail' }, [`${fmt(a.from, a.unit)} → ${fmt(a.to, a.unit)}`]),
+          el('span', { class: `al-pct ${a.pct > 0 ? 'up' : 'down'}` }, [`${a.pct > 0 ? '+' : ''}${a.pct.toFixed(1).replace('.', ',')} %`]),
+          seen,
+        ]);
+      });
+      const all = el('button', { type: 'button', class: 'btn al-all' }, ['Tout marquer comme vu']);
+      all.addEventListener('click', () => acknowledge());
+      box.replaceChildren(...rowsEls, list.length > 1 ? all : null as unknown as Node);
+    }
+    onAlertsChange(renderAlerts);
+    onFavoritesChange(renderAlerts);
+    renderAlerts();
+    checkAlerts().catch(() => {});
+
+    /* ---------- Portefeuille : si je vendais tout ---------- */
+    async function renderWallet() {
+      const items = getItems();
+      const favs = getFavorites();
+      $('wallet').hidden = !items.length && !favs.length;
+      const fill = (id: string, value: number, quick: number, n: number, missing: number, label: string) => {
+        const box = $(id);
+        (box.querySelector('[data-w=value]') as HTMLElement).textContent = n ? fmt(value) : '—';
+        (box.querySelector('[data-w=quick]') as HTMLElement).textContent = n ? `Vente rapide : ${fmt(quick)}` : '';
+        (box.querySelector('[data-w=count]') as HTMLElement).textContent =
+          `${n} ${label}${n > 1 ? 's' : ''}${missing ? ` · ${missing} sans cote` : ''}`;
+      };
+      // Collection : cote selon la finition, l'état et la quantité.
+      let cv = 0, cq = 0, cn = 0, cm = 0;
+      const cards = await Promise.all(items.map((i) => getCard(i.cardId, i.lang).catch(() => null)));
+      items.forEach((it, idx) => {
+        const c = cards[idx];
+        const p = c && priceFor(c, it.finish);
+        cn += it.quantity;
+        if (!p || p.unit !== 'EUR') { cm += it.quantity; return; }
+        const f = conditionFactor(it.condition) * it.quantity;
+        cv += p.value * f;
+        cq += (p.low ?? p.value) * f;
+      });
+      fill('w-coll', cv, cq, cn, cm, 'carte');
+      // Favoris : un exemplaire Near Mint de chaque.
+      let fv = 0, fq = 0, fm = 0;
+      const fcards = await Promise.all(favs.map((f) => getCard(f.cardId, f.lang).catch(() => null)));
+      fcards.forEach((c) => {
+        const p = c && priceFor(c, 'normal');
+        if (!p || p.unit !== 'EUR') { fm++; return; }
+        fv += p.value; fq += p.low ?? p.value;
+      });
+      fill('w-fav', fv, fq, favs.length, fm, 'carte');
+    }
+    onFavoritesChange(renderWallet);
+    renderWallet();
   </script>
 
   <style>
+
+    .wallet { margin-bottom: 22px; }
+    .wallet-head h2 { margin: 0 0 12px; font-size: clamp(1.3rem, 3.5vw, 1.7rem); }
+    .wallet-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-bottom: 8px; }
+    @media (min-width: 720px) { .wallet-grid { grid-template-columns: 1fr 1fr; } }
+    .wcard { display: flex; flex-direction: column; gap: 4px; }
+    #w-coll { border-color: rgba(62, 240, 255, 0.35); background: linear-gradient(150deg, rgba(62, 240, 255, 0.08), transparent 60%), var(--surface); }
+    #w-fav { border-color: rgba(255, 210, 90, 0.35); background: linear-gradient(150deg, rgba(255, 210, 90, 0.08), transparent 60%), var(--surface); }
+    .w-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+    .w-value { font-family: var(--font-display); font-size: clamp(1.8rem, 6vw, 2.4rem); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .w-sub { color: var(--muted); font-size: 0.88rem; }
+
+    .alerts { margin-bottom: 22px; scroll-margin-top: 90px; }
+    .al-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; flex-wrap: wrap; }
+    .al-head h2 { margin: 0 0 4px; font-size: 1.2rem; }
+    .al-head p { margin: 0; max-width: 620px; }
+    .switch { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+    .switch input { width: 20px; height: 20px; accent-color: var(--cyan); }
+    .al-settings { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin: 14px 0; }
+    .al-settings .field { flex: 1 1 170px; max-width: 240px; }
+    .al-list { display: flex; flex-direction: column; gap: 8px; }
+    .al-list p { margin: 0; }
+    .al-list :global(.al-row) {
+      display: grid; grid-template-columns: 22px 1fr auto auto; gap: 10px; align-items: center;
+      padding: 10px 12px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line);
+    }
+    .al-list :global(.al-row.up) { border-color: rgba(61, 255, 168, 0.4); }
+    .al-list :global(.al-row.down) { border-color: rgba(255, 90, 122, 0.4); }
+    .al-list :global(.al-arrow) { font-size: 0.9rem; }
+    .al-list :global(.al-row.up .al-arrow) { color: var(--up); }
+    .al-list :global(.al-row.down .al-arrow) { color: var(--down); }
+    .al-list :global(.al-name) { font-weight: 700; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .al-list :global(.al-detail) { grid-column: 2; grid-row: 2; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+    .al-list :global(.al-pct) { font-family: var(--font-display); font-weight: 700; grid-row: 1 / span 2; grid-column: 3; }
+    .al-list :global(.al-seen) { grid-row: 1 / span 2; grid-column: 4; min-height: 38px; padding: 0 12px; font-size: 0.85rem; }
+    .al-list :global(.al-all) { align-self: flex-start; min-height: 38px; font-size: 0.85rem; }
     .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.75rem; color: var(--gold); margin: 0 0 6px; font-weight: 700; }
     .fv-head { display: grid; gap: 22px; grid-template-columns: 1fr; padding: 20px 0 22px; align-items: end; }
     @media (min-width: 960px) { .fv-head { grid-template-columns: 1fr 520px; } }
