@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { CONTACT_EMAIL, LAST_UPDATE } from '../config';
+import { CONTACT_URL, CONTACT_LABEL, LAST_UPDATE } from '../config';
 ---
 <Base title="Confidentialité" active="legal">
   <article class="legal">
@@ -39,7 +39,7 @@ import { CONTACT_EMAIL, LAST_UPDATE } from '../config';
 
     <h2>Tes droits</h2>
     <p>
-      Pour toute question : <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Tu peux aussi contacter la CNIL
+      Pour toute question, ouvre une demande sur <a href={CONTACT_URL} rel="noopener">{CONTACT_LABEL}</a>. Tu peux aussi contacter la CNIL
       (<a href="https://www.cnil.fr" rel="noopener">cnil.fr</a>).
     </p>
   </article>

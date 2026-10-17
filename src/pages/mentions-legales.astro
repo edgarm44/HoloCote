@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { CONTACT_EMAIL, LAST_UPDATE } from '../config';
+import { CONTACT_URL, CONTACT_LABEL, LAST_UPDATE } from '../config';
 ---
 <Base title="Mentions légales" active="legal">
   <article class="legal">
@@ -13,7 +13,7 @@ import { CONTACT_EMAIL, LAST_UPDATE } from '../config';
       n° 2004-575 du 21 juin 2004 pour la confiance dans l'économie numérique, l'éditeur a choisi de préserver son anonymat ;
       les éléments permettant de l'identifier ont été communiqués à l'hébergeur.
     </p>
-    <p>Contact : <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p>
+    <p>Contact : ouvrir une demande sur <a href={CONTACT_URL} rel="noopener">{CONTACT_LABEL}</a>. Les demandes y sont publiques : n'y indique aucune information personnelle.</p>
 
     <h2>Hébergeur</h2>
     <p>GitHub, Inc. (service GitHub Pages) — 88 Colin P Kelly Jr Street, San Francisco, CA 94107, États-Unis — <a href="https://github.com" rel="noopener">github.com</a></p>
@@ -26,7 +26,7 @@ import { CONTACT_EMAIL, LAST_UPDATE } from '../config';
     </p>
     <p>
       Les images des cartes ne sont pas hébergées par HoloCote : elles sont affichées directement depuis les serveurs de
-      TCGdex. Tout titulaire de droits peut demander le retrait d'un contenu à l'adresse de contact ; la demande sera
+      TCGdex. Tout titulaire de droits peut demander le retrait d'un contenu via le contact ci-dessus ; la demande sera
       traitée dans les meilleurs délais.
     </p>
     <p>Le code, le design et les textes propres à HoloCote appartiennent à leur auteur.</p>

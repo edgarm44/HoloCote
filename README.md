@@ -23,7 +23,7 @@ npm run build    # génère dist/
 
 ## À compléter avant publication
 
-- `src/config.ts` : adresse e-mail de contact dédiée (`CONTACT_EMAIL`).
+- Activer les Issues du dépôt (Settings > General > Features > Issues) : elles servent de contact.
 
 ## Structure
 
@@ -40,4 +40,4 @@ src/
 
 ## Cadre légal
 
-Site non commercial : pas de publicité, d'affiliation, de vente ni d'échange entre utilisateurs. Toute demande de retrait d'un titulaire de droits est traitée sans délai via l'adresse de contact.
+Site non commercial : pas de publicité, d'affiliation, de vente ni d'échange entre utilisateurs. Toute demande de retrait d'un titulaire de droits est traitée sans délai via les Issues du dépôt.
