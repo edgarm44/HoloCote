@@ -252,3 +252,22 @@ input:focus-visible, select:focus-visible {
 .ticker .tk-name { font-weight: 600; }
 .ticker .tk-price { font-variant-numeric: tabular-nums; color: var(--muted); }
 .ticker .tk-chg { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Favoris : bouton étoile */
+.fav-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--line); background: rgba(7, 6, 13, 0.75); color: var(--muted);
+  border-radius: 999px; cursor: pointer; font: inherit; font-weight: 600;
+  min-width: 38px; height: 38px; padding: 0 10px;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  transition: color 0.2s, border-color 0.2s, transform 0.15s;
+}
+.fav-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.fav-btn:hover { color: var(--gold); border-color: rgba(255, 210, 90, 0.5); }
+.fav-btn:active { transform: scale(0.92); }
+.fav-btn[aria-pressed='true'] { color: var(--gold); border-color: rgba(255, 210, 90, 0.6); }
+.fav-btn[aria-pressed='true'] svg { fill: var(--gold); }
+.fav-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.tile-wrap { position: relative; }
+.tile-fav { position: absolute; top: 8px; right: 8px; z-index: 3; }
+

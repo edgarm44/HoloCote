@@ -157,7 +157,7 @@ function validate(data: unknown): Store | null {
     const r = raw as Record<string, unknown>;
     const cardId = str(r.cardId, 64);
     const name = str(r.name);
-    if (!cardId || !/^[\w.\-]+$/.test(cardId) || !name) continue;
+    if (!cardId || !/^[\w.\-!%?]+$/.test(cardId) || !name) continue;
     if (r.lang !== 'fr' && r.lang !== 'en') continue;
     if (!isCondition(r.condition)) continue;
     const image = str(r.image, 300);

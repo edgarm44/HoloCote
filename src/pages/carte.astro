@@ -35,7 +35,8 @@ import Base from '../layouts/Base.astro';
   <script>
     import { getCard, priceFor, hasReverse, formatPrice, formatDate, type Lang } from '../lib/tcgdex';
     import { rarityTier, tierLabel, valueBadge, USD_TO_EUR } from '../lib/rarity';
-    import { holoCard, el, status, url } from '../lib/ui';
+    import { holoCard, el, status, url, favInfo } from '../lib/ui';
+    import { favButton } from '../lib/favorites';
 
     const view = document.getElementById('view')!;
     const params = new URLSearchParams(location.search);
@@ -43,7 +44,7 @@ import Base from '../layouts/Base.astro';
     const lang: Lang = params.get('lang') === 'en' ? 'en' : 'fr';
 
     async function main() {
-      if (!/^[\w.\-]+$/.test(id)) {
+      if (!/^[\w.\-!%?]+$/.test(id)) {
         view.replaceChildren(status('Carte introuvable.', false));
         return;
       }
@@ -65,6 +66,7 @@ import Base from '../layouts/Base.astro';
 
       slot('visual').append(holoCard(card.image, card.name, 'high'));
       slot('name').textContent = card.name;
+      slot('name').after(favButton(card.id, lang, () => favInfo(card), { label: true, className: 'fav-big' }));
       const official = card.set.cardCount?.official;
       slot('set').textContent = `${card.set.name} · N° ${card.localId}${official ? `/${official}` : ''}`;
 
@@ -85,7 +87,7 @@ import Base from '../layouts/Base.astro';
           reverse ? `Version reverse holo : ${formatPrice(reverse.value, reverse.unit)}` : '',
         ].filter(Boolean).join(' · ');
         const date = formatDate(price.updated);
-        slot('price-note').textContent = `Cote indicative${date ? ` du ${date}` : ''}, source ${price.source}${price.unit === 'USD' ? ' (marché américain, en dollars)' : ''}. Les prix réels varient selon l'état, la langue et l'édition.`;
+        slot('price-note').textContent = `Cote indicative${date ? ` du ${date}` : ''}, source ${price.source}${price.unit === 'USD' ? ' (marché américain, en dollars)' : ''}. Cardmarket regroupe toutes les langues et tous les états : une carte française ou abîmée se vend souvent moins cher.`;
       } else {
         slot('price').textContent = '—';
         slot('price-note').textContent = "Pas de cote disponible pour cette carte. Essaie la version dans l'autre langue.";
@@ -124,6 +126,7 @@ import Base from '../layouts/Base.astro';
     @media (min-width: 820px) { .visual { position: sticky; top: 90px; } }
     .info { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
     .info h1 { margin: 0; }
+    .info :global(.fav-big) { align-self: flex-start; height: 42px; padding: 0 16px; }
     .badges { display: flex; gap: 8px; flex-wrap: wrap; }
     .price p { margin: 0; }
     .price .notice { margin-top: 10px; }

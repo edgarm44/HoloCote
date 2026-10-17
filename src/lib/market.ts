@@ -1,9 +1,10 @@
 // « Marché » HoloCote : cours des cartes façon bourse.
 // Source : cotes Cardmarket fournies par TCGdex. TCGdex ne publie pas d'historique
-// jour par jour : on dispose de quatre repères (moyenne 30 jours, moyenne 7 jours,
-// moyenne de la veille, tendance). Les variations et mini-graphiques en découlent.
+// jour par jour : on dispose de repères (moyenne 30 jours, moyenne 7 jours, cours actuel).
+// La moyenne de la veille n'est pas utilisée : sur données réelles elle varie du simple
+// au triple d'un jour à l'autre (une seule vente suffit).
 
-import { getCard, listSets, type Card, type CardBrief, type Lang } from './tcgdex';
+import { getCard, listSets, priceFor, type Card, type CardBrief, type Lang } from './tcgdex';
 
 export interface Quote {
   id: string;
@@ -12,12 +13,10 @@ export interface Quote {
   image?: string;
   setName?: string;
   rarity?: string;
-  price: number;          // cours actuel (tendance, sinon moyenne de la veille)
+  price: number;          // cours HoloCote (même calcul que la fiche carte)
   avg30?: number;
   avg7?: number;
-  avg1?: number;
-  change7?: number;       // variation moyenne 7 j vs moyenne 30 j (en %)
-  change1?: number;       // variation veille vs moyenne 7 j (en %)
+  change7?: number;       // variation : moyenne 7 j comparée à la moyenne 30 j (en %)
   points: number[];       // repères pour le mini-graphique, du plus ancien au plus récent
   updated?: string;
   group: 'legend' | 'new';
@@ -47,14 +46,13 @@ const pct = (a?: number, b?: number) => (a && b ? ((a - b) / b) * 100 : undefine
 
 export function toQuote(card: Card, lang: Lang, group: Quote['group']): Quote | null {
   const cm = card.pricing?.cardmarket as Record<string, unknown> | null | undefined;
-  if (!cm) return null;
-  // Carte uniquement holo : les cotes sont parfois dans les champs « -holo ».
-  const holoOnly = card.variants?.normal === false && !num(cm.trend) && !num(cm.avg);
+  const p = priceFor(card, 'normal');
+  if (!cm || !p || p.source !== 'Cardmarket') return null;
+  // Même champs que priceFor : version normale, ou « -holo » pour une carte uniquement holo sans cote normale.
+  const holoOnly = card.variants?.normal === false && card.variants?.holo === true && !num(cm.avg30) && !num(cm.avg7);
   const k = (f: string) => num(cm[holoOnly ? `${f}-holo` : f]);
-  const avg30 = k('avg30'), avg7 = k('avg7'), avg1 = k('avg1'), trend = k('trend');
-  const price = trend ?? avg1 ?? avg7 ?? avg30 ?? k('avg');
-  if (!price) return null;
-  const points = [avg30, avg7, avg1, trend].filter((x): x is number => x !== undefined);
+  const avg30 = k('avg30'), avg7 = k('avg7');
+  const points = [avg30, avg7, p.value].filter((x): x is number => x !== undefined);
   return {
     id: card.id,
     lang,
@@ -62,12 +60,11 @@ export function toQuote(card: Card, lang: Lang, group: Quote['group']): Quote | 
     image: card.image,
     setName: card.set?.name,
     rarity: card.rarity,
-    price,
-    avg30, avg7, avg1,
+    price: p.value,
+    avg30, avg7,
     change7: pct(avg7, avg30),
-    change1: pct(avg1, avg7),
-    points: points.length >= 2 ? points : [price, price],
-    updated: typeof cm.updated === 'string' ? cm.updated : undefined,
+    points: points.length >= 2 ? points : [p.value, p.value],
+    updated: p.updated,
     group,
   };
 }
@@ -97,7 +94,8 @@ interface SetDetail { id: string; name: string; cardCount?: { official?: number 
 /** Cartes « chasse » (numéro au-delà du total officiel) des deux dernières extensions. */
 async function newestChase(max = 16): Promise<string[]> {
   const sets = await listSets('fr').catch(() => []);
-  const recent = sets.slice(-2).reverse();
+  // Les deux extensions les plus récentes qui ont des cartes « secrètes » (total > officiel).
+  const recent = sets.filter((s) => (s.cardCount?.total ?? 0) > (s.cardCount?.official ?? 0)).slice(-2).reverse();
   const ids: string[] = [];
   for (const s of recent) {
     const d: SetDetail | null = await fetch(`https://api.tcgdex.net/v2/fr/sets/${encodeURIComponent(s.id)}`)
@@ -111,11 +109,11 @@ async function newestChase(max = 16): Promise<string[]> {
 
 export interface Market {
   quotes: Quote[];
-  index?: { value: number; change7?: number; change1?: number };
+  index?: { value: number; change7?: number };
   loadedAt: number;
 }
 
-const CACHE_KEY = 'holocote.market.v1';
+const CACHE_KEY = 'holocote.market.v2';
 const TTL = 30 * 60 * 1000;
 
 function readCache(): Market | null {
@@ -137,8 +135,8 @@ function computeIndex(quotes: Quote[]): Market['index'] {
   const withHist = quotes.filter((q) => q.avg30);
   if (!withHist.length) return undefined;
   const sum = (f: (q: Quote) => number | undefined) => withHist.reduce((s, q) => s + (f(q) ?? q.price), 0);
-  const s30 = sum((q) => q.avg30), s7 = sum((q) => q.avg7), s1 = sum((q) => q.avg1), now = sum((q) => q.price);
-  return { value: (now / s30) * 100, change7: pct(s7, s30), change1: pct(s1, s7) };
+  const s30 = sum((q) => q.avg30), s7 = sum((q) => q.avg7), now = sum((q) => q.price);
+  return { value: (now / s30) * 100, change7: pct(s7, s30) };
 }
 
 let inflight: Promise<Market> | null = null;

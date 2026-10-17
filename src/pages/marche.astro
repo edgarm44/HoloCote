@@ -68,7 +68,6 @@ import Base from '../layouts/Base.astro';
       <label class="sr-only" for="sort">Trier</label>
       <select id="sort">
         <option value="change7">Variation 7 j</option>
-        <option value="change1">Variation 24 h</option>
         <option value="price">Cours</option>
         <option value="name">Nom</option>
       </select>
@@ -77,7 +76,7 @@ import Base from '../layouts/Base.astro';
       <div class="tr th" role="row">
         <span role="columnheader">Carte</span>
         <span role="columnheader" class="num">Cours</span>
-        <span role="columnheader" class="num">24 h</span>
+        <span role="columnheader" class="num">Moy. 30 j</span>
         <span role="columnheader" class="num">7 j</span>
         <span role="columnheader" class="chart-col">Tendance</span>
       </div>
@@ -86,8 +85,9 @@ import Base from '../layouts/Base.astro';
   </section>
 
   <p class="notice">
-    Cours = tendance Cardmarket (en euros, version normale, état Near Mint). Variation 7 j = moyenne des 7 derniers jours comparée à celle des 30 jours ;
-    24 h = moyenne de la veille comparée à celle des 7 jours. Les mini-graphiques relient ces repères (30 j, 7 j, veille, tendance) : ce n'est pas un historique jour par jour.
+    Cours = cote HoloCote, identique à la fiche carte : médiane de la tendance, du prix moyen de vente et des moyennes 7 et 30 jours de Cardmarket
+    (en euros, version normale, toutes langues et tous états confondus). Variation 7 j = moyenne des 7 derniers jours comparée à celle des 30 jours.
+    Les mini-graphiques relient ces repères (moyenne 30 j, moyenne 7 j, cours) : ce n'est pas un historique jour par jour.
     Ce n'est pas un conseil d'investissement.
   </p>
 
@@ -96,7 +96,7 @@ import Base from '../layouts/Base.astro';
     import { formatPrice, formatDate, getCard, type Card } from '../lib/tcgdex';
     import { getItems } from '../lib/collection';
     import { conditionFactor } from '../lib/condition';
-    import { el, url } from '../lib/ui';
+    import { el, url, favForBrief } from '../lib/ui';
 
     const $ = (id: string) => document.getElementById(id)!;
     const href = (q: Quote) => url(`/carte/?id=${encodeURIComponent(q.id)}&lang=${q.lang}`);
@@ -124,8 +124,8 @@ import Base from '../layouts/Base.astro';
         .sort((a, b) =>
           sort === 'name' ? a.name.localeCompare(b.name, 'fr')
           : sort === 'price' ? b.price - a.price
-          : ((b[sort as 'change7' | 'change1'] ?? -1e9) - (a[sort as 'change7' | 'change1'] ?? -1e9)));
-      $('rows').replaceChildren(...list.map((q, i) =>
+          : ((b.change7 ?? -1e9) - (a.change7 ?? -1e9)));
+      $('rows').replaceChildren(...list.map((q, i) => el('div', { class: 'row-wrap' }, [
         el('a', { class: 'tr', role: 'row', href: href(q) }, [
           el('span', { class: 'card-cell', role: 'cell' }, [
             el('span', { class: 'rank' }, [String(i + 1)]),
@@ -133,11 +133,12 @@ import Base from '../layouts/Base.astro';
             el('span', { class: 'mv-name' }, [q.name, el('small', {}, [[q.setName, q.group === 'new' ? 'Nouveauté' : ''].filter(Boolean).join(' · ')])]),
           ]),
           el('span', { class: 'num price', role: 'cell' }, [eur(q.price)]),
-          el('span', { class: 'num', role: 'cell' }, [chg(q.change1)]),
+          el('span', { class: 'num muted', role: 'cell' }, [q.avg30 ? eur(q.avg30) : '—']),
           el('span', { class: 'num', role: 'cell' }, [chg(q.change7)]),
           el('span', { class: 'chart-col', role: 'cell' }, [sparkline(q.points, 110, 34)]),
         ]),
-      ));
+        favForBrief({ id: q.id, localId: '', name: q.name, image: q.image }, q.lang, 'row-fav'),
+      ])));
     }
 
     async function renderPortfolio() {
@@ -185,7 +186,7 @@ import Base from '../layouts/Base.astro';
         const withHist = quotes.filter((q) => q.avg30);
         const s = (f: (q: Quote) => number | undefined) => withHist.reduce((t, q) => t + (f(q) ?? q.price), 0);
         const base = s((q) => q.avg30);
-        const pts = [base, s((q) => q.avg7), s((q) => q.avg1), s((q) => q.price)].map((v) => (v / base) * 100);
+        const pts = [base, s((q) => q.avg7), s((q) => q.price)].map((v) => (v / base) * 100);
         $('index-chart').replaceChildren(sparkline(pts, 320, 70));
       }
       const updated = quotes.map((q) => q.updated).filter(Boolean).sort().pop();
@@ -269,16 +270,19 @@ import Base from '../layouts/Base.astro';
     .chips button[aria-pressed='true'] { color: #0a0812; background: var(--holo); border-color: transparent; }
     .table { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2); margin-bottom: 20px; }
     .table :global(.tr) {
-      display: grid; grid-template-columns: 1fr 90px 74px 74px 120px; gap: 10px; align-items: center;
+      display: grid; grid-template-columns: 1fr 90px 86px 74px 120px; gap: 10px; align-items: center;
       padding: 10px 14px; border-top: 1px solid var(--line); text-decoration: none; color: var(--text);
     }
+    .table :global(.row-wrap) { position: relative; }
+    .table :global(.row-wrap .tr), .table .th { padding-right: 58px; }
+    .table :global(.row-fav) { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
     .table .th { border-top: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; background: var(--surface); }
     .table :global(a.tr:hover) { background: var(--surface); }
     .table :global(.num) { text-align: right; font-variant-numeric: tabular-nums; }
     .table :global(.price) { font-weight: 700; }
     .table :global(.chart-col) { display: flex; justify-content: flex-end; }
     @media (max-width: 640px) {
-      .table :global(.tr) { grid-template-columns: 1fr 76px 64px; padding: 10px; }
+      .table :global(.tr) { grid-template-columns: 1fr 76px 64px; padding: 10px 52px 10px 10px; }
       .table :global(.tr > :nth-child(3)), .table :global(.chart-col) { display: none; }
     }
     :global(.card-cell) { display: flex; align-items: center; gap: 10px; min-width: 0; }

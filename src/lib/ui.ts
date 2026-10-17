@@ -1,6 +1,7 @@
 // Petites fonctions d'interface partagées (exécutées dans le navigateur).
 
-import { imageUrl, type CardBrief, type Lang } from './tcgdex';
+import { imageUrl, getCard, priceFor, type Card, type CardBrief, type Lang } from './tcgdex';
+import { favButton } from './favorites';
 
 export const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 export const url = (path: string) => `${BASE}${path.startsWith('/') ? path : `/${path}`}`;
@@ -53,11 +54,28 @@ export function attachTilt(box: HTMLElement) {
   });
 }
 
+/** Données d'un favori à partir des détails d'une carte (avec sa cote du moment). */
+export function favInfo(card: Card) {
+  const p = priceFor(card, 'normal');
+  return { name: card.name, image: card.image, setName: card.set?.name, rarity: card.rarity, priceAtAdd: p?.value, unit: p?.unit };
+}
+
+/** Étoile favori pour une carte dont on n'a que le résumé : les détails sont chargés au clic. */
+export function favForBrief(c: CardBrief, lang: Lang, className = 'tile-fav'): HTMLButtonElement {
+  return favButton(c.id, lang, async () => {
+    const card = await getCard(c.id, lang).catch(() => null);
+    return card ? favInfo(card) : { name: c.name, image: c.image };
+  }, { className });
+}
+
 export function cardTile(card: CardBrief, lang: Lang, meta?: string): HTMLElement {
-  return el('a', { class: 'tile', href: url(`/carte/?id=${encodeURIComponent(card.id)}&lang=${lang}`) }, [
-    holoCard(card.image, card.name),
-    el('span', { class: 'tile-name' }, [card.name]),
-    el('span', { class: 'tile-meta' }, [meta ?? `N° ${card.localId} · ${card.id.split('-')[0]}`]),
+  return el('div', { class: 'tile-wrap' }, [
+    el('a', { class: 'tile', href: url(`/carte/?id=${encodeURIComponent(card.id)}&lang=${lang}`) }, [
+      holoCard(card.image, card.name),
+      el('span', { class: 'tile-name' }, [card.name]),
+      el('span', { class: 'tile-meta' }, [meta ?? `N° ${card.localId} · ${card.id.split('-')[0]}`]),
+    ]),
+    favForBrief(card, lang),
   ]);
 }
 

@@ -125,7 +125,7 @@ import { CONDITIONS } from '../lib/condition';
     import { getItems, updateItem, removeItem, clearAll, exportJson, importJson, storageAvailable, type Item } from '../lib/collection';
     import { conditionFactor, type Condition } from '../lib/condition';
     import { getCard, priceFor, formatPrice, type Card, type PriceInfo } from '../lib/tcgdex';
-    import { rarityTier, type Tier } from '../lib/rarity';
+    import { rarityTier, USD_TO_EUR, type Tier } from '../lib/rarity';
     import { holoCard, el, toast, url } from '../lib/ui';
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -151,7 +151,7 @@ import { CONDITIONS } from '../lib/condition';
     const lineValue = (it: Item, p: PriceInfo) => p.value * conditionFactor(it.condition) * it.quantity;
     const unitEur = (it: Item) => {
       const p = priceOf(it);
-      return p ? (p.unit === 'EUR' ? p.value : p.value * 0.9) * conditionFactor(it.condition) : -1;
+      return p ? (p.unit === 'EUR' ? p.value : p.value * USD_TO_EUR) * conditionFactor(it.condition) : -1;
     };
 
     function render() {

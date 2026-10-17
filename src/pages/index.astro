@@ -64,6 +64,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <p>Hausses, baisses, indice HoloCote : le cours des cartes les plus recherchées, comme à la bourse.</p>
       <span class="f-link">Voir les cours →</span>
     </a>
+    <a class="feature f-fav" href={`${base}/favoris/`}>
+      <span class="f-icon"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg></span>
+      <h2>Favoris</h2>
+      <p>Mets une étoile sur les cartes que tu convoites et vois si leur cours monte ou descend.</p>
+      <span class="f-link">Mes favoris →</span>
+    </a>
     <a class="feature f-coll" href={`${base}/collection/`}>
       <span class="f-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" /></svg></span>
       <h2>Collection</h2>
@@ -218,7 +224,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     .stats-band span { color: var(--muted); font-size: 0.85rem; }
 
     .features { display: grid; gap: 16px; grid-template-columns: 1fr; margin-bottom: 56px; }
-    @media (min-width: 820px) { .features { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 640px) { .features { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1100px) { .features { grid-template-columns: repeat(4, 1fr); } }
     .feature {
       position: relative; display: flex; flex-direction: column; gap: 10px; padding: 26px; border-radius: 22px;
       text-decoration: none; color: var(--text); overflow: hidden;
@@ -238,6 +245,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     .f-scan .f-icon { background: linear-gradient(135deg, var(--cyan), #8a7bff); }
     .f-market .f-icon { background: linear-gradient(135deg, var(--up), var(--cyan)); }
     .f-coll .f-icon { background: linear-gradient(135deg, var(--magenta), var(--gold)); }
+    .f-fav .f-icon { background: linear-gradient(135deg, var(--gold), #ffb35a); }
     .f-link { font-weight: 700; color: var(--cyan); }
 
     .section-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }

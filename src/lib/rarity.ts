@@ -35,5 +35,9 @@ export function valueBadge(eur: number | null | undefined): ValueBadge {
   return { label: 'Trésor', level: 4 };
 }
 
-/** Conversion approximative USD -> EUR, uniquement pour le badge quand seule la cote TCGplayer existe. */
-export const USD_TO_EUR = 0.9;
+/**
+ * Conversion approximative USD -> EUR, utilisée seulement pour classer (badge, tri, pépite)
+ * quand une carte n'a qu'une cote TCGplayer. Les prix en dollars restent affichés en dollars.
+ * Référence BCE du 18 juin 2026 : 1 € = 1,1461 $, soit 1 $ ≈ 0,87 €.
+ */
+export const USD_TO_EUR = 0.87;

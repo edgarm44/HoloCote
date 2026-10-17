@@ -123,12 +123,15 @@ function median(values: (number | undefined)[]): number | undefined {
   return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
-function cardmarket(card: Card, holo: boolean): PriceInfo | null {
+export function cardmarket(card: Card, holo: boolean): PriceInfo | null {
   const cm = card.pricing?.cardmarket;
   if (!cm) return null;
   const k = (f: string) => num((cm as Record<string, unknown>)[holo ? `${f}-holo` : f]);
-  // Cardmarket : tendance, moyennes 7 et 30 jours ; on prend la médiane des trois.
-  const value = median([k('trend'), k('avg7'), k('avg30')]) ?? k('avg') ?? k('avg1');
+  // Cardmarket : médiane de la tendance, du prix moyen de vente et des moyennes 7 et 30 jours.
+  // La moyenne de la veille (avg1) est exclue : une seule vente peut la fausser.
+  // Vérifié sur données réelles : la tendance seule peut être aberrante (Dracaufeu set de base :
+  // tendance 78 € pour des ventes moyennes de 420 à 770 €).
+  const value = median([k('trend'), k('avg'), k('avg7'), k('avg30')]) ?? k('avg1');
   return value ? { value, low: k('low'), unit: 'EUR', source: 'Cardmarket', updated: cm.updated } : null;
 }
 
