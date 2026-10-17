@@ -4,8 +4,8 @@ import Base from '../layouts/Base.astro';
 <Base title="Marché" active="market" description="Le cours des cartes à collectionner, façon bourse : hausses, baisses, indice HoloCote.">
   <section class="mk-head">
     <div>
-      <p class="eyebrow">Bourse des cartes</p>
-      <h1>Le <span class="holo-text">Marché</span></h1>
+      <h1 class="mk-title">Le Marché.</h1>
+      <p class="mk-slogan">Ce qui monte, ce qui chute, ce qui vaut une fortune.</p>
       <p class="muted">Les cartes les plus recherchées et les nouveautés, avec leur cours et leurs variations, comme en bourse.</p>
     </div>
     <div class="panel index-card" id="index-card">
@@ -27,6 +27,33 @@ import Base from '../layouts/Base.astro';
 
   <div id="ticker-slot" class="ticker-slot"></div>
 
+  <section class="stats" id="stats" hidden>
+    <div class="stat-box"><span class="sb-label">Cartes suivies</span><span class="sb-value" id="st-n">—</span></div>
+    <div class="stat-box breadth">
+      <span class="sb-label">Hausse / baisse</span>
+      <span class="sb-value"><span class="up" id="st-up">0</span> <span class="muted">/</span> <span class="down" id="st-down">0</span></span>
+      <span class="breadth-bar"><span id="st-bar"></span></span>
+    </div>
+    <div class="stat-box"><span class="sb-label">Variation moyenne 7 j</span><span class="sb-value" id="st-avg">—</span></div>
+    <div class="stat-box"><span class="sb-label">Valeur cumulée</span><span class="sb-value" id="st-sum">—</span></div>
+  </section>
+
+  <section class="panel chart-panel" id="chart-panel" hidden>
+    <div class="cp-head">
+      <div>
+        <h2 id="cp-title">Indice HoloCote</h2>
+        <p class="muted small" id="cp-sub">Toutes les cartes suivies, base 100 = moyenne 30 jours.</p>
+      </div>
+      <div class="cp-actions">
+        <button type="button" class="btn" id="cp-index" hidden>Revenir à l'indice</button>
+        <a class="btn" id="cp-open" hidden>Voir la fiche</a>
+      </div>
+    </div>
+    <div class="cp-chart" id="cp-chart"></div>
+    <div class="cp-facts" id="cp-facts"></div>
+    <p class="muted small">Touche l'icône graphique d'une carte dans le tableau pour afficher sa courbe ici.</p>
+  </section>
+
   <div id="state" aria-live="polite">
     <div class="status" role="status"><div class="spinner"></div>Chargement des cours…</div>
   </div>
@@ -44,6 +71,12 @@ import Base from '../layouts/Base.astro';
       <h2><span class="gold">◆</span> Les plus chères</h2>
       <ol id="top"></ol>
     </div>
+  </section>
+
+  <section class="heat" id="heat" hidden>
+    <h2 class="sec-title">La carte thermique</h2>
+    <p class="muted">Vert : ça monte. Rouge : ça baisse. Plus la couleur est forte, plus ça bouge. Les plus grosses cases sont les cartes les plus chères.</p>
+    <div class="heat-grid" id="heat-grid"></div>
   </section>
 
   <section class="panel portfolio" id="portfolio" hidden>
@@ -92,7 +125,7 @@ import Base from '../layouts/Base.astro';
   </p>
 
   <script>
-    import { loadMarket, sparkline, ticker, formatChange, changeClass, toQuote, type Quote } from '../lib/market';
+    import { loadMarket, sparkline, bigChart, ticker, formatChange, changeClass, toQuote, type Quote } from '../lib/market';
     import { formatPrice, formatDate, getCard, type Card } from '../lib/tcgdex';
     import { getItems } from '../lib/collection';
     import { conditionFactor } from '../lib/condition';
@@ -137,8 +170,103 @@ import Base from '../layouts/Base.astro';
           el('span', { class: 'num', role: 'cell' }, [chg(q.change7)]),
           el('span', { class: 'chart-col', role: 'cell' }, [sparkline(q.points, 110, 34)]),
         ]),
+        graphBtn(q),
         favForBrief({ id: q.id, localId: '', name: q.name, image: q.image }, q.lang, 'row-fav'),
       ])));
+    }
+
+
+    /* ---------- Grand graphique ---------- */
+    let chartState: { kind: 'index' } | { kind: 'card'; q: Quote } = { kind: 'index' };
+    function indexPoints() {
+      const withHist = quotes.filter((q) => q.avg30);
+      const s = (f: (q: Quote) => number | undefined) => withHist.reduce((t, q) => t + (f(q) ?? q.price), 0);
+      const base = s((q) => q.avg30);
+      return base ? [base, s((q) => q.avg7), s((q) => q.price)].map((v) => (v / base) * 100) : null;
+    }
+    function fact(label: string, value: string, cls = '') {
+      return el('div', { class: 'fact' }, [el('span', { class: 'f-label' }, [label]), el('span', { class: `f-value ${cls}` }, [value])]);
+    }
+    function renderChart() {
+      const box = $('cp-chart');
+      const w = Math.max(300, Math.min(1100, box.clientWidth || 700));
+      const h = w < 520 ? 220 : 280;
+      if (chartState.kind === 'index') {
+        const pts = indexPoints();
+        if (!pts) return;
+        $('cp-title').textContent = 'Indice HoloCote';
+        $('cp-sub').textContent = 'Toutes les cartes suivies, base 100 = moyenne 30 jours.';
+        $('cp-index').hidden = true;
+        ($('cp-open') as HTMLAnchorElement).hidden = true;
+        box.replaceChildren(bigChart(pts, ['Moyenne 30 j', 'Moyenne 7 j', "Aujourd'hui"], (v) => v.toFixed(1).replace('.', ','), w, h));
+        const up = quotes.filter((q) => (q.change7 ?? 0) > 0).length;
+        $('cp-facts').replaceChildren(
+          fact('Indice', pts[2].toFixed(1).replace('.', ',')),
+          fact('Sur 7 jours', formatChange(((pts[1] - pts[0]) / pts[0]) * 100), changeClass(((pts[1] - pts[0]) / pts[0]) * 100)),
+          fact('Cartes en hausse', `${up} sur ${quotes.length}`),
+        );
+      } else {
+        const q = chartState.q;
+        const pts = [q.avg30, q.avg7, q.price].filter((x): x is number => x !== undefined);
+        const labels = [q.avg30 ? 'Moyenne 30 j' : '', q.avg7 ? 'Moyenne 7 j' : '', "Aujourd'hui"].filter(Boolean);
+        $('cp-title').textContent = q.name;
+        $('cp-sub').textContent = [q.setName, q.group === 'new' ? 'Nouveauté' : 'Légendaire'].filter(Boolean).join(', ');
+        $('cp-index').hidden = false;
+        const open = $('cp-open') as HTMLAnchorElement;
+        open.hidden = false;
+        open.href = href(q);
+        box.replaceChildren(pts.length >= 2 ? bigChart(pts, labels, eur, w, h) : el('p', { class: 'muted' }, ['Pas assez de repères pour tracer une courbe.']));
+        const spread = q.avg30 ? ((q.price - q.avg30) / q.avg30) * 100 : undefined;
+        $('cp-facts').replaceChildren(
+          fact('Cours', eur(q.price)),
+          fact('Moyenne 30 j', q.avg30 ? eur(q.avg30) : '—'),
+          fact('Variation 7 j', formatChange(q.change7), changeClass(q.change7)),
+          fact('Écart au mois', formatChange(spread), changeClass(spread)),
+        );
+      }
+    }
+    function graphBtn(q: Quote) {
+      const b = el('button', { type: 'button', class: 'row-graph', 'aria-label': `Afficher la courbe de ${q.name}`, title: 'Afficher la courbe' });
+      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6" /></svg>';
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        chartState = { kind: 'card', q };
+        renderChart();
+        $('chart-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return b;
+    }
+    window.addEventListener('resize', () => { if (!$('chart-panel').hidden) renderChart(); });
+
+    /* ---------- Statistiques et carte thermique ---------- */
+    function renderStats() {
+      const withChg = quotes.filter((q) => q.change7 !== undefined);
+      const up = withChg.filter((q) => q.change7! > 0.5).length;
+      const down = withChg.filter((q) => q.change7! < -0.5).length;
+      $('st-n').textContent = String(quotes.length);
+      $('st-up').textContent = String(up);
+      $('st-down').textContent = String(down);
+      ($('st-bar') as HTMLElement).style.width = `${up + down ? (up / (up + down)) * 100 : 50}%`;
+      const avg = withChg.length ? withChg.reduce((s, q) => s + q.change7!, 0) / withChg.length : undefined;
+      const a = $('st-avg'); a.textContent = formatChange(avg); a.className = `sb-value ${changeClass(avg)}`;
+      $('st-sum').textContent = eur(quotes.reduce((s, q) => s + q.price, 0));
+      $('stats').hidden = false;
+    }
+    function renderHeat() {
+      const list = [...quotes].sort((a, b) => b.price - a.price);
+      $('heat-grid').replaceChildren(...list.map((q, i) => {
+        const c = q.change7 ?? 0;
+        const k = Math.min(1, Math.abs(c) / 25);
+        const bg = c > 0.5 ? `rgba(61, 255, 168, ${0.12 + k * 0.5})` : c < -0.5 ? `rgba(255, 90, 122, ${0.12 + k * 0.5})` : 'rgba(255, 255, 255, 0.06)';
+        const a = el('a', { class: `heat-cell ${i < 2 ? 'xl' : i < 6 ? 'l' : ''}`, href: href(q), title: `${q.name} : ${formatChange(q.change7)}` }, [
+          el('span', { class: 'hc-name' }, [q.name]),
+          el('span', { class: 'hc-chg' }, [formatChange(q.change7)]),
+          el('span', { class: 'hc-price' }, [eur(q.price)]),
+        ]);
+        a.style.background = bg;
+        return a;
+      }));
+      $('heat').hidden = false;
     }
 
     async function renderPortfolio() {
@@ -202,6 +330,10 @@ import Base from '../layouts/Base.astro';
         if (!$(id).children.length) $(id).replaceChildren(el('li', { class: 'muted small' }, ['Rien à signaler cette semaine.']));
       }
       $('movers').hidden = false;
+      renderStats();
+      $('chart-panel').hidden = false;
+      renderChart();
+      renderHeat();
       $('board').hidden = false;
       renderBoard();
       renderPortfolio();
@@ -219,6 +351,45 @@ import Base from '../layouts/Base.astro';
   </script>
 
   <style>
+
+    .mk-title { font-size: clamp(3.2rem, 11vw, 7.5rem); line-height: 0.88; letter-spacing: -0.05em; font-weight: 800; margin: 0 0 10px; }
+    .mk-slogan { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.2rem, 3vw, 1.8rem); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 12px;
+      background: var(--holo); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 8s linear infinite; }
+    .stats { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); margin-bottom: 24px; }
+    @media (min-width: 900px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+    .stat-box { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+    .sb-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+    .sb-value { font-family: var(--font-display); font-size: clamp(1.4rem, 3.5vw, 1.9rem); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .breadth-bar { height: 6px; border-radius: 99px; background: rgba(255, 90, 122, 0.55); overflow: hidden; margin-top: 4px; }
+    .breadth-bar span { display: block; height: 100%; background: var(--up); border-radius: 99px; transition: width 0.6s; }
+    .chart-panel { margin-bottom: 28px; scroll-margin-top: 90px; background: radial-gradient(circle at 100% 0%, rgba(62, 240, 255, 0.08), transparent 50%), var(--surface); }
+    .cp-head { display: flex; justify-content: space-between; gap: 14px; align-items: start; flex-wrap: wrap; margin-bottom: 10px; }
+    .cp-head h2 { margin: 0 0 2px; font-size: clamp(1.4rem, 3.5vw, 2rem); letter-spacing: -0.02em; }
+    .cp-head p { margin: 0; }
+    .cp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .cp-chart { width: 100%; margin: 6px 0 14px; }
+    .cp-facts { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .cp-facts :global(.fact) { display: flex; flex-direction: column; padding: 10px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); min-width: 120px; }
+    .cp-facts :global(.f-label) { font-size: 0.75rem; color: var(--muted); }
+    .cp-facts :global(.f-value) { font-weight: 800; font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+    .sec-title { font-size: clamp(1.8rem, 5vw, 3rem); letter-spacing: -0.035em; font-weight: 800; line-height: 1; margin: 0 0 8px; }
+    .heat { margin-bottom: 28px; }
+    .heat-grid { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); grid-auto-rows: 86px; grid-auto-flow: dense; margin-top: 14px; }
+    .heat-grid :global(.heat-cell) { display: flex; flex-direction: column; justify-content: space-between; padding: 10px; border-radius: 12px; text-decoration: none; color: var(--text); border: 1px solid rgba(255, 255, 255, 0.08); transition: transform 0.15s, border-color 0.15s; min-width: 0; }
+    .heat-grid :global(.heat-cell:hover) { transform: scale(1.02); border-color: rgba(255, 255, 255, 0.35); }
+    .heat-grid :global(.heat-cell.l) { grid-column: span 2; }
+    .heat-grid :global(.heat-cell.xl) { grid-column: span 2; grid-row: span 2; }
+    .heat-grid :global(.hc-name) { font-weight: 700; font-size: 0.85rem; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .heat-grid :global(.heat-cell.xl .hc-name) { font-size: 1.1rem; }
+    .heat-grid :global(.hc-chg) { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; }
+    .heat-grid :global(.heat-cell.xl .hc-chg) { font-size: 2rem; letter-spacing: -0.03em; }
+    .heat-grid :global(.hc-price) { font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-variant-numeric: tabular-nums; }
+    .table :global(.row-graph) {
+      position: absolute; right: 56px; top: 50%; transform: translateY(-50%); z-index: 2;
+      width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: rgba(7, 6, 13, 0.75); color: var(--muted); cursor: pointer; display: grid; place-items: center;
+    }
+    .table :global(.row-graph:hover) { color: var(--cyan); border-color: rgba(62, 240, 255, 0.5); }
+    .table :global(.row-graph svg) { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.75rem; color: var(--cyan); margin: 0 0 6px; font-weight: 700; }
     .mk-head { display: grid; gap: 24px; grid-template-columns: 1fr; padding: 20px 0 24px; align-items: end; }
     @media (min-width: 900px) { .mk-head { grid-template-columns: 1fr 400px; } }
@@ -274,7 +445,7 @@ import Base from '../layouts/Base.astro';
       padding: 10px 14px; border-top: 1px solid var(--line); text-decoration: none; color: var(--text);
     }
     .table :global(.row-wrap) { position: relative; }
-    .table :global(.row-wrap .tr), .table .th { padding-right: 58px; }
+    .table :global(.row-wrap .tr), .table .th { padding-right: 104px; }
     .table :global(.row-fav) { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
     .table .th { border-top: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; background: var(--surface); }
     .table :global(a.tr:hover) { background: var(--surface); }
@@ -282,7 +453,7 @@ import Base from '../layouts/Base.astro';
     .table :global(.price) { font-weight: 700; }
     .table :global(.chart-col) { display: flex; justify-content: flex-end; }
     @media (max-width: 640px) {
-      .table :global(.tr) { grid-template-columns: 1fr 76px 64px; padding: 10px 52px 10px 10px; }
+      .table :global(.tr) { grid-template-columns: 1fr 76px 64px; padding: 10px 98px 10px 10px; }
       .table :global(.tr > :nth-child(3)), .table :global(.chart-col) { display: none; }
     }
     :global(.card-cell) { display: flex; align-items: center; gap: 10px; min-width: 0; }

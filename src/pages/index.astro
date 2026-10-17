@@ -1,37 +1,37 @@
 ---
 import Base from '../layouts/Base.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
 ---
 <Base title="HoloCote" active="home">
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 
   <section class="hero">
     <div class="hero-text">
-      <p class="eyebrow"><span class="dot"></span>La bourse de tes cartes</p>
-      <h1>Ta collection a de la valeur.<br /><span class="holo-text">Découvre combien.</span></h1>
-      <p class="lead">Scanne tes cartes, suis leur cote comme en bourse et construis ton classeur. Gratuit, sans compte, en français.</p>
+      <h1 class="mega"><span>Tes cartes</span><span>valent</span><span class="foil">de l'or.</span></h1>
+      <p class="lead">Scanne-les, suis leur cote comme à la bourse et garde l'œil sur celles que tu chasses. Gratuit, sans compte, sans pub.</p>
 
       <form class="hero-search" action={`${base}/recherche/`} method="get" role="search">
         <label class="sr-only" for="hq">Nom de la carte</label>
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-        <input id="hq" name="q" type="search" placeholder="Dracaufeu, Pikachu, Noctali…" minlength="2" required autocomplete="off" />
+        <input id="hq" name="q" type="search" placeholder="Cherche une carte…" minlength="2" required autocomplete="off" />
         <input type="hidden" name="lang" value="fr" />
-        <button class="btn btn-primary" type="submit">Chercher</button>
+        <button class="go" type="submit" aria-label="Chercher">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </button>
       </form>
 
       <div class="cta">
-        <a class="btn btn-primary btn-lg" href={`${base}/scanner/`}>
+        <a class="btn btn-primary btn-xl" href={`${base}/scanner/`}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" /></svg>
-          Scanner une carte
+          Scanner ma carte
         </a>
-        <a class="btn btn-lg" href={`${base}/marche/`}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6" /></svg>
-          Voir le marché
-        </a>
+        <a class="btn btn-ghost btn-xl" href={`${base}/marche/`}>Voir le marché</a>
       </div>
     </div>
 
-    <div class="showcase" id="showcase" aria-hidden="true">
+    <div class="showcase" aria-hidden="true">
+      <div class="halo"></div>
       <div class="fan">
         <div class="fan-card c1"><div class="ph"></div></div>
         <div class="fan-card c2"><div class="ph"></div></div>
@@ -44,81 +44,93 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
   <div class="ticker-slot" id="ticker-slot"></div>
 
-  <section class="stats-band">
-    <div><strong>FR &amp; EN</strong><span>des milliers de cartes</span></div>
-    <div><strong>Cardmarket</strong><span>cotes mises à jour chaque jour</span></div>
-    <div><strong>0 compte</strong><span>ta collection reste chez toi</span></div>
-    <div><strong>100 % gratuit</strong><span>sans publicité</span></div>
-  </section>
-
-  <section class="features">
-    <a class="feature f-scan" href={`${base}/scanner/`}>
-      <span class="f-icon"><svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" /></svg></span>
-      <h2>Scanner</h2>
-      <p>Vise ta carte avec ton téléphone : nom, PV, numéro et illustration sont analysés pour la reconnaître.</p>
-      <span class="f-link">Essayer →</span>
-    </a>
-    <a class="feature f-market" href={`${base}/marche/`}>
-      <span class="f-icon"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6" /></svg></span>
-      <h2>Marché</h2>
-      <p>Hausses, baisses, indice HoloCote : le cours des cartes les plus recherchées, comme à la bourse.</p>
-      <span class="f-link">Voir les cours →</span>
-    </a>
-    <a class="feature f-fav" href={`${base}/favoris/`}>
-      <span class="f-icon"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg></span>
-      <h2>Favoris</h2>
-      <p>Mets une étoile sur les cartes que tu convoites et vois si leur cours monte ou descend.</p>
-      <span class="f-link">Mes favoris →</span>
-    </a>
-    <a class="feature f-coll" href={`${base}/collection/`}>
-      <span class="f-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" /></svg></span>
-      <h2>Collection</h2>
-      <p>Un classeur stylé avec la valeur totale de tes cartes, ta pépite et des filtres par rareté.</p>
-      <span class="f-link">Ouvrir mon classeur →</span>
-    </a>
-  </section>
-
-  <section class="trends" id="trends" hidden>
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">En ce moment</p>
-        <h2>Les cartes qui <span class="holo-text">montent</span></h2>
-      </div>
-      <a class="btn" href={`${base}/marche/`}>Tout le marché</a>
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      {[0, 1].map(() => words.map((w) => <span>{w}<i>✦</i></span>))}
     </div>
-    <div class="trend-grid" id="trend-grid"></div>
+  </div>
+
+  <section class="bento">
+    <a class="tile t-scan" href={`${base}/scanner/`}>
+      <div class="scan-visual" aria-hidden="true">
+        <div class="sv-card">
+          <div class="sv-line"></div>
+          <span class="sv-chip c-a">Dracaufeu ex</span>
+          <span class="sv-chip c-b">330 PV</span>
+          <span class="sv-chip c-c">125/197</span>
+        </div>
+      </div>
+      <div class="tile-copy">
+        <h2>Vise.<br />C'est coté.</h2>
+        <p>Le scanner lit le nom, les PV et le numéro de ta carte, compare l'illustration et te donne sa cote en quelques secondes.</p>
+        <span class="tile-link">Ouvrir le scanner</span>
+      </div>
+    </a>
+
+    <a class="tile t-market" href={`${base}/marche/`}>
+      <h2>La bourse<br />des cartes.</h2>
+      <div class="mini-index">
+        <span class="mi-value" id="mi-value">—</span>
+        <span class="mi-chg" id="mi-chg"></span>
+      </div>
+      <div class="mi-chart" id="mi-chart"></div>
+      <span class="tile-link">Indice HoloCote</span>
+    </a>
+
+    <a class="tile t-alert" href={`${base}/favoris/`}>
+      <h2>Ne rate<br />aucune hausse.</h2>
+      <div class="alert-demo" aria-hidden="true">
+        <span class="ad-bell"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4" /></svg></span>
+        <span class="ad-text"><strong id="ad-name">Noctali VMAX</strong><span id="ad-chg" class="up">a passé ton seuil</span></span>
+      </div>
+      <p>Mets une étoile, fixe un prix cible : HoloCote te prévient.</p>
+    </a>
+
+    <a class="tile t-coll" href={`${base}/collection/`}>
+      <div>
+        <h2>Ton classeur,<br />ta fierté.</h2>
+        <p id="coll-line">Range tes cartes scannées, vois leur valeur totale et ta pépite.</p>
+      </div>
+      <div class="stack" aria-hidden="true"><span></span><span></span><span></span></div>
+    </a>
   </section>
 
-  <section class="steps">
-    <p class="eyebrow">Comment ça marche</p>
-    <h2>Trois gestes, et ta carte est cotée</h2>
-    <ol>
-      <li><span class="step-n">1</span><div><h3>Vise</h3><p>Place ta carte dans le cadre de la caméra, à plat et bien éclairée.</p></div></li>
-      <li><span class="step-n">2</span><div><h3>Vérifie</h3><p>HoloCote te montre la carte reconnue, sa rareté et sa cote du jour.</p></div></li>
-      <li><span class="step-n">3</span><div><h3>Range</h3><p>Ajoute-la à ton classeur et suis la valeur de ta collection.</p></div></li>
-    </ol>
+  <section class="risers" id="risers" hidden>
+    <div class="section-head">
+      <h2 class="big">Ça monte.</h2>
+      <a class="btn btn-ghost" href={`${base}/marche/`}>Tout le marché</a>
+    </div>
+    <div class="riser-grid" id="riser-grid"></div>
   </section>
 
-  <section class="final-cta">
-    <h2>Prêt à découvrir ce que valent tes cartes ?</h2>
-    <a class="btn btn-primary btn-lg" href={`${base}/scanner/`}>Scanner ma première carte</a>
+  <section class="manifesto">
+    <p><span>Pas de compte.</span><span>Pas de pub.</span><span class="foil">Juste tes cartes.</span></p>
+    <p class="m-sub">Ta collection et tes favoris restent dans ton téléphone. Tes photos ne quittent jamais ton appareil.</p>
+  </section>
+
+  <section class="final">
+    <h2>Ta prochaine carte vaut peut-être une fortune.</h2>
+    <a class="btn btn-primary btn-xl" href={`${base}/scanner/`}>Scanner maintenant</a>
   </section>
 
   <script>
-    import { loadMarket, ticker, formatChange, changeClass, type Quote } from '../lib/market';
+    import { loadMarket, ticker, formatChange, changeClass, sparkline, type Quote } from '../lib/market';
     import { formatPrice } from '../lib/tcgdex';
+    import { getItems, countCards } from '../lib/collection';
     import { holoCard, attachTilt, el, url } from '../lib/ui';
 
     const href = (q: Quote) => url(`/carte/?id=${encodeURIComponent(q.id)}&lang=${q.lang}`);
     const eur = (v: number) => formatPrice(v, 'EUR');
     document.querySelectorAll<HTMLElement>('.fan-card').forEach(attachTilt);
 
+    const n = countCards();
+    if (n) document.getElementById('coll-line')!.textContent = `${n} carte${n > 1 ? 's' : ''} dans ton classeur (${getItems().length} différente${getItems().length > 1 ? 's' : ''}). Viens voir ce qu'elles valent.`;
+
     loadMarket().then((m) => {
       const qs = m.quotes;
       if (!qs.length) return;
       document.getElementById('ticker-slot')!.replaceChildren(ticker(qs.filter((q) => q.change7 !== undefined), href, eur));
 
-      // Vitrine : les trois cartes les plus chères qui ont une image.
       const top = [...qs].filter((q) => q.image).sort((a, b) => b.price - a.price).slice(0, 3);
       const slots = [...document.querySelectorAll<HTMLElement>('.fan-card')];
       top.forEach((q, i) => {
@@ -129,63 +141,96 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       const tag = (id: string, q?: Quote) => {
         const t = document.getElementById(id)!;
         if (!q) return;
-        t.replaceChildren(el('span', { class: 'ft-name' }, [q.name]), el('span', { class: `ft-chg ${changeClass(q.change7)}` }, [`${eur(q.price)} · ${formatChange(q.change7)}`]));
+        t.replaceChildren(el('span', { class: 'ft-name' }, [q.name]), el('span', { class: 'ft-price' }, [eur(q.price)]), el('span', { class: `ft-chg ${changeClass(q.change7)}` }, [formatChange(q.change7)]));
         t.hidden = false;
       };
       tag('tag1', top[0]);
       tag('tag2', top[1]);
 
-      // Tendances : plus fortes hausses sur 7 jours.
+      if (m.index) {
+        document.getElementById('mi-value')!.textContent = m.index.value.toFixed(1).replace('.', ',');
+        const c = document.getElementById('mi-chg')!;
+        c.textContent = `${formatChange(m.index.change7)} sur 7 jours`;
+        c.className = `mi-chg ${changeClass(m.index.change7)}`;
+        const withHist = qs.filter((q) => q.avg30);
+        const s = (f: (q: Quote) => number | undefined) => withHist.reduce((t, q) => t + (f(q) ?? q.price), 0);
+        const b = s((q) => q.avg30);
+        if (b) document.getElementById('mi-chart')!.replaceChildren(sparkline([b, s((q) => q.avg7), s((q) => q.price)].map((v) => (v / b) * 100), 260, 70));
+      }
+
+      const mover = [...qs].filter((q) => q.change7 !== undefined).sort((a, b) => Math.abs(b.change7!) - Math.abs(a.change7!))[0];
+      if (mover) {
+        document.getElementById('ad-name')!.textContent = mover.name;
+        const c = document.getElementById('ad-chg')!;
+        c.textContent = `${mover.change7! > 0 ? '▲' : '▼'} ${formatChange(mover.change7)} cette semaine`;
+        c.className = changeClass(mover.change7);
+      }
+
       const up = qs.filter((q) => (q.change7 ?? 0) > 0 && q.image).sort((a, b) => b.change7! - a.change7!).slice(0, 4);
       if (up.length) {
-        document.getElementById('trend-grid')!.replaceChildren(...up.map((q) =>
-          el('a', { class: 'trend', href: href(q) }, [
+        document.getElementById('riser-grid')!.replaceChildren(...up.map((q, i) =>
+          el('a', { class: `riser r${i}`, href: href(q) }, [
             holoCard(q.image, q.name),
-            el('span', { class: 'trend-chg up' }, [`▲ ${formatChange(q.change7)}`]),
-            el('span', { class: 'tile-name' }, [q.name]),
-            el('span', { class: 'tile-meta' }, [`${eur(q.price)} · ${q.setName ?? ''}`]),
+            el('div', { class: 'riser-info' }, [
+              el('span', { class: 'riser-chg up' }, [`▲ ${formatChange(q.change7)}`]),
+              el('span', { class: 'riser-name' }, [q.name]),
+              el('span', { class: 'riser-price' }, [eur(q.price)]),
+            ]),
           ]),
         ));
-        document.getElementById('trends')!.hidden = false;
+        document.getElementById('risers')!.hidden = false;
       }
     }).catch(() => { /* la page reste utilisable sans les cours */ });
   </script>
 
   <style>
     .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-    .aurora span { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); opacity: 0.22; animation: drift 24s ease-in-out infinite alternate; }
+    .aurora span { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); opacity: 0.2; animation: drift 26s ease-in-out infinite alternate; }
     .aurora span:nth-child(1) { background: #3ef0ff; top: -30vmax; left: -20vmax; }
-    .aurora span:nth-child(2) { background: #ff4fd8; top: -10vmax; right: -30vmax; animation-delay: -8s; }
-    .aurora span:nth-child(3) { background: #8a7bff; bottom: -40vmax; left: 20vmax; animation-delay: -16s; opacity: 0.16; }
+    .aurora span:nth-child(2) { background: #ff4fd8; top: -10vmax; right: -30vmax; animation-delay: -9s; }
+    .aurora span:nth-child(3) { background: #8a7bff; bottom: -40vmax; left: 20vmax; animation-delay: -17s; opacity: 0.14; }
     @keyframes drift { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
 
-    .eyebrow { display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.75rem; color: var(--cyan); margin: 0 0 14px; font-weight: 700; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up); box-shadow: 0 0 12px var(--up); }
-
-    .hero { display: grid; gap: 32px; grid-template-columns: 1fr; align-items: center; padding: 28px 0 40px; min-height: min(78vh, 720px); }
-    @media (min-width: 960px) { .hero { grid-template-columns: 1.1fr 0.9fr; } }
-    .hero h1 { font-size: clamp(2.3rem, 6.2vw, 4.4rem); line-height: 1.04; letter-spacing: -0.02em; margin-bottom: 18px; }
-    .lead { font-size: clamp(1.05rem, 2.2vw, 1.25rem); color: var(--muted); max-width: 560px; }
+    /* ---------- Hero ---------- */
+    .hero { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: center; padding: clamp(24px, 5vw, 56px) 0 44px; min-height: min(86vh, 820px); }
+    @media (min-width: 980px) { .hero { grid-template-columns: 1.15fr 0.85fr; } }
+    .mega { display: flex; flex-direction: column; font-size: clamp(3.1rem, 10vw, 7.4rem); line-height: 0.9; letter-spacing: -0.045em; font-weight: 800; margin: 0 0 24px; }
+    .mega span { display: block; }
+    .foil {
+      background: linear-gradient(100deg, #3ef0ff 0%, #8a7bff 25%, #ff4fd8 50%, #ffd25a 75%, #3ef0ff 100%);
+      background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+      animation: foil 6s linear infinite;
+      filter: drop-shadow(0 0 30px rgba(255, 79, 216, 0.25));
+    }
+    @keyframes foil { to { background-position: 200% 0; } }
+    .lead { font-size: clamp(1.05rem, 2.2vw, 1.3rem); color: var(--muted); max-width: 540px; margin-bottom: 26px; }
 
     .hero-search {
-      display: flex; align-items: center; gap: 8px; max-width: 560px; margin: 24px 0 18px;
-      padding: 6px 6px 6px 16px; border-radius: 16px;
-      background: rgba(14, 12, 26, 0.85); border: 1px solid var(--line);
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+      display: flex; align-items: center; gap: 10px; max-width: 560px; margin-bottom: 16px;
+      padding: 7px 7px 7px 18px; border-radius: 999px;
+      background: rgba(14, 12, 26, 0.88); border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.4);
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .hero-search:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(62, 240, 255, 0.15), 0 10px 40px rgba(0, 0, 0, 0.35); }
-    .hero-search svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
-    .hero-search input[type='search'] { border: 0; background: transparent; box-shadow: none; padding: 10px 4px; min-height: 44px; font-size: 1.05rem; }
+    .hero-search:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(62, 240, 255, 0.15), 0 16px 50px rgba(0, 0, 0, 0.4); }
+    .hero-search > svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+    .hero-search input[type='search'] { border: 0; background: transparent; box-shadow: none; padding: 10px 2px; min-height: 46px; font-size: 1.05rem; }
     .hero-search input:focus-visible { box-shadow: none; }
+    .go { width: 48px; height: 48px; flex: 0 0 48px; border: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center; background: var(--holo); background-size: 200% 100%; animation: shimmer 6s linear infinite; }
+    .go svg { width: 22px; height: 22px; fill: none; stroke: #0a0812; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .go:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     .cta { display: flex; gap: 12px; flex-wrap: wrap; }
-    .btn-lg { min-height: 52px; padding: 0 24px; font-size: 1.02rem; border-radius: 14px; }
-    .btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-xl { min-height: 58px; padding: 0 28px; font-size: 1.05rem; border-radius: 999px; }
+    .btn-xl svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-ghost { background: transparent; border: 1px solid rgba(255, 255, 255, 0.22); }
+    .btn-ghost:hover { border-color: var(--text); }
 
-    .showcase { position: relative; height: clamp(320px, 52vw, 520px); }
+    .showcase { position: relative; height: clamp(340px, 54vw, 580px); }
+    .halo { position: absolute; inset: 12%; border-radius: 50%; background: conic-gradient(from 90deg, #3ef0ff, #8a7bff, #ff4fd8, #ffd25a, #3ef0ff); filter: blur(70px); opacity: 0.35; animation: spin 18s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .fan { position: absolute; inset: 0; display: grid; place-items: center; }
     .fan-card {
-      position: absolute; width: clamp(150px, 24vw, 250px); aspect-ratio: 245 / 342; border-radius: 4.5% / 3.2%;
+      position: absolute; width: clamp(160px, 25vw, 270px); aspect-ratio: 245 / 342; border-radius: 4.5% / 3.2%;
       overflow: hidden; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55);
       animation: float 7s ease-in-out infinite;
       background: var(--holo); background-size: 200% 200%;
@@ -193,90 +238,128 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       transform: var(--base) perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
       transition: transform 0.3s ease-out;
     }
+    .fan-card::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s; mix-blend-mode: color-dodge;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.4), transparent 45%),
+        linear-gradient(115deg, transparent 20%, rgba(62, 240, 255, 0.3) 40%, rgba(255, 79, 216, 0.3) 55%, rgba(255, 210, 90, 0.25) 70%, transparent 85%);
+    }
+    .fan-card.is-active::after, .fan-card:hover::after { opacity: 1; }
     .fan-card img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.6s; }
     .fan-card.loaded img { opacity: 1; }
     .fan-card .ph { position: absolute; inset: 6%; border-radius: 6px; background: rgba(7, 6, 13, 0.55); }
-    .fan-card.c1 { --base: translateX(-42%) rotate(-12deg); z-index: 1; animation-delay: -2s; filter: saturate(0.9); }
-    .fan-card.c2 { z-index: 3; animation-delay: 0s; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 79, 216, 0.35); }
-    .fan-card.c3 { --base: translateX(42%) rotate(12deg); z-index: 2; animation-delay: -4s; filter: saturate(0.9); }
-    @keyframes float { 50% { translate: 0 -14px; } }
+    .fan-card.c1 { --base: translateX(-44%) rotate(-13deg); z-index: 1; animation-delay: -2s; }
+    .fan-card.c2 { z-index: 3; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 70px rgba(255, 79, 216, 0.35); }
+    .fan-card.c3 { --base: translateX(44%) rotate(13deg); z-index: 2; animation-delay: -4s; }
+    @keyframes float { 50% { translate: 0 -16px; } }
     .float-tag {
-      position: absolute; z-index: 4; display: flex; flex-direction: column; gap: 2px;
-      padding: 10px 14px; border-radius: 14px; background: rgba(14, 12, 26, 0.85); border: 1px solid var(--line);
+      position: absolute; z-index: 4; display: grid; grid-template-columns: auto auto; gap: 0 10px; align-items: baseline;
+      padding: 12px 16px; border-radius: 16px; background: rgba(14, 12, 26, 0.88); border: 1px solid var(--line);
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
       animation: float 6s ease-in-out infinite;
     }
-    .float-tag.t1 { top: 8%; right: 2%; }
-    .float-tag.t2 { bottom: 10%; left: 0; animation-delay: -3s; }
-    .ft-name { font-weight: 700; font-size: 0.9rem; }
-    .ft-chg { font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-    @media (max-width: 959px) { .showcase { order: -1; height: 300px; } .float-tag { display: none !important; } }
+    .float-tag.t1 { top: 6%; right: 0; }
+    .float-tag.t2 { bottom: 8%; left: -2%; animation-delay: -3s; }
+    .ft-name { grid-column: 1 / -1; font-weight: 700; font-size: 0.9rem; }
+    .ft-price { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; }
+    .ft-chg { font-weight: 700; font-size: 0.85rem; }
+    @media (max-width: 979px) { .showcase { order: -1; height: 320px; } .float-tag { display: none !important; } }
 
-    .ticker-slot { margin: 0 -16px 36px; min-height: 42px; }
+    .ticker-slot { margin: 0 -16px; min-height: 42px; }
 
-    .stats-band {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin-bottom: 48px;
-      border-radius: 20px; overflow: hidden; background: var(--line); border: 1px solid var(--line);
+    /* ---------- Bandeau géant ---------- */
+    .marquee { overflow: hidden; margin: 18px -16px 56px; padding: 6px 0; }
+    .marquee-track { display: inline-flex; white-space: nowrap; animation: marquee 40s linear infinite; }
+    .marquee span {
+      font-family: var(--font-display); font-weight: 800; font-size: clamp(3.2rem, 11vw, 8.5rem); line-height: 1; letter-spacing: -0.04em;
+      color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.28); padding-right: 0.3em;
     }
-    @media (min-width: 820px) { .stats-band { grid-template-columns: repeat(4, 1fr); } }
-    .stats-band div { background: var(--bg-2); padding: 18px; display: flex; flex-direction: column; gap: 2px; }
-    .stats-band strong { font-family: var(--font-display); font-size: 1.15rem; }
-    .stats-band span { color: var(--muted); font-size: 0.85rem; }
+    .marquee span:nth-child(4n + 2) { -webkit-text-stroke-color: rgba(62, 240, 255, 0.6); }
+    .marquee span:nth-child(4n + 3) { -webkit-text-stroke-color: rgba(255, 79, 216, 0.6); }
+    .marquee i { font-style: normal; color: var(--gold); -webkit-text-stroke: 0; font-size: 0.4em; vertical-align: middle; margin-left: 0.3em; }
+    @keyframes marquee { to { transform: translateX(-50%); } }
 
-    .features { display: grid; gap: 16px; grid-template-columns: 1fr; margin-bottom: 56px; }
-    @media (min-width: 640px) { .features { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 1100px) { .features { grid-template-columns: repeat(4, 1fr); } }
-    .feature {
-      position: relative; display: flex; flex-direction: column; gap: 10px; padding: 26px; border-radius: 22px;
-      text-decoration: none; color: var(--text); overflow: hidden;
-      background: var(--surface); border: 1px solid var(--line);
-      transition: transform 0.25s, border-color 0.25s;
+    /* ---------- Bento ---------- */
+    .bento { display: grid; gap: 16px; grid-template-columns: 1fr; margin-bottom: 72px; }
+    @media (min-width: 900px) {
+      .bento { grid-template-columns: 1.3fr 1fr 1fr; grid-template-rows: auto auto; }
+      .t-scan { grid-row: span 2; }
+      .t-coll { grid-column: span 2; }
     }
-    .feature::before {
-      content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; opacity: 0; transition: opacity 0.3s;
-      background: var(--holo); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+    .tile {
+      position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
+      padding: clamp(22px, 3vw, 32px); border-radius: 28px; text-decoration: none; color: var(--text);
+      background: var(--surface); border: 1px solid var(--line); transition: border-color 0.3s, transform 0.3s;
     }
-    .feature:hover { transform: translateY(-4px); }
-    .feature:hover::before { opacity: 1; }
-    .feature h2 { margin: 6px 0 0; font-size: 1.35rem; }
-    .feature p { color: var(--muted); margin: 0; flex: 1; }
-    .f-icon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; }
-    .f-icon svg { width: 26px; height: 26px; fill: none; stroke: #0a0812; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .f-scan .f-icon { background: linear-gradient(135deg, var(--cyan), #8a7bff); }
-    .f-market .f-icon { background: linear-gradient(135deg, var(--up), var(--cyan)); }
-    .f-coll .f-icon { background: linear-gradient(135deg, var(--magenta), var(--gold)); }
-    .f-fav .f-icon { background: linear-gradient(135deg, var(--gold), #ffb35a); }
-    .f-link { font-weight: 700; color: var(--cyan); }
+    .tile:hover { border-color: rgba(255, 255, 255, 0.28); transform: translateY(-3px); }
+    .tile:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+    .tile h2 { font-size: clamp(1.8rem, 3.6vw, 2.7rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; margin: 0; }
+    .tile p { color: var(--muted); margin: 0; max-width: 440px; }
+    .tile-link { font-weight: 700; color: var(--cyan); margin-top: auto; }
 
-    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
-    .section-head h2 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.2rem); }
-    .trends { margin-bottom: 56px; }
-    .trend-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, 1fr); }
-    @media (min-width: 820px) { .trend-grid { grid-template-columns: repeat(4, 1fr); } }
-    .trend-grid :global(.trend) { position: relative; display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--text); }
-    .trend-grid :global(.trend-chg) {
-      position: absolute; top: 10px; right: 10px; z-index: 2; padding: 4px 10px; border-radius: 999px;
-      background: rgba(7, 6, 13, 0.8); border: 1px solid rgba(61, 255, 168, 0.4); font-weight: 700; font-size: 0.85rem;
-      backdrop-filter: blur(6px);
+    .t-scan { background: radial-gradient(circle at 50% 30%, rgba(62, 240, 255, 0.14), transparent 60%), var(--surface); min-height: 520px; }
+    .scan-visual { flex: 1; display: grid; place-items: center; min-height: 260px; }
+    .sv-card {
+      position: relative; width: min(190px, 46%); aspect-ratio: 245 / 342; border-radius: 12px;
+      background: linear-gradient(160deg, #1b1830, #0f0d1d); border: 2px solid rgba(62, 240, 255, 0.55);
+      box-shadow: 0 0 0 9999px rgba(7, 6, 13, 0), 0 0 40px rgba(62, 240, 255, 0.25);
     }
+    .sv-card::before { content: ''; position: absolute; inset: 9% 8% 46%; border-radius: 6px; background: linear-gradient(135deg, rgba(255, 79, 216, 0.5), rgba(255, 210, 90, 0.4)); }
+    .sv-line { position: absolute; left: -8%; right: -8%; height: 3px; top: 0; background: var(--holo); box-shadow: 0 0 18px var(--magenta); animation: sweep 2.6s ease-in-out infinite alternate; }
+    @keyframes sweep { to { top: 100%; } }
+    .sv-chip {
+      position: absolute; white-space: nowrap; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem;
+      background: rgba(14, 12, 26, 0.92); border: 1px solid rgba(61, 255, 168, 0.5); color: var(--up);
+    }
+    .c-a { top: 2%; left: 70%; }
+    .c-b { top: 40%; right: 78%; }
+    .c-c { bottom: 4%; left: 72%; }
 
-    .steps { margin-bottom: 56px; }
-    .steps h2 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin-bottom: 22px; }
-    .steps ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: 1fr; }
-    @media (min-width: 820px) { .steps ol { grid-template-columns: repeat(3, 1fr); } }
-    .steps li { display: flex; gap: 16px; padding: 20px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
-    .steps h3 { margin: 2px 0 4px; }
-    .steps p { margin: 0; color: var(--muted); }
-    .step-n {
-      flex: 0 0 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
-      font-family: var(--font-display); font-weight: 700; color: #0a0812; background: var(--holo);
-    }
+    .t-market { background: radial-gradient(circle at 80% 0%, rgba(61, 255, 168, 0.12), transparent 60%), var(--surface); }
+    .mini-index { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .mi-value { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; letter-spacing: -0.03em; }
+    .mi-chg { font-weight: 700; }
+    .mi-chart :global(svg) { width: 100%; height: 70px; }
 
-    .final-cta {
-      text-align: center; padding: 48px 20px; border-radius: 28px; margin-bottom: 24px;
-      background: radial-gradient(circle at 50% 0%, rgba(255, 79, 216, 0.22), transparent 60%), radial-gradient(circle at 50% 100%, rgba(62, 240, 255, 0.18), transparent 60%), var(--bg-2);
-      border: 1px solid var(--line);
+    .t-alert { background: radial-gradient(circle at 0% 100%, rgba(255, 210, 90, 0.14), transparent 60%), var(--surface); }
+    .alert-demo { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 16px; background: rgba(7, 6, 13, 0.6); border: 1px solid rgba(255, 210, 90, 0.35); }
+    .ad-bell { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 12px; display: grid; place-items: center; background: var(--gold); animation: ring 3s ease-in-out infinite; }
+    .ad-bell svg { width: 20px; height: 20px; fill: none; stroke: #0a0812; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    @keyframes ring { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(14deg); } 93% { transform: rotate(-12deg); } 96% { transform: rotate(6deg); } }
+    .ad-text { display: flex; flex-direction: column; font-size: 0.9rem; }
+
+    .t-coll { flex-direction: row; justify-content: space-between; align-items: center; gap: 24px; background: radial-gradient(circle at 100% 50%, rgba(255, 79, 216, 0.14), transparent 55%), var(--surface); }
+    .stack { position: relative; width: 150px; height: 150px; flex: 0 0 150px; }
+    .stack span { position: absolute; top: 10px; left: 40px; width: 74px; height: 104px; border-radius: 9px; background: var(--holo); background-size: 200% 200%; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
+    .stack span:nth-child(1) { transform: rotate(-16deg) translateX(-26px); opacity: 0.5; }
+    .stack span:nth-child(2) { transform: rotate(-4deg); opacity: 0.75; }
+    .stack span:nth-child(3) { transform: rotate(10deg) translateX(26px); }
+    @media (max-width: 560px) { .stack { display: none; } }
+
+    /* ---------- Ça monte ---------- */
+    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+    .big { font-size: clamp(3rem, 9vw, 6.5rem); line-height: 0.9; letter-spacing: -0.045em; font-weight: 800; margin: 0; }
+    .risers { margin-bottom: 80px; }
+    .riser-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, 1fr); }
+    @media (min-width: 900px) { .riser-grid { grid-template-columns: repeat(4, 1fr); } }
+    .riser-grid :global(.riser) { display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: var(--text); }
+    .riser-grid :global(.riser-info) { display: flex; flex-direction: column; gap: 2px; }
+    .riser-grid :global(.riser-chg) { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.3rem, 2.6vw, 1.8rem); letter-spacing: -0.02em; }
+    .riser-grid :global(.riser-name) { font-weight: 700; }
+    .riser-grid :global(.riser-price) { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* ---------- Manifeste ---------- */
+    .manifesto { padding: clamp(40px, 8vw, 90px) 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 72px; }
+    .manifesto p:first-child { display: flex; flex-direction: column; font-family: var(--font-display); font-weight: 800; font-size: clamp(2.4rem, 8vw, 6rem); line-height: 0.95; letter-spacing: -0.045em; margin: 0 0 22px; }
+    .m-sub { color: var(--muted); font-size: 1.1rem; max-width: 560px; margin: 0; }
+
+    /* ---------- Fin ---------- */
+    .final { text-align: center; padding: clamp(40px, 8vw, 80px) 16px; border-radius: 36px; margin-bottom: 30px; position: relative; overflow: hidden;
+      background: radial-gradient(circle at 50% 0%, rgba(255, 79, 216, 0.25), transparent 60%), radial-gradient(circle at 50% 100%, rgba(62, 240, 255, 0.2), transparent 60%), var(--bg-2);
+      border: 1px solid var(--line); }
+    .final h2 { font-size: clamp(2rem, 6vw, 4.2rem); line-height: 0.98; letter-spacing: -0.04em; font-weight: 800; max-width: 900px; margin: 0 auto 28px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .marquee-track, .halo, .foil, .sv-line, .ad-bell { animation: none !important; }
     }
-    .final-cta h2 { font-size: clamp(1.5rem, 4vw, 2.3rem); max-width: 640px; margin: 0 auto 22px; }
   </style>
 </Base>

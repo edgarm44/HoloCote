@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Logo from '../components/Logo.astro';
 
 interface Props {
   title: string;
@@ -26,8 +27,7 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
     <header class="site-header">
       <div class="bar">
         <a class="logo" href={`${base}/`} aria-label="HoloCote, accueil">
-          <span class="logo-mark" aria-hidden="true"></span>
-          <span class="holo-text">HoloCote</span>
+          <Logo />
         </a>
         <nav aria-label="Navigation principale">
           <a href={`${base}/`} aria-current={active === 'home' ? 'page' : undefined}>
@@ -83,7 +83,7 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
     <script>
       import { countCards } from '../lib/collection';
       import { countFavorites, onFavoritesChange } from '../lib/favorites';
-      import { checkAlerts, currentAlerts, onAlertsChange } from '../lib/alerts';
+      import { checkAlerts, currentAlerts, onAlertsChange, alertText } from '../lib/alerts';
       const favBadge = document.getElementById('fav-count');
       const refreshFav = () => {
         const n = countFavorites();
@@ -103,10 +103,10 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         try { dismissed = sessionStorage.getItem('holocote.alerts.dismissed') === '1'; } catch { /* rien */ }
         if (!alerts.length || onFavPage || dismissed) { banner.hidden = true; return; }
         const a = alerts[0];
-        const sign = a.pct > 0 ? '▲ +' : '▼ ';
-        const more = alerts.length > 1 ? ` et ${alerts.length - 1} autre${alerts.length > 2 ? 's' : ''}` : '';
-        document.getElementById('alert-text')!.textContent = `${a.name} : ${sign}${a.pct.toFixed(0)} %${more} depuis ta dernière alerte`;
-        banner.dataset.dir = a.pct > 0 ? 'up' : 'down';
+        const fmt = (v: number, u: 'EUR' | 'USD') => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: u, maximumFractionDigits: v < 100 ? 2 : 0 }).format(v);
+        const more = alerts.length > 1 ? ` (+${alerts.length - 1} autre${alerts.length > 2 ? 's' : ''})` : '';
+        document.getElementById('alert-text')!.textContent = alertText(a, fmt) + more;
+        banner.dataset.dir = a.kind === 'below' ? 'down' : a.kind === 'above' ? 'up' : a.pct > 0 ? 'up' : 'down';
         banner.hidden = false;
       };
       document.getElementById('alert-close')!.addEventListener('click', () => {

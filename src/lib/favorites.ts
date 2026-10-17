@@ -17,6 +17,8 @@ export interface Favorite extends FavoriteInfo {
   lang: Lang;
   addedAt: number;
   refPrice?: number;        // cours de référence des alertes (dernière alerte vue), sinon priceAtAdd
+  targetBelow?: number;     // alerte si le cours descend à ce prix ou moins
+  targetAbove?: number;     // alerte si le cours monte à ce prix ou plus
 }
 
 const KEY = 'holocote.favorites.v1';
@@ -60,6 +62,11 @@ export function setRefPrices(prices: { cardId: string; lang: Lang; price: number
     return p ? { ...f, refPrice: p.price } : f;
   });
   save(list);
+}
+
+/** Prix cibles d'une carte (undefined = pas de cible). */
+export function setTargets(cardId: string, lang: Lang, t: { below?: number; above?: number }) {
+  save(load().map((f) => (same(f, cardId, lang) ? { ...f, targetBelow: t.below, targetAbove: t.above } : f)));
 }
 
 /** Prévient quand les favoris changent (dans cet onglet ou un autre). */
@@ -135,6 +142,8 @@ function validate(data: unknown): Favorite[] {
       priceAtAdd: typeof r.priceAtAdd === 'number' && r.priceAtAdd > 0 ? r.priceAtAdd : undefined,
       unit: r.unit === 'USD' ? 'USD' : r.unit === 'EUR' ? 'EUR' : undefined,
       refPrice: typeof r.refPrice === 'number' && r.refPrice > 0 ? r.refPrice : undefined,
+      targetBelow: typeof r.targetBelow === 'number' && r.targetBelow > 0 ? r.targetBelow : undefined,
+      targetAbove: typeof r.targetAbove === 'number' && r.targetAbove > 0 ? r.targetAbove : undefined,
       addedAt: typeof r.addedAt === 'number' ? r.addedAt : Date.now(),
     });
   }

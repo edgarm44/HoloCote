@@ -271,3 +271,16 @@ input:focus-visible, select:focus-visible {
 .tile-wrap { position: relative; }
 .tile-fav { position: absolute; top: 8px; right: 8px; z-index: 3; }
 
+
+/* Grand graphique du marché */
+.big-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.big-chart .bc-grid { stroke: rgba(255, 255, 255, 0.07); stroke-width: 1; }
+.big-chart .bc-line { fill: none; stroke-width: 3.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.big-chart .bc-line.up { stroke: var(--up); } .big-chart .bc-line.down { stroke: var(--down); } .big-chart .bc-line.flat { stroke: var(--cyan); }
+.big-chart .bc-stop-a { stop-opacity: 0.32; } .big-chart .bc-stop-a.up { stop-color: var(--up); } .big-chart .bc-stop-a.down { stop-color: var(--down); } .big-chart .bc-stop-a.flat { stop-color: var(--cyan); }
+.big-chart .bc-stop-b { stop-color: #000; stop-opacity: 0; }
+.big-chart .bc-dot { stroke: var(--bg); stroke-width: 3; }
+.big-chart .bc-dot.up { fill: var(--up); } .big-chart .bc-dot.down { fill: var(--down); } .big-chart .bc-dot.flat { fill: var(--cyan); }
+.big-chart .bc-dot.last { filter: drop-shadow(0 0 8px currentColor); }
+.big-chart .bc-val { fill: var(--text); font: 700 15px var(--font-display); }
+.big-chart .bc-lab { fill: var(--muted); font: 600 13px var(--font-body); }

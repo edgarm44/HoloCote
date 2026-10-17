@@ -2,98 +2,98 @@
 import Base from '../layouts/Base.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<Base title="Mes favoris" active="favorites" description="Les cartes que tu suis : cours, hausse ou baisse, performance depuis que tu les as ajoutées.">
-  <section class="fv-head">
-    <div>
-      <p class="eyebrow">Ma liste de suivi</p>
-      <h1>Mes <span class="holo-text">favoris</span></h1>
-      <p class="muted">Les cartes que tu surveilles : leur cours, si elles montent ou descendent, et leur évolution depuis que tu les as ajoutées.</p>
+<Base title="Ma chasse" active="favorites" description="Les cartes que tu veux : leur cours, tes prix cibles et des alertes quand c'est le bon moment.">
+  <section class="fv-hero">
+    <h1>Ta chasse.</h1>
+    <p class="fv-slogan">Les cartes que tu veux. Le bon moment pour les avoir.</p>
+    <p class="muted fv-lead">Mets une étoile sur une carte, fixe ton prix cible : HoloCote surveille son cours et te prévient dès qu'elle passe sous ton prix.</p>
+  </section>
+
+  <div id="empty" class="empty" hidden>
+    <div class="empty-star" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg></div>
+    <h2>Ta chasse commence ici</h2>
+    <p class="muted">Touche l'étoile d'une carte dans la recherche, sur sa fiche ou au Marché pour la suivre ici.</p>
+    <div class="empty-actions">
+      <a class="btn btn-primary" href={`${base}/marche/`}>Parcourir le marché</a>
+      <a class="btn" href={`${base}/recherche/`}>Chercher une carte</a>
     </div>
-    <div class="fv-stats" id="stats" hidden>
-      <div class="stat">
-        <span class="stat-label">Cartes suivies</span>
-        <span class="stat-value" id="st-count">0</span>
+  </div>
+
+  <section class="goal" id="goal" hidden>
+    <div class="goal-main">
+      <span class="g-label">Budget pour toute ta chasse</span>
+      <span class="g-value" id="g-budget">—</span>
+      <span class="g-sub" id="g-budget-sub"></span>
+      <div class="g-bar"><span id="g-bar-fill"></span></div>
+      <span class="g-sub" id="g-fund"></span>
+    </div>
+    <div class="goal-side">
+      <div class="g-card">
+        <span class="g-label">Déjà dans ton classeur</span>
+        <span class="g-mid" id="g-owned">—</span>
       </div>
-      <div class="stat">
-        <span class="stat-label">Valeur (1 de chaque)</span>
-        <span class="stat-value" id="st-value">—</span>
+      <div class="g-card">
+        <span class="g-label">Bonne affaire du moment</span>
+        <span class="g-mid" id="g-deal">—</span>
+        <span class="g-sub" id="g-deal-sub"></span>
       </div>
-      <div class="stat">
-        <span class="stat-label">Depuis l'ajout</span>
-        <span class="stat-value" id="st-since">—</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Tendance 7 j</span>
-        <span class="stat-value" id="st-7">—</span>
+      <div class="g-card">
+        <span class="g-label">La plus abordable</span>
+        <span class="g-mid" id="g-cheap">—</span>
+        <span class="g-sub" id="g-cheap-sub"></span>
       </div>
     </div>
   </section>
 
-
-  <section class="wallet" id="wallet" hidden>
-    <div class="wallet-head">
-      <p class="eyebrow">Mon portefeuille</p>
-      <h2>Si je vendais tout aujourd'hui</h2>
-    </div>
-    <div class="wallet-grid">
-      <div class="panel wcard" id="w-coll">
-        <span class="w-label">Ma collection</span>
-        <span class="w-value" data-w="value">—</span>
-        <span class="w-sub" data-w="quick"></span>
-        <span class="w-sub" data-w="count"></span>
-      </div>
-      <div class="panel wcard" id="w-fav">
-        <span class="w-label">Mes favoris (1 de chaque)</span>
-        <span class="w-value" data-w="value">—</span>
-        <span class="w-sub" data-w="quick"></span>
-        <span class="w-sub" data-w="count"></span>
-      </div>
-    </div>
-    <p class="muted small">Valeur estimée = cote du jour × état × quantité. « Vente rapide » = prix le plus bas constaté sur Cardmarket : ce que tu obtiendrais en vendant vite. Avant frais de vente et d'envoi.</p>
-  </section>
-
-  <section class="panel alerts" id="alertes">
+  <section class="alerts" id="alertes" hidden>
     <div class="al-head">
       <div>
-        <h2>Alertes de prix</h2>
-        <p class="muted small">Quand un favori monte ou baisse au-delà de ton seuil, une alerte s'affiche dès que tu viens sur HoloCote. Sans e-mail ni compte : tout reste dans ton navigateur.</p>
+        <h2>Centre d'alertes</h2>
+        <p class="muted small" id="al-status"></p>
       </div>
-      <label class="switch">
-        <input type="checkbox" id="al-on" />
-        <span>Activées</span>
-      </label>
-    </div>
-    <div class="al-settings">
-      <div class="field">
-        <label for="al-th">Seuil</label>
-        <select id="al-th">
-          <option value="5">± 5 %</option>
-          <option value="10">± 10 %</option>
-          <option value="20">± 20 %</option>
-          <option value="50">± 50 %</option>
-        </select>
+      <div class="al-actions">
+        <button class="btn" type="button" id="al-check">Vérifier maintenant</button>
+        <button class="btn" type="button" id="al-notify" hidden>Activer les notifications</button>
       </div>
-      <div class="field">
-        <label for="al-dir">Me prévenir</label>
-        <select id="al-dir">
-          <option value="both">Hausse et baisse</option>
-          <option value="up">Seulement en hausse</option>
-          <option value="down">Seulement en baisse</option>
-        </select>
-      </div>
-      <button class="btn" type="button" id="al-check">Vérifier maintenant</button>
     </div>
     <div id="al-list" class="al-list"></div>
+    <details class="al-settings">
+      <summary>Réglages des alertes</summary>
+      <div class="al-grid">
+        <label class="switch"><input type="checkbox" id="al-on" /><span>Alertes activées</span></label>
+        <div class="field">
+          <label for="al-th">Prévenir si une carte bouge de</label>
+          <select id="al-th">
+            <option value="0">Jamais (seulement mes prix cibles)</option>
+            <option value="5">± 5 %</option>
+            <option value="10">± 10 %</option>
+            <option value="20">± 20 %</option>
+            <option value="50">± 50 %</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="al-dir">Dans quel sens</label>
+          <select id="al-dir">
+            <option value="both">Hausse et baisse</option>
+            <option value="up">Seulement en hausse</option>
+            <option value="down">Seulement en baisse</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted small">Les cours sont vérifiés à chaque visite (au plus toutes les 30 minutes). Les notifications s'affichent tant qu'un onglet HoloCote est ouvert. Aucun e-mail n'est demandé : tout reste dans ton navigateur.</p>
+    </details>
   </section>
 
   <div class="fv-bar" id="bar" hidden>
     <div class="chips" role="group" aria-label="Filtrer">
       <button type="button" data-f="all" aria-pressed="true">Toutes</button>
+      <button type="button" data-f="target" aria-pressed="false">Avec prix cible</button>
       <button type="button" data-f="up" aria-pressed="false">▲ En hausse</button>
       <button type="button" data-f="down" aria-pressed="false">▼ En baisse</button>
     </div>
     <label class="sr-only" for="sort">Trier</label>
     <select id="sort">
+      <option value="target">Plus proches de ma cible</option>
       <option value="since">Depuis l'ajout</option>
       <option value="change7">Variation 7 j</option>
       <option value="price">Cours</option>
@@ -102,119 +102,178 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     </select>
   </div>
 
-  <div id="list" class="fv-list" aria-live="polite"></div>
+  <div id="list" class="watch-grid" aria-live="polite"></div>
   <p id="no-match" class="muted" hidden>Aucune carte ne correspond à ce filtre.</p>
 
-  <div id="empty" class="empty" hidden>
-    <div class="empty-star" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg>
-    </div>
-    <h2>Aucun favori pour l'instant</h2>
-    <p class="muted">Touche l'étoile sur une carte (dans la recherche, sur sa fiche ou au Marché) pour suivre son cours ici.</p>
-    <div class="empty-actions">
-      <a class="btn btn-primary" href={`${base}/marche/`}>Parcourir le marché</a>
-      <a class="btn" href={`${base}/recherche/`}>Chercher une carte</a>
-    </div>
-  </div>
-
   <p class="notice">
-    Cours = cote HoloCote (médiane des repères Cardmarket, version normale, toutes langues et tous états confondus). « Depuis l'ajout » compare le cours actuel à celui du jour où tu as ajouté la carte.
-    Variation 7 j = moyenne des 7 derniers jours comparée à celle des 30 jours. Ce n'est pas un conseil d'investissement.
+    Cours = cote HoloCote (médiane des repères Cardmarket, version normale, toutes langues et tous états confondus). « Depuis l'ajout » compare le cours actuel à celui du jour où tu as suivi la carte.
+    Ce n'est pas un conseil d'investissement : avant d'acheter ou de vendre une carte de valeur, parles-en à un adulte.
   </p>
 
   <script>
-    import { getFavorites, removeFavorite, onFavoritesChange, type Favorite } from '../lib/favorites';
-    import { getCard, priceFor, formatPrice, formatDate } from '../lib/tcgdex';
+    import { getFavorites, removeFavorite, setTargets, onFavoritesChange, type Favorite } from '../lib/favorites';
+    import { getCard, priceFor, formatPrice } from '../lib/tcgdex';
     import { toQuote, sparkline, formatChange, changeClass, type Quote } from '../lib/market';
-    import { el, url, toast } from '../lib/ui';
-    /* ---------- Alertes ---------- */
-    import { getSettings, setSettings, checkAlerts, currentAlerts, acknowledge, onAlertsChange } from '../lib/alerts';
     import { getItems } from '../lib/collection';
     import { conditionFactor } from '../lib/condition';
+    import { getSettings, setSettings, checkAlerts, currentAlerts, acknowledge, onAlertsChange, enableNotifications, notificationsSupported, recheckSoon, type PriceAlert } from '../lib/alerts';
+    import { el, url, toast } from '../lib/ui';
 
-
-    interface Row {
-      fav: Favorite;
-      price?: number;
-      unit?: 'EUR' | 'USD';
-      quote?: Quote | null;
-      since?: number;
-      loaded: boolean;
-    }
+    interface Row { fav: Favorite; price?: number; low?: number; unit?: 'EUR' | 'USD'; quote?: Quote | null; since?: number; loaded: boolean }
 
     const $ = (id: string) => document.getElementById(id)!;
     const rows = new Map<string, Row>();
     const key = (f: Pick<Favorite, 'cardId' | 'lang'>) => `${f.lang}:${f.cardId}`;
-    let filter: 'all' | 'up' | 'down' = 'all';
-
     const fmt = (v: number, u: 'EUR' | 'USD' = 'EUR') => formatPrice(v, u);
-    const chgEl = (v?: number, prefix = '') => el('span', { class: `pill ${changeClass(v)}` }, [`${prefix}${v === undefined ? '—' : (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + formatChange(v)}`]);
+    let filter: 'all' | 'target' | 'up' | 'down' = 'all';
+    let editing: string | null = null;
 
-    function trendOf(r: Row) { return r.quote?.change7 ?? r.since; }
+    const pill = (v: number | undefined, prefix: string) =>
+      el('span', { class: `pill ${changeClass(v)}` }, [`${prefix}${v === undefined ? '—' : (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + formatChange(v)}`]);
+    const toTarget = (r: Row) => (r.price && r.fav.targetBelow ? ((r.price - r.fav.targetBelow) / r.price) * 100 : undefined);
 
+    /* ---------- Liste ---------- */
     function render() {
       const favs = getFavorites();
-      $('empty').hidden = favs.length > 0;
-      $('stats').hidden = $('bar').hidden = favs.length === 0;
-      for (const f of favs) if (!rows.has(key(f))) rows.set(key(f), { fav: f, loaded: false });
+      const has = favs.length > 0;
+      $('empty').hidden = has;
+      $('bar').hidden = $('goal').hidden = $('alertes').hidden = !has;
+      for (const f of favs) {
+        const r = rows.get(key(f));
+        if (!r) rows.set(key(f), { fav: f, loaded: false }); else r.fav = f;
+      }
       for (const k of [...rows.keys()]) if (!favs.some((f) => key(f) === k)) rows.delete(k);
-
-      let list = favs.map((f) => rows.get(key(f))!);
-      list = list.filter((r) => filter === 'all' || (filter === 'up' ? (trendOf(r) ?? 0) > 0 : (trendOf(r) ?? 0) < 0));
+      const trend = (r: Row) => r.quote?.change7 ?? r.since;
+      let list = favs.map((f) => rows.get(key(f))!).filter((r) =>
+        filter === 'all' || (filter === 'target' ? !!(r.fav.targetBelow || r.fav.targetAbove) : filter === 'up' ? (trend(r) ?? 0) > 0 : (trend(r) ?? 0) < 0));
       const sort = ($('sort') as HTMLSelectElement).value;
       list.sort((a, b) =>
         sort === 'name' ? a.fav.name.localeCompare(b.fav.name, 'fr')
         : sort === 'recent' ? b.fav.addedAt - a.fav.addedAt
         : sort === 'price' ? (b.price ?? -1) - (a.price ?? -1)
         : sort === 'change7' ? (b.quote?.change7 ?? -1e9) - (a.quote?.change7 ?? -1e9)
-        : (b.since ?? -1e9) - (a.since ?? -1e9));
-      $('no-match').hidden = !(favs.length && !list.length);
-      $('list').replaceChildren(...list.map(rowEl));
-      renderStats(favs.map((f) => rows.get(key(f))!));
+        : sort === 'since' ? (b.since ?? -1e9) - (a.since ?? -1e9)
+        : (toTarget(a) ?? 1e9) - (toTarget(b) ?? 1e9));
+      $('no-match').hidden = !(has && !list.length);
+      $('list').replaceChildren(...list.map(card));
+      renderGoal();
     }
 
-    function rowEl(r: Row): HTMLElement {
+    function card(r: Row): HTMLElement {
       const f = r.fav;
+      const k = key(f);
       const href = url(`/carte/?id=${encodeURIComponent(f.cardId)}&lang=${f.lang}`);
-      const thumb = el('a', { class: 'fv-thumb', href, 'aria-hidden': 'true', tabindex: '-1' });
-      if (f.image) thumb.append(el('img', { src: `${f.image}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
-      const hot = (r.quote?.change7 ?? 0) >= 10;
-      const remove = el('button', { type: 'button', class: 'fav-btn', 'aria-pressed': 'true', 'aria-label': `Retirer ${f.name} des favoris`, title: 'Retirer des favoris' });
-      remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
-      remove.addEventListener('click', () => { removeFavorite(f.cardId, f.lang); toast(`${f.name} retirée des favoris`); });
-      return el('article', { class: `fv-row ${hot ? 'hot' : ''}` }, [
-        thumb,
-        el('div', { class: 'fv-main' }, [
-          el('a', { class: 'fv-name', href }, [f.name]),
-          el('span', { class: 'fv-sub' }, [[f.setName, f.lang.toUpperCase(), `suivie depuis le ${formatDate(new Date(f.addedAt).toISOString())}`].filter(Boolean).join(' · ')]),
-          el('div', { class: 'fv-pills' }, [
-            chgEl(r.quote?.change7, '7 j '),
-            r.since !== undefined ? chgEl(r.since, 'Depuis l\'ajout ') : null,
-            hot ? el('span', { class: 'pill hot-pill' }, ['En forte hausse']) : null,
+      const alerts = currentAlerts().filter((a) => a.cardId === f.cardId && a.lang === f.lang);
+      const img = el('a', { class: 'w-img', href, 'aria-hidden': 'true', tabindex: '-1' });
+      if (f.image) img.append(el('img', { src: `${f.image}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
+
+      const star = el('button', { type: 'button', class: 'fav-btn', 'aria-pressed': 'true', 'aria-label': `Retirer ${f.name} de ta chasse`, title: 'Retirer' });
+      star.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
+      star.addEventListener('click', () => { removeFavorite(f.cardId, f.lang); toast(`${f.name} retirée de ta chasse`); });
+      const bell = el('button', { type: 'button', class: `bell-btn ${f.targetBelow || f.targetAbove ? 'set' : ''}`, 'aria-expanded': String(editing === k), 'aria-label': `Prix cibles de ${f.name}`, title: 'Prix cibles' });
+      bell.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg>';
+      bell.addEventListener('click', () => { editing = editing === k ? null : k; render(); });
+
+      // Jauge vers le prix cible
+      let target: HTMLElement | null = null;
+      if (f.targetBelow && r.price !== undefined) {
+        const reached = r.price <= f.targetBelow;
+        const ratio = Math.max(0, Math.min(1, f.targetBelow / r.price));
+        target = el('div', { class: `w-target ${reached ? 'hit' : ''}` }, [
+          el('div', { class: 'wt-top' }, [
+            el('span', {}, [reached ? 'Prix cible atteint' : `Cible ${fmt(f.targetBelow, r.unit)}`]),
+            el('span', {}, [reached ? fmt(f.targetBelow, r.unit) : `encore ${formatChange(-(toTarget(r) ?? 0))}`]),
           ]),
+          el('div', { class: 'wt-bar' }, [el('span', { style: `width:${(reached ? 1 : ratio) * 100}%` })]),
+        ]);
+      }
+
+      const editor = editing === k ? targetEditor(r) : null;
+      return el('article', { class: `watch ${alerts.length ? 'alerting' : ''}` }, [
+        img,
+        el('div', { class: 'w-body' }, [
+          el('div', { class: 'w-top' }, [
+            el('div', { class: 'w-title' }, [
+              el('a', { class: 'w-name', href }, [f.name]),
+              el('span', { class: 'w-sub' }, [[f.setName, f.lang.toUpperCase()].filter(Boolean).join(', ')]),
+            ]),
+            el('div', { class: 'w-btns' }, [bell, star]),
+          ]),
+          el('div', { class: 'w-price-row' }, [
+            el('span', { class: 'w-price' }, [!r.loaded ? '…' : r.price !== undefined ? fmt(r.price, r.unit) : 'Sans cote']),
+            r.quote ? sparkline(r.quote.points, 96, 34) : null,
+          ]),
+          el('div', { class: 'w-pills' }, [
+            pill(r.quote?.change7, '7 j '),
+            r.since !== undefined ? pill(r.since, 'depuis l\'ajout ') : null,
+            ...alerts.map((a) => el('span', { class: 'pill alert-pill' }, [a.kind === 'below' ? 'Cible atteinte' : a.kind === 'above' ? 'Plafond dépassé' : 'Gros mouvement'])),
+          ]),
+          target,
+          f.targetAbove ? el('span', { class: 'w-sub' }, [`Plafond : ${fmt(f.targetAbove, r.unit)}`]) : null,
+          editor,
         ]),
-        el('div', { class: 'fv-chart' }, [r.quote ? sparkline(r.quote.points, 120, 40) : null]),
-        el('div', { class: 'fv-price' }, [
-          el('span', { class: 'fv-now' }, [!r.loaded ? '…' : r.price !== undefined ? fmt(r.price, r.unit) : 'Sans cote']),
-          f.priceAtAdd ? el('span', { class: 'fv-was' }, [`ajoutée à ${fmt(f.priceAtAdd, f.unit)}`]) : null,
-        ]),
-        remove,
       ]);
     }
 
-    function renderStats(all: Row[]) {
-      $('st-count').textContent = String(all.length);
-      const eur = all.filter((r) => r.unit === 'EUR' && r.price !== undefined);
-      const total = eur.reduce((s, r) => s + r.price!, 0);
-      $('st-value').textContent = eur.length ? fmt(total) : '—';
-      const withAdd = eur.filter((r) => r.fav.priceAtAdd && r.fav.unit === 'EUR');
-      const nowA = withAdd.reduce((s, r) => s + r.price!, 0), thenA = withAdd.reduce((s, r) => s + r.fav.priceAtAdd!, 0);
-      const since = thenA ? ((nowA - thenA) / thenA) * 100 : undefined;
-      const sEl = $('st-since'); sEl.textContent = formatChange(since); sEl.className = `stat-value ${changeClass(since)}`;
-      const q = all.map((r) => r.quote).filter((x): x is Quote => !!x && !!x.avg7 && !!x.avg30);
-      const s7 = q.reduce((s, x) => s + x.avg7!, 0), s30 = q.reduce((s, x) => s + x.avg30!, 0);
-      const c7 = s30 ? ((s7 - s30) / s30) * 100 : undefined;
-      const cEl = $('st-7'); cEl.textContent = formatChange(c7); cEl.className = `stat-value ${changeClass(c7)}`;
+    function targetEditor(r: Row): HTMLElement {
+      const f = r.fav;
+      const below = el('input', { type: 'number', min: '0', step: '0.01', inputmode: 'decimal', placeholder: r.price ? (r.price * 0.85).toFixed(2) : 'ex. 20', value: f.targetBelow ? String(f.targetBelow) : '' }) as HTMLInputElement;
+      const above = el('input', { type: 'number', min: '0', step: '0.01', inputmode: 'decimal', placeholder: r.price ? (r.price * 1.25).toFixed(2) : 'ex. 60', value: f.targetAbove ? String(f.targetAbove) : '' }) as HTMLInputElement;
+      const save = el('button', { type: 'submit', class: 'btn btn-primary' }, ['Enregistrer']);
+      const clear = el('button', { type: 'button', class: 'btn' }, ['Aucune cible']);
+      const form = el('form', { class: 'w-editor' }, [
+        el('label', { class: 'field' }, [el('span', {}, ['Me prévenir si le prix descend à']), el('span', { class: 'money' }, [below, el('span', {}, ['€'])])]),
+        el('label', { class: 'field' }, [el('span', {}, ['ou s\'il monte à']), el('span', { class: 'money' }, [above, el('span', {}, ['€'])])]),
+        el('div', { class: 'w-ed-actions' }, [save, clear]),
+      ]);
+      const num = (i: HTMLInputElement) => { const v = parseFloat(i.value.replace(',', '.')); return Number.isFinite(v) && v > 0 ? v : undefined; };
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        setTargets(f.cardId, f.lang, { below: num(below), above: num(above) });
+        editing = null;
+        toast(num(below) || num(above) ? 'Prix cibles enregistrés' : 'Prix cibles retirés');
+        recheckSoon();
+      });
+      clear.addEventListener('click', () => { setTargets(f.cardId, f.lang, {}); editing = null; recheckSoon(); });
+      setTimeout(() => below.focus(), 0);
+      return form;
+    }
+
+    /* ---------- Objectif ---------- */
+    let collectionValue = 0;
+    function renderGoal() {
+      const all = [...rows.values()];
+      const owned = new Set(getItems().map((i) => `${i.lang}:${i.cardId}`));
+      const wanted = all.filter((r) => !owned.has(key(r.fav)));
+      const eurRows = wanted.filter((r) => r.unit === 'EUR' && r.price !== undefined);
+      const budget = eurRows.reduce((s, r) => s + r.price!, 0);
+      const ownedN = all.length - wanted.length;
+      $('g-budget').textContent = all.some((r) => !r.loaded) && !eurRows.length ? '…' : fmt(budget);
+      $('g-budget-sub').textContent = `${wanted.length} carte${wanted.length > 1 ? 's' : ''} à trouver, un exemplaire de chaque.`;
+      const pctFunded = budget ? Math.min(100, (collectionValue / budget) * 100) : 0;
+      ($('g-bar-fill') as HTMLElement).style.width = `${budget ? pctFunded : 0}%`;
+      $('g-fund').textContent = collectionValue > 0 && budget > 0
+        ? (collectionValue >= budget ? `Ton classeur (${fmt(collectionValue)}) vaut plus que toute ta chasse.` : `Ton classeur (${fmt(collectionValue)}) couvre ${pctFunded.toFixed(0)} % de ta chasse.`)
+        : 'Scanne tes cartes : la valeur de ton classeur s\'affichera face à ce budget.';
+      $('g-owned').textContent = `${ownedN} sur ${all.length}`;
+      // Bonne affaire : cours le plus en dessous de sa moyenne 30 jours.
+      const deals = all.filter((r) => r.quote?.avg30 && r.price).map((r) => ({ r, gap: ((r.price! - r.quote!.avg30!) / r.quote!.avg30!) * 100 })).sort((a, b) => a.gap - b.gap);
+      const deal = deals[0];
+      $('g-deal').textContent = deal && deal.gap < -1 ? deal.r.fav.name : '—';
+      $('g-deal-sub').textContent = deal && deal.gap < -1 ? `${formatChange(deal.gap)} sous sa moyenne du mois` : 'Aucune carte sous sa moyenne du mois.';
+      const cheap = eurRows.sort((a, b) => a.price! - b.price!)[0];
+      $('g-cheap').textContent = cheap ? cheap.fav.name : '—';
+      $('g-cheap-sub').textContent = cheap ? fmt(cheap.price!) : '';
+    }
+
+    async function loadCollectionValue() {
+      const items = getItems();
+      const cards = await Promise.all(items.map((i) => getCard(i.cardId, i.lang).catch(() => null)));
+      collectionValue = items.reduce((s, it, i) => {
+        const p = cards[i] && priceFor(cards[i]!, it.finish);
+        return p && p.unit === 'EUR' ? s + p.value * conditionFactor(it.condition) * it.quantity : s;
+      }, 0);
+      renderGoal();
     }
 
     async function loadPrices() {
@@ -223,19 +282,83 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       await Promise.all(Array.from({ length: 6 }, async () => {
         while (i < todo.length) {
           const r = todo[i++];
-          const card = await getCard(r.fav.cardId, r.fav.lang).catch(() => null);
-          if (card) {
-            r.quote = toQuote(card, r.fav.lang, 'legend');
-            const p = priceFor(card, 'normal');
-            if (p) { r.price = p.value; r.unit = p.unit; }
-            if (r.price !== undefined && r.fav.priceAtAdd && r.fav.unit === r.unit) {
-              r.since = ((r.price - r.fav.priceAtAdd) / r.fav.priceAtAdd) * 100;
-            }
+          const c = await getCard(r.fav.cardId, r.fav.lang).catch(() => null);
+          if (c) {
+            r.quote = toQuote(c, r.fav.lang, 'legend');
+            const p = priceFor(c, 'normal');
+            if (p) { r.price = p.value; r.unit = p.unit; r.low = p.low; }
+            if (r.price !== undefined && r.fav.priceAtAdd && r.fav.unit === r.unit) r.since = ((r.price - r.fav.priceAtAdd) / r.fav.priceAtAdd) * 100;
           }
           r.loaded = true;
         }
       }));
       render();
+    }
+
+    /* ---------- Alertes ---------- */
+    const alOn = $('al-on') as HTMLInputElement;
+    const alTh = $('al-th') as HTMLSelectElement;
+    const alDir = $('al-dir') as HTMLSelectElement;
+    const s0 = getSettings();
+    alOn.checked = s0.enabled; alTh.value = String(s0.threshold); alDir.value = s0.direction;
+    const syncDisabled = () => { alTh.disabled = !alOn.checked; alDir.disabled = !alOn.checked || alTh.value === '0'; };
+    syncDisabled();
+    [alOn, alTh, alDir].forEach((x) => x.addEventListener('change', () => {
+      setSettings({ ...getSettings(), enabled: alOn.checked, threshold: Number(alTh.value), direction: alDir.value as 'both' | 'up' | 'down' });
+      syncDisabled();
+      if (alOn.checked) checkAlerts(true);
+    }));
+    $('al-check').addEventListener('click', async () => {
+      const b = $('al-check') as HTMLButtonElement;
+      b.disabled = true; b.textContent = 'Vérification…';
+      const res = await checkAlerts(true).catch(() => [] as PriceAlert[]);
+      b.disabled = false; b.textContent = 'Vérifier maintenant';
+      if (!res.length) toast('Rien à signaler : aucun prix cible atteint');
+    });
+    const notifyBtn = $('al-notify') as HTMLButtonElement;
+    notifyBtn.addEventListener('click', async () => {
+      const ok = await enableNotifications();
+      toast(ok ? 'Notifications activées sur cet appareil' : 'Notifications refusées par le navigateur');
+      renderAlerts();
+    });
+
+    function renderAlerts() {
+      const st = getSettings();
+      notifyBtn.hidden = !notificationsSupported() || st.notify || !st.enabled;
+      const favs = getFavorites();
+      const targets = favs.filter((f) => f.targetBelow || f.targetAbove).length;
+      $('al-status').textContent = !st.enabled ? 'Alertes désactivées.'
+        : `${targets} prix cible${targets > 1 ? 's' : ''} surveillé${targets > 1 ? 's' : ''}${st.threshold ? `, et toute variation de plus de ${st.threshold} %` : ''}.${st.notify ? ' Notifications activées.' : ''}`;
+      const list = currentAlerts();
+      const box = $('al-list');
+      if (!list.length) {
+        box.replaceChildren(el('div', { class: 'al-empty' }, [
+          el('span', { class: 'al-ok' }, ['✓']),
+          el('span', {}, [targets ? 'Aucune alerte : aucun prix cible atteint pour le moment.' : 'Touche la cloche d\'une carte pour fixer ton prix cible.']),
+        ]));
+      } else {
+        const items = list.map((a) => {
+          const seen = el('button', { type: 'button', class: 'btn al-seen' }, ["J'ai vu"]);
+          seen.addEventListener('click', () => acknowledge([a]));
+          const label = a.kind === 'below' ? 'Prix cible atteint' : a.kind === 'above' ? 'Plafond dépassé' : a.pct > 0 ? 'Forte hausse' : 'Forte baisse';
+          const dir = a.kind === 'below' ? 'down' : a.kind === 'above' ? 'up' : a.pct > 0 ? 'up' : 'down';
+          const thumb = el('span', { class: 'al-thumb' });
+          if (a.image) thumb.append(el('img', { src: `${a.image}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
+          return el('div', { class: `al-row ${a.kind} ${dir}` }, [
+            thumb,
+            el('div', { class: 'al-main' }, [
+              el('span', { class: 'al-kind' }, [label]),
+              el('a', { class: 'al-name', href: url(`/carte/?id=${encodeURIComponent(a.cardId)}&lang=${a.lang}`) }, [a.name]),
+              el('span', { class: 'al-detail' }, [a.kind === 'move' ? `${fmt(a.from, a.unit)} → ${fmt(a.to, a.unit)}` : `Cours ${fmt(a.to, a.unit)} · ${a.kind === 'below' ? 'cible' : 'plafond'} ${fmt(a.from, a.unit)}`]),
+            ]),
+            el('span', { class: `al-pct ${dir}` }, [`${a.pct > 0 ? '+' : ''}${a.pct.toFixed(1).replace('.', ',')} %`]),
+            seen,
+          ]);
+        });
+        const all = list.length > 1 ? el('button', { type: 'button', class: 'btn al-all' }, ['Tout marquer comme vu']) : null;
+        all?.addEventListener('click', () => acknowledge());
+        box.replaceChildren(...items, ...(all ? [all] : []));
+      }
     }
 
     document.querySelectorAll<HTMLButtonElement>('[data-f]').forEach((b) => b.addEventListener('click', () => {
@@ -244,140 +367,77 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       render();
     }));
     $('sort').addEventListener('change', render);
-    onFavoritesChange(() => { render(); loadPrices(); });
+    onFavoritesChange(() => { render(); loadPrices(); renderAlerts(); });
+    onAlertsChange(() => { renderAlerts(); render(); });
 
     render();
-    loadPrices();
-
-    const alOn = $('al-on') as HTMLInputElement;
-    const alTh = $('al-th') as HTMLSelectElement;
-    const alDir = $('al-dir') as HTMLSelectElement;
-    const st0 = getSettings();
-    alOn.checked = st0.enabled; alTh.value = String(st0.threshold); alDir.value = st0.direction;
-    const saveSettings = () => {
-      setSettings({ enabled: alOn.checked, threshold: Number(alTh.value), direction: alDir.value as 'both' | 'up' | 'down' });
-      alTh.disabled = alDir.disabled = !alOn.checked;
-      if (alOn.checked) checkAlerts(true); else renderAlerts();
-    };
-    alTh.disabled = alDir.disabled = !alOn.checked;
-    [alOn, alTh, alDir].forEach((x) => x.addEventListener('change', saveSettings));
-    $('al-check').addEventListener('click', async () => {
-      const b = $('al-check') as HTMLButtonElement;
-      b.disabled = true; b.textContent = 'Vérification…';
-      await checkAlerts(true).catch(() => {});
-      b.disabled = false; b.textContent = 'Vérifier maintenant';
-      if (!currentAlerts().length) toast('Aucune variation au-delà de ton seuil');
-    });
-
-    function renderAlerts() {
-      const list = getSettings().enabled ? currentAlerts() : [];
-      const box = $('al-list');
-      if (!getFavorites().length) { box.replaceChildren(el('p', { class: 'muted small' }, ['Ajoute des favoris pour recevoir des alertes.'])); return; }
-      if (!list.length) { box.replaceChildren(el('p', { class: 'muted small' }, [getSettings().enabled ? 'Aucune alerte pour le moment : tes favoris sont stables.' : 'Alertes désactivées.'])); return; }
-      const rowsEls = list.map((a) => {
-        const seen = el('button', { type: 'button', class: 'btn al-seen' }, ["J'ai vu"]);
-        seen.addEventListener('click', () => acknowledge([a]));
-        return el('div', { class: `al-row ${a.pct > 0 ? 'up' : 'down'}` }, [
-          el('span', { class: 'al-arrow' }, [a.pct > 0 ? '▲' : '▼']),
-          el('a', { class: 'al-name', href: url(`/carte/?id=${encodeURIComponent(a.cardId)}&lang=${a.lang}`) }, [a.name]),
-          el('span', { class: 'al-detail' }, [`${fmt(a.from, a.unit)} → ${fmt(a.to, a.unit)}`]),
-          el('span', { class: `al-pct ${a.pct > 0 ? 'up' : 'down'}` }, [`${a.pct > 0 ? '+' : ''}${a.pct.toFixed(1).replace('.', ',')} %`]),
-          seen,
-        ]);
-      });
-      const all = el('button', { type: 'button', class: 'btn al-all' }, ['Tout marquer comme vu']);
-      all.addEventListener('click', () => acknowledge());
-      box.replaceChildren(...rowsEls, list.length > 1 ? all : null as unknown as Node);
-    }
-    onAlertsChange(renderAlerts);
-    onFavoritesChange(renderAlerts);
     renderAlerts();
+    loadPrices();
+    loadCollectionValue();
     checkAlerts().catch(() => {});
-
-    /* ---------- Portefeuille : si je vendais tout ---------- */
-    async function renderWallet() {
-      const items = getItems();
-      const favs = getFavorites();
-      $('wallet').hidden = !items.length && !favs.length;
-      const fill = (id: string, value: number, quick: number, n: number, missing: number, label: string) => {
-        const box = $(id);
-        (box.querySelector('[data-w=value]') as HTMLElement).textContent = n ? fmt(value) : '—';
-        (box.querySelector('[data-w=quick]') as HTMLElement).textContent = n ? `Vente rapide : ${fmt(quick)}` : '';
-        (box.querySelector('[data-w=count]') as HTMLElement).textContent =
-          `${n} ${label}${n > 1 ? 's' : ''}${missing ? ` · ${missing} sans cote` : ''}`;
-      };
-      // Collection : cote selon la finition, l'état et la quantité.
-      let cv = 0, cq = 0, cn = 0, cm = 0;
-      const cards = await Promise.all(items.map((i) => getCard(i.cardId, i.lang).catch(() => null)));
-      items.forEach((it, idx) => {
-        const c = cards[idx];
-        const p = c && priceFor(c, it.finish);
-        cn += it.quantity;
-        if (!p || p.unit !== 'EUR') { cm += it.quantity; return; }
-        const f = conditionFactor(it.condition) * it.quantity;
-        cv += p.value * f;
-        cq += (p.low ?? p.value) * f;
-      });
-      fill('w-coll', cv, cq, cn, cm, 'carte');
-      // Favoris : un exemplaire Near Mint de chaque.
-      let fv = 0, fq = 0, fm = 0;
-      const fcards = await Promise.all(favs.map((f) => getCard(f.cardId, f.lang).catch(() => null)));
-      fcards.forEach((c) => {
-        const p = c && priceFor(c, 'normal');
-        if (!p || p.unit !== 'EUR') { fm++; return; }
-        fv += p.value; fq += p.low ?? p.value;
-      });
-      fill('w-fav', fv, fq, favs.length, fm, 'carte');
-    }
-    onFavoritesChange(renderWallet);
-    renderWallet();
   </script>
 
   <style>
+    .fv-hero { padding: clamp(24px, 5vw, 56px) 0 26px; }
+    .fv-hero h1 { font-size: clamp(3.2rem, 11vw, 7.5rem); line-height: 0.88; letter-spacing: -0.05em; font-weight: 800; margin: 0 0 12px; }
+    .fv-slogan { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.2rem, 3vw, 1.8rem); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 12px;
+      background: linear-gradient(100deg, var(--gold), #ffb35a 40%, var(--magenta)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .fv-lead { max-width: 620px; }
 
-    .wallet { margin-bottom: 22px; }
-    .wallet-head h2 { margin: 0 0 12px; font-size: clamp(1.3rem, 3.5vw, 1.7rem); }
-    .wallet-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-bottom: 8px; }
-    @media (min-width: 720px) { .wallet-grid { grid-template-columns: 1fr 1fr; } }
-    .wcard { display: flex; flex-direction: column; gap: 4px; }
-    #w-coll { border-color: rgba(62, 240, 255, 0.35); background: linear-gradient(150deg, rgba(62, 240, 255, 0.08), transparent 60%), var(--surface); }
-    #w-fav { border-color: rgba(255, 210, 90, 0.35); background: linear-gradient(150deg, rgba(255, 210, 90, 0.08), transparent 60%), var(--surface); }
-    .w-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
-    .w-value { font-family: var(--font-display); font-size: clamp(1.8rem, 6vw, 2.4rem); font-weight: 700; font-variant-numeric: tabular-nums; }
-    .w-sub { color: var(--muted); font-size: 0.88rem; }
-
-    .alerts { margin-bottom: 22px; scroll-margin-top: 90px; }
-    .al-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; flex-wrap: wrap; }
-    .al-head h2 { margin: 0 0 4px; font-size: 1.2rem; }
-    .al-head p { margin: 0; max-width: 620px; }
-    .switch { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
-    .switch input { width: 20px; height: 20px; accent-color: var(--cyan); }
-    .al-settings { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin: 14px 0; }
-    .al-settings .field { flex: 1 1 170px; max-width: 240px; }
-    .al-list { display: flex; flex-direction: column; gap: 8px; }
-    .al-list p { margin: 0; }
-    .al-list :global(.al-row) {
-      display: grid; grid-template-columns: 22px 1fr auto auto; gap: 10px; align-items: center;
-      padding: 10px 12px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line);
+    .goal { display: grid; gap: 14px; grid-template-columns: 1fr; margin-bottom: 26px; }
+    @media (min-width: 900px) { .goal { grid-template-columns: 1.2fr 1fr; } }
+    .goal-main {
+      display: flex; flex-direction: column; gap: 6px; padding: clamp(20px, 3vw, 30px); border-radius: 26px;
+      background: radial-gradient(circle at 0% 0%, rgba(255, 210, 90, 0.16), transparent 55%), var(--surface); border: 1px solid rgba(255, 210, 90, 0.35);
     }
-    .al-list :global(.al-row.up) { border-color: rgba(61, 255, 168, 0.4); }
-    .al-list :global(.al-row.down) { border-color: rgba(255, 90, 122, 0.4); }
-    .al-list :global(.al-arrow) { font-size: 0.9rem; }
-    .al-list :global(.al-row.up .al-arrow) { color: var(--up); }
-    .al-list :global(.al-row.down .al-arrow) { color: var(--down); }
+    .goal-side { display: grid; gap: 10px; }
+    .g-card { display: flex; flex-direction: column; gap: 2px; padding: 14px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+    .g-label { font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+    .g-value { font-family: var(--font-display); font-size: clamp(2.4rem, 8vw, 3.8rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .g-mid { font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .g-sub { color: var(--muted); font-size: 0.9rem; }
+    .g-bar { height: 10px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin: 10px 0 2px; }
+    .g-bar span { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--gold), var(--magenta)); transition: width 0.8s; }
+
+    .alerts { margin-bottom: 26px; padding: clamp(18px, 3vw, 26px); border-radius: 24px; background: var(--surface); border: 1px solid var(--line); scroll-margin-top: 90px; }
+    .al-head { display: flex; justify-content: space-between; gap: 14px; align-items: start; flex-wrap: wrap; margin-bottom: 14px; }
+    .al-head h2 { margin: 0 0 4px; font-size: clamp(1.4rem, 3.5vw, 2rem); letter-spacing: -0.02em; }
+    .al-head p { margin: 0; }
+    .al-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .al-list { display: flex; flex-direction: column; gap: 8px; }
+    .al-list :global(.al-empty) { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 14px; background: var(--bg-2); color: var(--muted); }
+    .al-list :global(.al-ok) { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(61, 255, 168, 0.15); color: var(--up); font-weight: 800; }
+    .al-list :global(.al-row) {
+      display: grid; grid-template-columns: 44px 1fr auto auto; gap: 12px; align-items: center;
+      padding: 10px 12px; border-radius: 16px; background: var(--bg-2); border: 1px solid var(--line); animation: pop 0.35s ease-out;
+    }
+    @keyframes pop { from { transform: scale(0.97); opacity: 0; } }
+    .al-list :global(.al-row.below) { border-color: rgba(255, 210, 90, 0.6); box-shadow: 0 0 24px rgba(255, 210, 90, 0.1); }
+    .al-list :global(.al-row.move.up), .al-list :global(.al-row.above) { border-color: rgba(61, 255, 168, 0.45); }
+    .al-list :global(.al-row.move.down) { border-color: rgba(255, 90, 122, 0.45); }
+    .al-list :global(.al-thumb) { width: 44px; aspect-ratio: 245 / 342; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+    .al-list :global(.al-thumb img) { width: 100%; height: 100%; object-fit: cover; }
+    .al-list :global(.al-main) { display: flex; flex-direction: column; min-width: 0; }
+    .al-list :global(.al-kind) { font-size: 0.75rem; font-weight: 800; color: var(--gold); }
+    .al-list :global(.al-row.move .al-kind), .al-list :global(.al-row.above .al-kind) { color: inherit; }
+    .al-list :global(.al-row.up .al-kind) { color: var(--up); }
+    .al-list :global(.al-row.move.down .al-kind) { color: var(--down); }
     .al-list :global(.al-name) { font-weight: 700; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .al-list :global(.al-detail) { grid-column: 2; grid-row: 2; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
-    .al-list :global(.al-pct) { font-family: var(--font-display); font-weight: 700; grid-row: 1 / span 2; grid-column: 3; }
-    .al-list :global(.al-seen) { grid-row: 1 / span 2; grid-column: 4; min-height: 38px; padding: 0 12px; font-size: 0.85rem; }
+    .al-list :global(.al-detail) { color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+    .al-list :global(.al-pct) { font-family: var(--font-display); font-weight: 800; }
+    .al-list :global(.al-seen) { min-height: 38px; padding: 0 12px; font-size: 0.85rem; }
     .al-list :global(.al-all) { align-self: flex-start; min-height: 38px; font-size: 0.85rem; }
-    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.75rem; color: var(--gold); margin: 0 0 6px; font-weight: 700; }
-    .fv-head { display: grid; gap: 22px; grid-template-columns: 1fr; padding: 20px 0 22px; align-items: end; }
-    @media (min-width: 960px) { .fv-head { grid-template-columns: 1fr 520px; } }
-    .fv-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    @media (min-width: 640px) { .fv-stats { grid-template-columns: repeat(4, 1fr); } }
-    .stat { display: flex; flex-direction: column; gap: 2px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; min-width: 0; }
-    .stat-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-    .stat-value { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 560px) {
+      .al-list :global(.al-row) { grid-template-columns: 40px 1fr auto; }
+      .al-list :global(.al-seen) { grid-column: 2 / -1; justify-self: start; }
+    }
+    .al-settings { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+    .al-settings summary { cursor: pointer; font-weight: 700; color: var(--muted); }
+    .al-settings summary:hover { color: var(--text); }
+    .al-grid { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; margin: 14px 0 10px; }
+    .al-grid .field { flex: 1 1 220px; max-width: 320px; }
+    .switch { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; min-height: 46px; }
+    .switch input { width: 20px; height: 20px; accent-color: var(--cyan); }
 
     .fv-bar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
     .fv-bar select { width: auto; }
@@ -385,39 +445,51 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     .chips button { border: 1px solid var(--line); background: var(--surface); color: var(--muted); padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
     .chips button[aria-pressed='true'] { color: #0a0812; background: var(--holo); border-color: transparent; }
 
-    .fv-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-    .fv-list :global(.fv-row) {
-      display: grid; grid-template-columns: 56px 1fr auto auto; gap: 14px; align-items: center;
-      padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line);
-      transition: border-color 0.2s;
+    .watch-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-bottom: 24px; }
+    @media (min-width: 760px) { .watch-grid { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 1100px) { .watch-grid { grid-template-columns: 1fr 1fr 1fr; } }
+    .watch-grid :global(.watch) {
+      display: grid; grid-template-columns: 88px 1fr; gap: 14px; padding: 14px; border-radius: 20px;
+      background: var(--surface); border: 1px solid var(--line); transition: border-color 0.2s; align-items: start;
     }
-    .fv-list :global(.fv-row:hover) { border-color: rgba(255, 255, 255, 0.2); }
-    .fv-list :global(.fv-row.hot) { border-color: rgba(61, 255, 168, 0.4); box-shadow: 0 0 24px rgba(61, 255, 168, 0.08); }
-    @media (min-width: 760px) { .fv-list :global(.fv-row) { grid-template-columns: 64px 1fr 130px 130px auto; } }
-    .fv-list :global(.fv-thumb) { width: 100%; aspect-ratio: 245 / 342; border-radius: 4px; overflow: hidden; background: var(--bg-2); display: block; }
-    .fv-list :global(.fv-thumb img) { width: 100%; height: 100%; object-fit: cover; }
-    .fv-list :global(.fv-main) { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-    .fv-list :global(.fv-name) { font-weight: 700; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .fv-list :global(.fv-name:hover) { text-decoration: underline; }
-    .fv-list :global(.fv-sub) { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .fv-list :global(.fv-pills) { display: flex; gap: 6px; flex-wrap: wrap; }
-    .fv-list :global(.pill) { font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
-    .fv-list :global(.hot-pill) { color: #0a0812; background: var(--up); border-color: transparent; }
-    .fv-list :global(.fv-chart) { display: none; }
-    @media (min-width: 760px) { .fv-list :global(.fv-chart) { display: flex; justify-content: center; } }
-    .fv-list :global(.fv-price) { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
-    .fv-list :global(.fv-now) { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
-    .fv-list :global(.fv-was) { font-size: 0.72rem; color: var(--muted); }
-    @media (max-width: 759px) {
-      .fv-list :global(.fv-row) { grid-template-columns: 52px 1fr auto; }
-      .fv-list :global(.fv-row > .fav-btn) { grid-column: 3; grid-row: 1; align-self: start; }
-      .fv-list :global(.fv-price) { grid-column: 2 / 4; flex-direction: row; justify-content: space-between; align-items: baseline; }
+    .watch-grid :global(.watch:hover) { border-color: rgba(255, 255, 255, 0.22); }
+    .watch-grid :global(.watch.alerting) { border-color: rgba(255, 210, 90, 0.6); box-shadow: 0 0 30px rgba(255, 210, 90, 0.1); }
+    .watch-grid :global(.w-img) { display: block; width: 88px; aspect-ratio: 245 / 342; border-radius: 6px; overflow: hidden; background: var(--bg-2); }
+    .watch-grid :global(.w-img img) { width: 100%; height: 100%; object-fit: cover; }
+    .watch-grid :global(.w-body) { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .watch-grid :global(.w-top) { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+    .watch-grid :global(.w-title) { display: flex; flex-direction: column; min-width: 0; }
+    .watch-grid :global(.w-name) { font-weight: 800; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .watch-grid :global(.w-sub) { color: var(--muted); font-size: 0.8rem; }
+    .watch-grid :global(.w-btns) { display: flex; gap: 6px; flex: 0 0 auto; }
+    .watch-grid :global(.bell-btn) {
+      width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: rgba(7, 6, 13, 0.6); color: var(--muted);
+      cursor: pointer; display: grid; place-items: center;
     }
+    .watch-grid :global(.bell-btn svg) { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .watch-grid :global(.bell-btn.set) { color: var(--gold); border-color: rgba(255, 210, 90, 0.6); }
+    .watch-grid :global(.bell-btn[aria-expanded='true']) { background: var(--gold); color: #0a0812; }
+    .watch-grid :global(.w-price-row) { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .watch-grid :global(.w-price) { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .watch-grid :global(.w-pills) { display: flex; gap: 6px; flex-wrap: wrap; }
+    .watch-grid :global(.pill) { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--bg-2); border: 1px solid var(--line); }
+    .watch-grid :global(.alert-pill) { color: #0a0812; background: var(--gold); border-color: transparent; }
+    .watch-grid :global(.w-target) { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; border-radius: 12px; background: var(--bg-2); }
+    .watch-grid :global(.wt-top) { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; font-weight: 700; }
+    .watch-grid :global(.wt-bar) { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+    .watch-grid :global(.wt-bar span) { display: block; height: 100%; border-radius: 99px; background: var(--cyan); }
+    .watch-grid :global(.w-target.hit) { background: rgba(255, 210, 90, 0.12); color: var(--gold); }
+    .watch-grid :global(.w-target.hit .wt-bar span) { background: var(--gold); }
+    .watch-grid :global(.w-editor) { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--bg-2); border: 1px solid rgba(255, 210, 90, 0.35); }
+    .watch-grid :global(.w-editor .field > span:first-child) { font-size: 0.8rem; color: var(--muted); }
+    .watch-grid :global(.money) { display: flex; align-items: center; gap: 8px; }
+    .watch-grid :global(.money input) { min-height: 42px; }
+    .watch-grid :global(.w-ed-actions) { display: flex; gap: 8px; flex-wrap: wrap; }
+    .watch-grid :global(.w-ed-actions .btn) { min-height: 40px; }
 
-    .empty { text-align: center; padding: 48px 20px; border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 22px; margin-bottom: 24px; }
-    .empty-star { width: 84px; height: 84px; margin: 0 auto 16px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, rgba(255, 210, 90, 0.25), transparent 70%); }
-    .empty-star svg { width: 48px; height: 48px; fill: var(--gold); filter: drop-shadow(0 0 16px rgba(255, 210, 90, 0.6)); animation: twinkle 3s ease-in-out infinite; }
-    @keyframes twinkle { 50% { transform: scale(1.12) rotate(8deg); } }
+    .empty { text-align: center; padding: 48px 20px; border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 24px; margin-bottom: 24px; }
+    .empty-star { width: 76px; height: 76px; margin: 0 auto 16px; border-radius: 22px; display: grid; place-items: center; background: linear-gradient(135deg, var(--gold), #ffb35a); }
+    .empty-star svg { width: 40px; height: 40px; fill: #0a0812; }
     .empty-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   </style>
 </Base>

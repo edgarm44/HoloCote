@@ -154,7 +154,7 @@ function validate(data: unknown): Store | null {
   const items: Item[] = [];
   for (const raw of d.items.slice(0, 5000)) {
     if (!raw || typeof raw !== 'object') continue;
-    const r = raw as Record<string, unknown>;
+    const r = raw as unknown as Record<string, unknown>;
     const cardId = str(r.cardId, 64);
     const name = str(r.name);
     if (!cardId || !/^[\w.\-!%?]+$/.test(cardId) || !name) continue;

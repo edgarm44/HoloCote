@@ -231,3 +231,72 @@ export function ticker(quotes: Quote[], href: (q: Quote) => string, fmt: (v: num
   wrap.append(track);
   return wrap;
 }
+
+/**
+ * Grand graphique (aire + courbe lissée + repères chiffrés).
+ * `labels` décrit chaque point (ex. « Moy. 30 j »), `fmt` met en forme les valeurs.
+ */
+export function bigChart(points: number[], labels: string[], fmt: (v: number) => string, width = 720, height = 260): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.classList.add('big-chart');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', labels.map((l, i) => `${l} : ${fmt(points[i])}`).join(', '));
+  const padX = 48, padTop = 46, padBottom = 40;
+  const min = Math.min(...points), max = Math.max(...points);
+  const span = max - min || Math.max(1, max * 0.04);
+  const lo = min - span * 0.35, hi = max + span * 0.35;
+  const X = (i: number) => padX + (i / Math.max(1, points.length - 1)) * (width - padX * 2);
+  const Y = (v: number) => padTop + (1 - (v - lo) / (hi - lo)) * (height - padTop - padBottom);
+  const trend = points[points.length - 1] - points[0];
+  const cls = trend > 0 ? 'up' : trend < 0 ? 'down' : 'flat';
+  const id = `g${Math.random().toString(36).slice(2, 7)}`;
+
+  const defs = document.createElementNS(ns, 'defs');
+  defs.innerHTML = `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="bc-stop-a ${cls}"/><stop offset="1" class="bc-stop-b"/></linearGradient>`;
+  svg.append(defs);
+
+  for (let k = 0; k <= 3; k++) {
+    const y = padTop + (k / 3) * (height - padTop - padBottom);
+    const l = document.createElementNS(ns, 'line');
+    l.setAttribute('x1', String(padX)); l.setAttribute('x2', String(width - padX));
+    l.setAttribute('y1', y.toFixed(1)); l.setAttribute('y2', y.toFixed(1));
+    l.setAttribute('class', 'bc-grid');
+    svg.append(l);
+  }
+  // Courbe lissée (Catmull-Rom -> Bézier).
+  const pts = points.map((v, i) => [X(i), Y(v)]);
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  const area = document.createElementNS(ns, 'path');
+  area.setAttribute('d', `${d} L${pts[pts.length - 1][0]},${height - padBottom} L${pts[0][0]},${height - padBottom} Z`);
+  area.setAttribute('fill', `url(#${id})`);
+  const line = document.createElementNS(ns, 'path');
+  line.setAttribute('d', d);
+  line.setAttribute('class', `bc-line ${cls}`);
+  svg.append(area, line);
+
+  pts.forEach(([x, y], i) => {
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('cx', String(x)); dot.setAttribute('cy', String(y)); dot.setAttribute('r', i === pts.length - 1 ? '6' : '4');
+    dot.setAttribute('class', `bc-dot ${cls}${i === pts.length - 1 ? ' last' : ''}`);
+    const val = document.createElementNS(ns, 'text');
+    val.setAttribute('x', String(x)); val.setAttribute('y', String(y - 14));
+    val.setAttribute('class', 'bc-val');
+    val.setAttribute('text-anchor', i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle');
+    val.textContent = fmt(points[i]);
+    const lab = document.createElementNS(ns, 'text');
+    lab.setAttribute('x', String(x)); lab.setAttribute('y', String(height - 12));
+    lab.setAttribute('class', 'bc-lab');
+    lab.setAttribute('text-anchor', i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle');
+    lab.textContent = labels[i] ?? '';
+    svg.append(dot, val, lab);
+  });
+  return svg;
+}

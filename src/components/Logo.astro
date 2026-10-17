@@ -1,0 +1,46 @@
+---
+// Logo HoloCote : une carte holographique traversée par une courbe de cote qui monte,
+// avec un éclat en coin. Le mot-symbole reprend le reflet irisé.
+interface Props { size?: number; withText?: boolean; class?: string }
+const { size = 34, withText = true, class: cls = '' } = Astro.props;
+const id = `hc${Math.random().toString(36).slice(2, 8)}`;
+---
+<span class={`hc-logo ${cls}`}>
+  <svg class="hc-mark" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+    <defs>
+      <linearGradient id={`${id}f`} x1="6" y1="4" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#3ef0ff" />
+        <stop offset=".38" stop-color="#8a7bff" />
+        <stop offset=".68" stop-color="#ff4fd8" />
+        <stop offset="1" stop-color="#ffd25a" />
+      </linearGradient>
+      <linearGradient id={`${id}s`} x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity=".55" />
+        <stop offset=".5" stop-color="#fff" stop-opacity="0" />
+      </linearGradient>
+    </defs>
+    <g transform="rotate(-10 24 24)">
+      <rect x="10" y="5" width="28" height="38" rx="5" fill={`url(#${id}f)`} />
+      <rect x="10" y="5" width="28" height="38" rx="5" fill={`url(#${id}s)`} />
+      <rect x="13.5" y="8.5" width="21" height="31" rx="2.5" fill="none" stroke="#07060d" stroke-opacity=".35" stroke-width="1.2" />
+      <path d="M14 33 L20.5 26 L25 29.5 L33 19" fill="none" stroke="#07060d" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M28.5 19 H33 V23.5" fill="none" stroke="#07060d" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+    <path d="M41 4.5 L42.4 8.6 L46.5 10 L42.4 11.4 L41 15.5 L39.6 11.4 L35.5 10 L39.6 8.6 Z" fill="#fff" />
+  </svg>
+  {withText && <span class="hc-word">HoloCote</span>}
+</span>
+
+<style>
+  .hc-logo { display: inline-flex; align-items: center; gap: 10px; }
+  .hc-mark { flex: 0 0 auto; filter: drop-shadow(0 0 10px rgba(255, 79, 216, 0.45)); transition: transform 0.4s cubic-bezier(.2,.9,.3,1.4); }
+  :global(a:hover) > .hc-logo .hc-mark, .hc-logo:hover .hc-mark { transform: rotate(-8deg) scale(1.08); }
+  .hc-word {
+    font-family: var(--font-display); font-weight: 800; font-size: 1.32rem; letter-spacing: -0.03em; line-height: 1;
+    background: linear-gradient(100deg, #ffffff 0%, #ffffff 38%, #3ef0ff 52%, #ff4fd8 70%, #ffd25a 88%);
+    background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: hc-sheen 7s ease-in-out infinite;
+  }
+  @keyframes hc-sheen { 0%, 100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
+  @media (prefers-reduced-motion: reduce) { .hc-word { animation: none; } }
+</style>

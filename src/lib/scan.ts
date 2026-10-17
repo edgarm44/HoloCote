@@ -6,7 +6,9 @@
 // La photo ne quitte jamais l'appareil.
 
 import { createWorker, PSM, type Worker } from 'tesseract.js';
-import { listSets, getCard, searchCards, imageUrl, type Card, type CardBrief, type Lang } from './tcgdex';
+import { getCard, searchCards, imageUrl, type Card, type CardBrief, type Lang } from './tcgdex';
+import { loadIndex, coreName, normalize, similarity, preloadIndexes } from './cardindex';
+export { preloadIndexes };
 import { url } from './ui';
 
 export interface ScanReading {
@@ -240,6 +242,18 @@ async function readZones(worker: Worker, src: Source, card: Rect): Promise<ScanR
     if (name.length >= 4) break;
   }
 
+  if (name.length < 4) {
+    // Repli : zone de nom plus serrée (cartes récentes, mention « DE BASE » à gauche).
+    const alt = cut(src, at(0.12, 0.03, 0.72, 0.1), 1200);
+    for (const mode of ['gray', 'otsu'] as const) {
+      const t = await ocr(worker, prepare(alt, mode), PSM.SINGLE_LINE);
+      raw += t + '\n';
+      const n2 = parseName(t);
+      if (n2.length > name.length) name = n2;
+      if (name.length >= 4) break;
+    }
+  }
+
   let num: { number?: string; total?: number } = {};
   outer: for (const zone of numZones) {
     for (const mode of ['gray', 'otsu', 'invert'] as const) {
@@ -247,6 +261,16 @@ async function readZones(worker: Worker, src: Source, card: Rect): Promise<ScanR
       raw += t + '\n';
       num = parseNumber(t);
       if (num.number) break outer;
+    }
+  }
+  if (!num.number) {
+    // Repli : toute la bande du bas, lue comme une seule ligne.
+    const strip = cut(src, at(0, 0.86, 1, 0.99), 1400);
+    for (const mode of ['gray', 'otsu', 'invert'] as const) {
+      const t = await ocr(worker, prepare(strip, mode), PSM.SINGLE_LINE, '0123456789/');
+      raw += t + '\n';
+      num = parseNumber(t);
+      if (num.number) break;
     }
   }
   let hp: number | undefined;
@@ -373,70 +397,6 @@ export async function readCard(input: Source | Source[], onProgress: Progress, c
 /* ------------------------------------------------------------------ */
 /* Correspondance avec l'index des cartes                              */
 /* ------------------------------------------------------------------ */
-
-export function normalize(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
-}
-
-/** Nom sans les suffixes de mécanique de jeu (ex, V, VMAX…). */
-function coreName(s: string): string {
-  return normalize(
-    s.replace(/\b(ex|EX|GX|V|VMAX|VSTAR|V-UNION|BREAK|LV\.?X|Prime|Star|δ|◇|☆)\b/g, ' '),
-  );
-}
-
-export function similarity(a: string, b: string): number {
-  if (!a || !b) return 0;
-  if (a === b) return 1;
-  if (b.length >= 4 && a.includes(b)) return 0.95;
-  if (a.length >= 4 && b.includes(a)) return 0.9;
-  const m = a.length, n = b.length;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    prev = cur;
-  }
-  return 1 - prev[n] / Math.max(m, n);
-}
-
-interface IndexEntry extends CardBrief { core: string; setId: string }
-interface CardIndex { cards: IndexEntry[]; sets: Map<string, { name: string; official: number }> }
-
-const indexes = new Map<Lang, Promise<CardIndex>>();
-
-function loadIndex(lang: Lang): Promise<CardIndex> {
-  if (!indexes.has(lang)) {
-    const p = (async () => {
-      const [cards, sets] = await Promise.all([
-        fetch(`https://api.tcgdex.net/v2/${lang}/cards`).then((r) => {
-          if (!r.ok) throw new Error(`TCGdex ${r.status}`);
-          return r.json() as Promise<CardBrief[]>;
-        }),
-        listSets(lang),
-      ]);
-      return {
-        cards: cards.map((c) => ({ ...c, core: coreName(c.name), setId: c.id.slice(0, c.id.length - c.localId.length - 1) })),
-        sets: new Map(sets.map((s) => [s.id, { name: s.name, official: s.cardCount?.official ?? 0 }])),
-      };
-    })();
-    p.catch(() => indexes.delete(lang));
-    indexes.set(lang, p);
-  }
-  return indexes.get(lang)!;
-}
-
-/** Précharge les index FR et EN (pendant que l'utilisateur vise). */
-export function preloadIndexes() {
-  loadIndex('fr').catch(() => {});
-  loadIndex('en').catch(() => {});
-}
 
 const sameNumber = (localId: string, n: string) =>
   localId.replace(/^0+/, '').toLowerCase() === n.replace(/^0+/, '').toLowerCase();

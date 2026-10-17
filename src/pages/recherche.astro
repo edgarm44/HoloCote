@@ -1,103 +1,245 @@
 ---
 import Base from '../layouts/Base.astro';
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 'Rayquaza', 'Ectoplasma', 'Mewtwo', 'Gardevoir', 'Ronflex', 'Léviator'];
 ---
-<Base title="Recherche" active="search" description="Cherche une carte par son nom : rareté, cote, fiche détaillée.">
-  <section class="hero">
-    <h1>Chercher <span class="holo-text">une carte</span></h1>
-    <p class="muted lead">Tape son nom, découvre sa rareté et sa cote. Ou <a href={`${base}/scanner/`}>scanne-la</a> avec ton téléphone.</p>
+<Base title="Recherche" active="search" description="Cherche une carte par son nom, même avec une faute : rareté, cote et fiche détaillée.">
+  <section class="s-hero">
+    <h1>Trouve n'importe<br />quelle carte.</h1>
+    <p class="lead">Même avec une faute. Tape « Dracofeu », « Pikatchu » ou « Raykaza » : HoloCote comprend.</p>
 
-    <form id="search-form" class="search" role="search">
-      <label class="sr-only" for="q">Nom de la carte</label>
-      <input id="q" name="q" type="search" placeholder="Dracaufeu, Pikachu, Mew…" autocomplete="off" minlength="2" required />
-      <div class="segmented" role="group" aria-label="Langue des cartes">
-        <button type="button" data-lang="fr" aria-pressed="true">FR</button>
-        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+    <form id="search-form" class="s-form" role="search" autocomplete="off">
+      <div class="s-box" id="s-box">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <label class="sr-only" for="q">Nom de la carte</label>
+        <input id="q" name="q" type="search" placeholder="Nom d'une carte…" role="combobox" aria-expanded="false" aria-controls="suggest" aria-autocomplete="list" />
+        <div class="segmented" role="group" aria-label="Langue des cartes">
+          <button type="button" data-lang="fr" aria-pressed="true">FR</button>
+          <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+        <button class="btn btn-primary" type="submit">Chercher</button>
       </div>
-      <button class="btn btn-primary" type="submit">Chercher</button>
+      <ul class="suggest" id="suggest" role="listbox" hidden></ul>
     </form>
   </section>
 
-  <section aria-live="polite">
-    <p id="summary" class="muted small"></p>
+  <section id="discover" class="discover">
+    <div class="d-block">
+      <h2>Les plus recherchées</h2>
+      <div class="chips" id="popular">
+        {popular.map((p) => <button type="button" class="chip" data-q={p}>{p}</button>)}
+      </div>
+    </div>
+    <div class="d-block" id="recent-block" hidden>
+      <div class="d-head">
+        <h2>Tes dernières recherches</h2>
+        <button type="button" class="link-btn" id="clear-recent">Effacer</button>
+      </div>
+      <div class="chips" id="recent"></div>
+    </div>
+    <div class="d-block" id="hot-block" hidden>
+      <h2>Les cartes du moment</h2>
+      <div class="grid" id="hot"></div>
+    </div>
+  </section>
+
+  <section id="results-wrap" hidden aria-live="polite">
+    <div class="r-head">
+      <h2 id="summary"></h2>
+      <p id="dym" class="dym" hidden></p>
+      <div class="chips" id="near"></div>
+    </div>
     <div id="results" class="grid"></div>
     <div id="state"></div>
   </section>
 
   <script>
-    import { searchCards, type Lang } from '../lib/tcgdex';
+    import { smartSearch, suggestNames, preloadSearch, recentSearches, rememberSearch, clearRecent } from '../lib/smartsearch';
+    import { loadMarket } from '../lib/market';
+    import { formatPrice, type Lang } from '../lib/tcgdex';
     import { cardTile, status, getLang, rememberLang, el } from '../lib/ui';
 
-    const form = document.getElementById('search-form') as HTMLFormElement;
-    const input = document.getElementById('q') as HTMLInputElement;
-    const results = document.getElementById('results')!;
-    const state = document.getElementById('state')!;
-    const summary = document.getElementById('summary')!;
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const form = $<HTMLFormElement>('search-form');
+    const input = $<HTMLInputElement>('q');
+    const suggest = $<HTMLUListElement>('suggest');
+    const results = $('results');
+    const state = $('state');
     const langButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-lang]')];
 
     let lang: Lang = getLang();
     let seq = 0;
+    let active = -1;
+    let options: string[] = [];
 
     const setLang = (l: Lang) => {
       lang = l;
       rememberLang(l);
       langButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === l)));
+      preloadSearch(l);
     };
     setLang(lang);
 
+    /* ---------- Page d'accueil de la recherche ---------- */
+    function renderRecent() {
+      const r = recentSearches();
+      $('recent-block').hidden = !r.length;
+      $('recent').replaceChildren(...r.map((q) => el('button', { type: 'button', class: 'chip', 'data-q': q }, [q])));
+    }
+    renderRecent();
+    $('clear-recent').addEventListener('click', () => { clearRecent(); renderRecent(); });
+    document.addEventListener('click', (e) => {
+      const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-q]');
+      if (chip) { input.value = chip.dataset.q!; run(chip.dataset.q!); }
+    });
+    loadMarket().then((m) => {
+      const hot = [...m.quotes].filter((q) => q.image).sort((a, b) => (b.change7 ?? -99) - (a.change7 ?? -99)).slice(0, 8);
+      if (!hot.length) return;
+      $('hot').replaceChildren(...hot.map((q) => cardTile({ id: q.id, localId: '', name: q.name, image: q.image }, q.lang, `${formatPrice(q.price, 'EUR')}${q.setName ? ` · ${q.setName}` : ''}`)));
+      $('hot-block').hidden = false;
+    }).catch(() => {});
+
+    /* ---------- Autocomplétion ---------- */
+    let suggestTimer = 0;
+    function closeSuggest() {
+      suggest.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      active = -1;
+    }
+    function paintActive() {
+      [...suggest.children].forEach((li, i) => li.setAttribute('aria-selected', String(i === active)));
+    }
+    input.addEventListener('input', () => {
+      window.clearTimeout(suggestTimer);
+      const q = input.value.trim();
+      if (q.length < 2) { closeSuggest(); return; }
+      suggestTimer = window.setTimeout(async () => {
+        const names = await suggestNames(q, lang, 7).catch(() => []);
+        if (input.value.trim() !== q) return;
+        options = names.map((n) => n.label);
+        if (!names.length) { closeSuggest(); return; }
+        suggest.replaceChildren(...names.map((n, i) => {
+          const li = el('li', { role: 'option', id: `opt-${i}`, 'aria-selected': 'false' }, [
+            el('span', { class: 'sg-name' }, [n.label]),
+            el('span', { class: 'sg-count' }, [`${n.cards.length} carte${n.cards.length > 1 ? 's' : ''}`]),
+          ]);
+          li.addEventListener('mousedown', (e) => { e.preventDefault(); input.value = n.label; closeSuggest(); run(n.label); });
+          return li;
+        }));
+        active = -1;
+        suggest.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+      }, 110);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (suggest.hidden) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(options.length - 1, active + 1); paintActive(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(-1, active - 1); paintActive(); }
+      else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); const v = options[active]; input.value = v; closeSuggest(); run(v); }
+      else if (e.key === 'Escape') closeSuggest();
+    });
+    input.addEventListener('blur', () => setTimeout(closeSuggest, 120));
+    input.addEventListener('focus', () => preloadSearch(lang));
+
+    /* ---------- Résultats ---------- */
     async function run(q: string) {
       const my = ++seq;
+      closeSuggest();
+      rememberSearch(q);
+      renderRecent();
+      history.replaceState(null, '', `?${new URLSearchParams({ q, lang })}`);
+      $('discover').hidden = true;
+      $('results-wrap').hidden = false;
       results.replaceChildren();
-      summary.textContent = '';
-      state.replaceChildren(status('Recherche en cours…'));
-      const params = new URLSearchParams({ q, lang });
-      history.replaceState(null, '', `?${params}`);
-      try {
-        const cards = await searchCards(q, lang);
-        if (my !== seq) return;
-        state.replaceChildren();
-        if (cards.length === 0) {
-          state.replaceChildren(
-            el('div', { class: 'panel' }, [
-              el('p', {}, [`Aucune carte trouvée pour « ${q} » en ${lang === 'fr' ? 'français' : 'anglais'}.`]),
-              el('p', { class: 'muted small' }, ["Vérifie l'orthographe ou essaie l'autre langue (Dracaufeu = Charizard)."]),
-            ]),
-          );
-          return;
-        }
-        summary.textContent = `${cards.length}${cards.length >= 36 ? '+' : ''} carte${cards.length > 1 ? 's' : ''} trouvée${cards.length > 1 ? 's' : ''}`;
-        results.replaceChildren(...cards.map((c) => cardTile(c, lang)));
-      } catch {
-        if (my !== seq) return;
-        state.replaceChildren(status('Impossible de joindre la base de cartes. Réessaie dans un instant.', false));
+      $('near').replaceChildren();
+      $('dym').hidden = true;
+      $('summary').textContent = '';
+      state.replaceChildren(status('Recherche en cours… (la première fois, HoloCote charge la liste de toutes les cartes)'));
+      const r = await smartSearch(q, lang);
+      if (my !== seq) return;
+      state.replaceChildren();
+      if (!r.cards.length) {
+        $('summary').textContent = `Aucune carte pour « ${q} »`;
+        state.replaceChildren(el('div', { class: 'panel empty' }, [
+          el('p', {}, [lang === 'fr' ? 'Essaie en anglais (Dracaufeu = Charizard) ou choisis une carte populaire ci-dessous.' : 'Essaie en français, ou choisis une carte populaire.']),
+          el('button', { type: 'button', class: 'btn', id: 'back-discover' }, ['Voir les suggestions']),
+        ]));
+        document.getElementById('back-discover')?.addEventListener('click', () => { $('discover').hidden = false; $('results-wrap').hidden = true; });
+        return;
       }
+      const n = r.cards.length;
+      $('summary').textContent = `${n}${n >= 72 ? '+' : ''} carte${n > 1 ? 's' : ''}`;
+      if (r.didYouMean) {
+        $('dym').replaceChildren('Résultats pour ', el('strong', {}, [r.didYouMean]), ` (tu as tapé « ${q} »)`);
+        $('dym').hidden = false;
+      }
+      const others = r.names.filter((x) => x.label !== r.didYouMean && x.score < 0.999).slice(0, 6);
+      $('near').replaceChildren(...others.map((x) => el('button', { type: 'button', class: 'chip small', 'data-q': x.label }, [x.label])));
+      results.replaceChildren(...r.cards.map((c) => cardTile(c, lang)));
     }
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const q = input.value.trim();
       if (q.length >= 2) run(q);
+      else input.focus();
     });
-    langButtons.forEach((b) =>
-      b.addEventListener('click', () => {
-        setLang(b.dataset.lang as Lang);
-        const q = input.value.trim();
-        if (q.length >= 2) run(q);
-      }),
-    );
+    langButtons.forEach((b) => b.addEventListener('click', () => {
+      setLang(b.dataset.lang as Lang);
+      const q = input.value.trim();
+      if (q.length >= 2 && !$('results-wrap').hidden) run(q);
+    }));
 
     const initial = new URLSearchParams(location.search).get('q');
-    if (initial) {
-      input.value = initial;
-      run(initial);
-    }
+    if (initial) { input.value = initial; run(initial); }
+    else input.focus({ preventScroll: true });
   </script>
 
   <style>
-    .hero { padding: 32px 0 28px; max-width: 760px; }
-    .lead { font-size: 1.1rem; }
-    .search { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
-    .search input { flex: 1 1 260px; font-size: 1.05rem; }
-    .search .btn { flex: 0 0 auto; }
+    .s-hero { padding: clamp(28px, 6vw, 64px) 0 28px; }
+    .s-hero h1 { font-size: clamp(2.6rem, 8vw, 5.6rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; margin-bottom: 18px; }
+    .lead { color: var(--muted); font-size: clamp(1.05rem, 2.2vw, 1.25rem); max-width: 620px; }
+    .s-form { position: relative; max-width: 760px; margin-top: 26px; }
+    .s-box {
+      display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 18px; border-radius: 20px;
+      background: rgba(14, 12, 26, 0.9); border: 1px solid var(--line);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .s-box:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(62, 240, 255, 0.14), 0 20px 60px rgba(0, 0, 0, 0.45); }
+    .s-box > svg { width: 22px; height: 22px; flex: 0 0 22px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+    .s-box input { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 1.15rem; padding: 12px 4px; min-height: 52px; box-shadow: none !important; }
+    .s-box .btn { min-height: 50px; border-radius: 14px; }
+    @media (max-width: 560px) {
+      .s-box { flex-wrap: wrap; padding: 8px; }
+      .s-box input { flex: 1 1 60%; }
+      .s-box .segmented { order: 3; }
+      .s-box .btn { order: 4; flex: 1; }
+    }
+    .suggest {
+      position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 15; list-style: none; margin: 0; padding: 6px;
+      background: rgba(14, 12, 26, 0.98); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+    .suggest :global(li) { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 10px; cursor: pointer; }
+    .suggest :global(li:hover), .suggest :global(li[aria-selected='true']) { background: var(--surface-2); }
+    .suggest :global(.sg-name) { font-weight: 700; }
+    .suggest :global(.sg-count) { color: var(--muted); font-size: 0.85rem; }
+
+    .discover { display: flex; flex-direction: column; gap: 34px; padding-bottom: 20px; }
+    .d-block h2 { font-size: clamp(1.25rem, 3vw, 1.6rem); margin-bottom: 14px; }
+    .d-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    .link-btn { border: 0; background: none; color: var(--muted); cursor: pointer; text-decoration: underline; font: inherit; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .discover :global(.chip), .r-head :global(.chip) {
+      border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer;
+      padding: 10px 16px; border-radius: 999px; font: inherit; font-weight: 600; transition: border-color 0.2s, transform 0.15s;
+    }
+    .discover :global(.chip:hover), .r-head :global(.chip:hover) { border-color: var(--cyan); }
+    .discover :global(.chip:active), .r-head :global(.chip:active) { transform: scale(0.96); }
+    .r-head :global(.chip.small) { padding: 7px 12px; font-size: 0.85rem; }
+    .r-head { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+    .r-head h2 { margin: 0; font-size: 1.3rem; }
+    .dym { margin: 0; color: var(--muted); }
+    .dym :global(strong) { color: var(--cyan); }
+    .empty p { margin: 0 0 12px; }
   </style>
 </Base>
