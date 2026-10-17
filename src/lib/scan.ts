@@ -6,20 +6,23 @@
 // La photo ne quitte jamais l'appareil.
 
 import { createWorker, PSM, type Worker } from 'tesseract.js';
-import { listSets, type CardBrief, type Lang } from './tcgdex';
+import { listSets, getCard, searchCards, imageUrl, type Card, type CardBrief, type Lang } from './tcgdex';
 import { url } from './ui';
 
 export interface ScanReading {
   name: string;
   number?: string;
   total?: number;
+  hp?: number;
   raw: string;
+  art?: Float32Array[]; // empreintes de l'illustration photographiée (légers décalages)
 }
 
 export interface Candidate extends CardBrief {
   lang: Lang;
   setName?: string;
   score: number;
+  card?: Card; // détails (PV, cote) pour les meilleures correspondances
 }
 
 type Source = ImageBitmap | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
@@ -209,6 +212,12 @@ export function parseNumber(text: string): { number?: string; total?: number } {
   return { number: String(Number(m[1])), total: Number(m[2]) };
 }
 
+export function parseHp(text: string): number | undefined {
+  const m = text.replace(/[oO]/g, '0').match(/(?:PV|HP)?\s*(\d{2,3})\s*$/m) ?? text.match(/(\d{2,3})/);
+  const v = m ? Number(m[1]) : NaN;
+  return v >= 30 && v <= 400 && v % 10 === 0 ? v : undefined;
+}
+
 async function ocr(worker: Worker, canvas: HTMLCanvasElement, psm: PSM, whitelist = ''): Promise<string> {
   await worker.setParameters({ tessedit_pageseg_mode: psm, tessedit_char_whitelist: whitelist });
   return (await worker.recognize(canvas)).data.text;
@@ -222,6 +231,7 @@ async function readZones(worker: Worker, src: Source, card: Rect): Promise<ScanR
   const nameZone = cut(src, at(0.03, 0.02, 0.82, 0.115), 1200);
   const numZones = [cut(src, at(0, 0.875, 0.5, 0.985), 1000), cut(src, at(0.5, 0.875, 1, 0.985), 1000)];
 
+  const hpZone = cut(src, at(0.6, 0.02, 0.98, 0.115), 800);
   let name = '', raw = '';
   for (const mode of ['gray', 'otsu', 'invert'] as const) {
     const t = await ocr(worker, prepare(nameZone, mode), PSM.SINGLE_LINE);
@@ -239,23 +249,122 @@ async function readZones(worker: Worker, src: Source, card: Rect): Promise<ScanR
       if (num.number) break outer;
     }
   }
-  return { name, ...num, raw };
+  let hp: number | undefined;
+  for (const mode of ['gray', 'otsu'] as const) {
+    const t = await ocr(worker, prepare(hpZone, mode), PSM.SINGLE_LINE, '0123456789PVH ');
+    raw += t + '\n';
+    hp = parseHp(t);
+    if (hp) break;
+  }
+  // Plusieurs empreintes légèrement décalées : tolère un cadrage imparfait.
+  const shifts = [[0, 0], [-0.03, 0], [0.03, 0], [0, -0.02], [0, 0.02]];
+  const art = shifts.map(([dx, dy]) => fingerprint(src, card, dx, dy)).filter(Boolean) as Float32Array[];
+  return { name, ...num, hp, raw, art: art.length ? art : undefined };
+}
+
+/* ------------------------------------------------------------------ */
+/* Empreinte visuelle de l'illustration                                */
+/* ------------------------------------------------------------------ */
+
+const FP_W = 16, FP_H = 10;
+
+/** Couleurs moyennes de l'illustration sur une grille 16 x 10 (valeurs RVB entre 0 et 1). */
+function fingerprint(src: CanvasImageSource, r: Rect, dx = 0, dy = 0): Float32Array | undefined {
+  try {
+    const c = document.createElement('canvas');
+    c.width = FP_W; c.height = FP_H;
+    const ctx = c.getContext('2d', { willReadFrequently: true })!;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, r.x + r.w * (0.09 + dx), r.y + r.h * (0.12 + dy), r.w * 0.82, r.h * 0.36, 0, 0, FP_W, FP_H);
+    const d = ctx.getImageData(0, 0, FP_W, FP_H).data; // lève une erreur si l'image est « protégée » (CORS)
+    const out = new Float32Array(FP_W * FP_H * 3);
+    for (let i = 0; i < FP_W * FP_H; i++) for (let ch = 0; ch < 3; ch++) out[i * 3 + ch] = d[i * 4 + ch] / 255;
+    return out;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Ressemblance entre deux illustrations, entre 0 et 1 :
+ * moitié couleurs (chromaticité, insensible à la luminosité),
+ * moitié formes (corrélation des niveaux de gris).
+ */
+export function visualSimilarity(a: Float32Array, b: Float32Array): number {
+  const n = a.length / 3;
+  let chroma = 0;
+  const ga = new Float32Array(n), gb = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const sa = a[i * 3] + a[i * 3 + 1] + a[i * 3 + 2] + 1e-3;
+    const sb = b[i * 3] + b[i * 3 + 1] + b[i * 3 + 2] + 1e-3;
+    chroma += Math.abs(a[i * 3] / sa - b[i * 3] / sb) + Math.abs(a[i * 3 + 1] / sa - b[i * 3 + 1] / sb);
+    ga[i] = sa; gb[i] = sb;
+  }
+  const colorSim = Math.max(0, 1 - chroma / n / 0.15);
+  const stats = (g: Float32Array) => {
+    const m = g.reduce((x, y) => x + y, 0) / n;
+    const sd = Math.sqrt(g.reduce((x, y) => x + (y - m) ** 2, 0) / n);
+    return { m, sd };
+  };
+  const A = stats(ga), B = stats(gb);
+  if (A.sd < 0.03 || B.sd < 0.03) return colorSim; // zone trop uniforme : seules les couleurs comptent
+  let cov = 0;
+  for (let i = 0; i < n; i++) cov += (ga[i] - A.m) * (gb[i] - B.m);
+  const corr = Math.max(0, cov / n / (A.sd * B.sd));
+  return 0.5 * colorSim + 0.5 * corr;
+}
+
+const fpCache = new Map<string, Promise<Float32Array | undefined>>();
+
+function imageFingerprint(base?: string): Promise<Float32Array | undefined> {
+  const src = imageUrl(base, 'low');
+  if (!src) return Promise.resolve(undefined);
+  if (!fpCache.has(src)) {
+    fpCache.set(src, new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.referrerPolicy = 'no-referrer';
+      img.onload = () => resolve(fingerprint(img, { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight }));
+      img.onerror = () => resolve(undefined);
+      img.src = src;
+    }));
+  }
+  return fpCache.get(src)!;
 }
 
 /**
  * Lit une carte. `card` = rectangle connu (cadre de visée de la caméra) ;
  * sinon on essaie la détection automatique, puis l'image entière.
+ * Plusieurs images (rafale de la caméra) : on fusionne les meilleures lectures.
  */
-export async function readCard(src: Source, onProgress: Progress, card?: Rect): Promise<ScanReading> {
+export async function readCard(input: Source | Source[], onProgress: Progress, card?: Rect): Promise<ScanReading> {
   const worker = await getWorker(onProgress);
-  const hypotheses: Rect[] = card ? [card] : [detectCard(src), centeredCard(src), centeredCard(src, 0.85)].filter(Boolean) as Rect[];
+  const frames = Array.isArray(input) ? input : [input];
+  const jobs: { src: Source; rect: Rect }[] = [];
+  for (const src of frames) {
+    const rects = card ? [card] : ([detectCard(src), centeredCard(src), centeredCard(src, 0.85)].filter(Boolean) as Rect[]);
+    rects.forEach((rect) => jobs.push({ src, rect }));
+  }
+  const q = (x: ScanReading) => (x.name.length >= 4 ? 1 : 0) + (x.number ? 1 : 0) + (x.total ? 0.5 : 0) + (x.hp ? 0.25 : 0);
   let best: ScanReading = { name: '', raw: '' };
-  for (let i = 0; i < hypotheses.length; i++) {
-    onProgress(i / hypotheses.length, 'Lecture de la carte…');
-    const r = await readZones(worker, src, hypotheses[i]);
-    const q = (x: ScanReading) => (x.name.length >= 4 ? 1 : 0) + (x.number ? 1 : 0) + (x.total ? 0.5 : 0);
-    if (q(r) > q(best)) best = r;
-    if (best.name.length >= 4 && best.number && best.total) break;
+  const numbers = new Map<string, number>();
+  for (let i = 0; i < jobs.length; i++) {
+    onProgress(i / jobs.length, 'Lecture de la carte…');
+    const r = await readZones(worker, jobs[i].src, jobs[i].rect);
+    if (r.number) {
+      const k = `${r.number}/${r.total ?? ''}`;
+      numbers.set(k, (numbers.get(k) ?? 0) + 1);
+    }
+    if (q(r) > q(best)) best = { ...r, name: r.name || best.name, hp: r.hp ?? best.hp, art: r.art ?? best.art };
+    else best = { ...best, name: best.name || r.name, hp: best.hp ?? r.hp, art: best.art ?? r.art };
+    if (q(best) >= 2.75) break;
+  }
+  // Vote sur le numéro si plusieurs lectures divergent.
+  if (numbers.size > 1) {
+    const [k] = [...numbers.entries()].sort((a, b) => b[1] - a[1])[0];
+    const [n, t] = k.split('/');
+    best.number = n;
+    best.total = t ? Number(t) : best.total;
   }
   await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO, tessedit_char_whitelist: '' });
   return best;
@@ -332,11 +441,8 @@ export function preloadIndexes() {
 const sameNumber = (localId: string, n: string) =>
   localId.replace(/^0+/, '').toLowerCase() === n.replace(/^0+/, '').toLowerCase();
 
-/**
- * Classe les cartes selon la lecture : ressemblance du nom (60 %),
- * numéro exact (25 %), nombre de cartes de l'extension (15 %).
- */
-export async function findCandidates(r: Pick<ScanReading, 'name' | 'number' | 'total'>): Promise<Candidate[]> {
+/** Classement sur le texte seul : nom (60 %), numéro (25 %), taille de l'extension (15 %). */
+async function textCandidates(r: Pick<ScanReading, 'name' | 'number' | 'total'>): Promise<Candidate[]> {
   const q = coreName(r.name);
   const results: Candidate[] = [];
   const settled = await Promise.allSettled([loadIndex('fr'), loadIndex('en')]);
@@ -354,12 +460,57 @@ export async function findCandidates(r: Pick<ScanReading, 'name' | 'number' | 't
       if (score >= 0.35) results.push({ ...c, lang, setName: set?.name, score });
     }
   });
-  if (settled.every((s) => s.status === 'rejected')) throw new Error('Index indisponible');
 
-  // Si le numéro a été mal lu, on retente sur le nom seul.
-  if (!results.some((c) => c.score >= 0.6) && r.number && q.length >= 3) {
-    return findCandidates({ name: r.name });
+  if (settled.every((s) => s.status === 'rejected')) {
+    // Index indisponible : recherche classique par nom.
+    for (const lang of ['fr', 'en'] as Lang[]) {
+      const found = await searchCards(r.name, lang, 100).catch(() => [] as CardBrief[]);
+      for (const c of found) {
+        const numScore = r.number && sameNumber(c.localId, r.number) ? 1 : 0;
+        results.push({ ...c, lang, score: 0.6 * similarity(q, coreName(c.name)) + 0.25 * numScore });
+      }
+      if (results.length) break;
+    }
+    if (!results.length) throw new Error('Index indisponible');
   }
-  results.sort((a, b) => b.score - a.score);
-  return results.slice(0, 24);
+
+  if (!results.some((c) => c.score >= 0.6) && r.number && q.length >= 3) {
+    return textCandidates({ name: r.name });
+  }
+  return results.sort((a, b) => b.score - a.score).slice(0, 30);
+}
+
+/**
+ * Classe les cartes selon la lecture, puis affine les meilleures avec
+ * les points de vie et la ressemblance de l'illustration.
+ */
+export async function findCandidates(r: Pick<ScanReading, 'name' | 'number' | 'total' | 'hp' | 'art'>): Promise<Candidate[]> {
+  const list = await textCandidates(r);
+  const top = list.slice(0, 8);
+  const vis = new Map<Candidate, number>();
+  await Promise.all(
+    top.map(async (c) => {
+      const [card, fp] = await Promise.all([
+        getCard(c.id, c.lang).catch(() => null),
+        r.art ? imageFingerprint(c.image) : Promise.resolve(undefined),
+      ]);
+      if (card) {
+        c.card = card;
+        c.setName = c.setName ?? card.set?.name;
+        if (r.hp && card.hp) c.score += card.hp === r.hp ? 0.1 : -0.05;
+      }
+      if (r.art && fp) vis.set(c, Math.max(...r.art.map((a) => visualSimilarity(a, fp))));
+    }),
+  );
+  // Illustration : bonus pour la plus ressemblante, comparée aux autres candidates.
+  if (vis.size) {
+    const values = [...vis.values()];
+    const ref = values.length >= 2 ? values.reduce((x, y) => x + y, 0) / values.length : 0.4;
+    for (const [c, v] of vis) c.score += 0.3 * (v - ref);
+  }
+  if (location.search.includes('debug')) {
+    for (const c of top) console.info('[scan] ' + JSON.stringify({ id: c.id, lang: c.lang, score: c.score, hp: c.card?.hp, readHp: r.hp, vis: vis.get(c) }));
+  }
+  list.sort((a, b) => b.score - a.score);
+  return list.slice(0, 24).map((c) => ({ ...c, score: Math.min(1, c.score) }));
 }

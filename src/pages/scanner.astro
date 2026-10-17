@@ -1,10 +1,11 @@
 ---
 import Base from '../layouts/Base.astro';
+import { CONDITIONS } from '../lib/condition';
 ---
-<Base title="Scanner" active="scanner" description="Prends ta carte en photo pour retrouver sa cote et sa rareté.">
+<Base title="Scanner" active="scanner" description="Scanne ta carte pour retrouver sa cote et l'ajouter à ta collection.">
   <section class="intro">
     <h1>Scanner <span class="holo-text">une carte</span></h1>
-    <p class="muted">Place ta carte dans le cadre, à plat, bien éclairée et sans reflet. Le scanner lit son nom et son numéro (ex. 136/198) puis retrouve la carte.</p>
+    <p class="muted">Place ta carte dans le cadre, à plat, bien éclairée et sans reflet. Le scanner lit son nom, ses PV et son numéro (ex. 136/198), compare l'illustration, puis te propose de l'ajouter à ta collection.</p>
   </section>
 
   <div class="layout">
@@ -44,20 +45,72 @@ import Base from '../layouts/Base.astro';
         </div>
         <button class="btn" type="submit">Relancer la recherche</button>
       </form>
+      <p class="muted small" id="hp-line"></p>
       <p class="muted small">Le numéro est imprimé en bas de la carte. S'il est bien lu, la bonne carte sort presque toujours en premier. Corrige-le si besoin.</p>
     </div>
   </div>
 
+  <section id="confirm" class="panel confirm" hidden aria-live="polite">
+    <div class="confirm-visual" data-slot="visual"></div>
+    <div class="confirm-info">
+      <p class="muted small" data-slot="set"></p>
+      <h2 data-slot="name"></h2>
+      <div class="badges" data-slot="badges"></div>
+      <p class="confirm-price" data-slot="price"></p>
+      <p class="muted small" data-slot="price-note"></p>
+
+      <form data-slot="form" class="confirm-form">
+        <p class="ask">C'est bien ta carte ? Ajoute-la à ta collection.</p>
+        <div class="row">
+          <div class="field" data-slot="finish-field">
+            <label for="finish">Finition</label>
+            <select id="finish">
+              <option value="normal">Normale</option>
+              <option value="reverse">Reverse holo</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="condition">État</label>
+            <select id="condition">
+              {CONDITIONS.map((c) => <option value={c.code} selected={c.code === 'NM'}>{c.label} — {c.hint}</option>)}
+            </select>
+          </div>
+          <div class="field qty">
+            <label for="qty">Quantité</label>
+            <input id="qty" type="number" min="1" max="999" value="1" inputmode="numeric" />
+          </div>
+        </div>
+        <p class="muted small" data-slot="estimate"></p>
+        <div class="confirm-actions">
+          <button class="btn btn-primary" type="submit">Ajouter à ma collection</button>
+          <button class="btn" type="button" data-slot="not-mine">Ce n'est pas ma carte</button>
+          <a class="btn" data-slot="details">Voir la fiche</a>
+        </div>
+      </form>
+      <div data-slot="done" class="done" hidden>
+        <p><strong>Ajoutée à ta collection.</strong></p>
+        <div class="confirm-actions">
+          <button class="btn btn-primary" type="button" data-slot="again">Scanner une autre carte</button>
+          <a class="btn" data-slot="to-collection">Voir ma collection</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section aria-live="polite" class="candidates">
-    <h2 id="cand-title" hidden>Est-ce ta carte ?</h2>
-    <p id="cand-note" class="notice" hidden>Vérifie que c'est bien ta carte avant de l'ajouter : touche-la pour voir sa fiche.</p>
+    <h2 id="cand-title" hidden>Est-ce une de ces cartes ?</h2>
+    <p id="cand-note" class="notice" hidden>Touche ta carte pour la vérifier et l'ajouter à ta collection.</p>
     <div id="cand" class="grid"></div>
     <div id="cand-state"></div>
   </section>
 
   <script>
-    import { readCard, findCandidates, parseNumber, loadImage, warmUp, preloadIndexes, type Rect } from '../lib/scan';
-    import { cardTile, status, el } from '../lib/ui';
+    import { readCard, findCandidates, parseNumber, loadImage, warmUp, preloadIndexes, type Rect, type Candidate, type ScanReading } from '../lib/scan';
+    import { getCard, priceFor, hasReverse, formatPrice, formatDate, type Card, type Finish } from '../lib/tcgdex';
+    import { rarityTier, tierLabel, valueBadge, USD_TO_EUR } from '../lib/rarity';
+    import { conditionFactor, type Condition } from '../lib/condition';
+    import { addItem } from '../lib/collection';
+    import { holoCard, status, el, toast, url } from '../lib/ui';
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     const video = $<HTMLVideoElement>('video');
@@ -73,15 +126,19 @@ import Base from '../layouts/Base.astro';
     const plabel = $('progress-label');
     const nameIn = $<HTMLInputElement>('name');
     const numIn = $<HTMLInputElement>('number');
+    const hpLine = $('hp-line');
     const manual = $<HTMLFormElement>('manual');
     const cand = $('cand');
     const candState = $('cand-state');
     const candTitle = $('cand-title');
     const candNote = $('cand-note');
+    const confirmBox = $('confirm');
+    const slot = (n: string) => confirmBox.querySelector(`[data-slot="${n}"]`) as HTMLElement;
 
     let stream: MediaStream | null = null;
     let busy = false;
     let previewUrl: string | null = null;
+    let lastReading: Pick<ScanReading, 'hp' | 'art'> = {};
 
     warmUp();
     preloadIndexes();
@@ -92,17 +149,120 @@ import Base from '../layouts/Base.astro';
       plabel.textContent = label;
     };
 
-    function quality(score: number) {
-      return score >= 0.85 ? 'Correspondance forte' : score >= 0.6 ? 'Correspondance probable' : 'Correspondance faible';
+    const quality = (s: number) => (s >= 0.85 ? 'Correspondance forte' : s >= 0.6 ? 'Correspondance probable' : 'Correspondance faible');
+
+    /* ---------- Confirmation et ajout ---------- */
+
+    let current: { card: Card; lang: 'fr' | 'en' } | null = null;
+    const finishSel = $<HTMLSelectElement>('finish');
+    const condSel = $<HTMLSelectElement>('condition');
+    const qtyIn = $<HTMLInputElement>('qty');
+
+    function refreshPrice() {
+      if (!current) return;
+      const finish = finishSel.value as Finish;
+      const p = priceFor(current.card, finish);
+      const eur = p ? (p.unit === 'EUR' ? p.value : p.value * USD_TO_EUR) : null;
+      const vb = valueBadge(eur);
+      const tier = rarityTier(current.card.rarity);
+      slot('badges').replaceChildren(
+        el('span', { class: `badge tier-${tier}` }, [current.card.rarity ?? tierLabel[tier]]),
+        el('span', { class: `badge value-${vb.level}` }, [vb.label]),
+      );
+      if (p) {
+        slot('price').textContent = formatPrice(p.value, p.unit);
+        const d = formatDate(p.updated);
+        slot('price-note').textContent = `Cote ${finish === 'reverse' ? 'reverse holo ' : ''}indicative${d ? ` du ${d}` : ''}, source ${p.source}${p.unit === 'USD' ? ' (marché américain)' : ''}.`;
+        const q = Math.max(1, Math.min(999, Number(qtyIn.value) || 1));
+        slot('estimate').textContent = `Valeur estimée : ${formatPrice(p.value * conditionFactor(condSel.value as Condition) * q, p.unit)}`;
+      } else {
+        slot('price').textContent = 'Pas de cote';
+        slot('price-note').textContent = "Aucune vente récente connue pour cette carte.";
+        slot('estimate').textContent = '';
+      }
+    }
+
+    async function openConfirm(c: Candidate) {
+      let card = c.card ?? null;
+      if (!card) {
+        confirmBox.hidden = false;
+        slot('visual').replaceChildren(status('Chargement…'));
+        card = await getCard(c.id, c.lang).catch(() => null);
+      }
+      if (!card) { toast('Impossible de charger cette carte'); confirmBox.hidden = true; return; }
+      current = { card, lang: c.lang };
+      slot('visual').replaceChildren(holoCard(card.image, card.name, 'high'));
+      slot('name').textContent = card.name;
+      const off = card.set?.cardCount?.official;
+      slot('set').textContent = `${quality(c.score)} · ${card.set?.name ?? ''} · N° ${card.localId}${off ? `/${off}` : ''} · ${c.lang.toUpperCase()}`;
+      const rev = hasReverse(card);
+      slot('finish-field').hidden = !rev;
+      finishSel.value = 'normal';
+      condSel.value = 'NM';
+      qtyIn.value = '1';
+      (slot('details') as HTMLAnchorElement).href = url(`/carte/?id=${encodeURIComponent(card.id)}&lang=${c.lang}`);
+      slot('form').hidden = false;
+      slot('done').hidden = true;
+      refreshPrice();
+      confirmBox.hidden = false;
+      confirmBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    [finishSel, condSel].forEach((s) => s.addEventListener('change', refreshPrice));
+    qtyIn.addEventListener('input', refreshPrice);
+
+    slot('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!current) return;
+      const { card, lang } = current;
+      addItem({
+        cardId: card.id,
+        lang,
+        name: card.name,
+        image: card.image,
+        setName: card.set?.name,
+        rarity: card.rarity,
+        condition: condSel.value as Condition,
+        finish: finishSel.value as Finish,
+        quantity: Number(qtyIn.value) || 1,
+      });
+      slot('form').hidden = true;
+      slot('done').hidden = false;
+      toast(`${card.name} ajoutée à ta collection`);
+    });
+    slot('not-mine').addEventListener('click', () => {
+      confirmBox.hidden = true;
+      cand.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    slot('again').addEventListener('click', () => {
+      confirmBox.hidden = true;
+      cand.replaceChildren();
+      candTitle.hidden = candNote.hidden = true;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (!stream) openCamera();
+    });
+    (slot('to-collection') as HTMLAnchorElement).href = url('/collection/');
+
+    /* ---------- Recherche des candidats ---------- */
+
+    function candidateTile(c: Candidate): HTMLElement {
+      const btn = el('button', { type: 'button', class: 'tile tile-btn' }, [
+        holoCard(c.image, c.name),
+        el('span', { class: 'tile-name' }, [c.name]),
+        el('span', { class: 'tile-meta' }, [`${quality(c.score)} · ${c.lang.toUpperCase()} · N° ${c.localId}${c.setName ? ` · ${c.setName}` : ''}`]),
+      ]);
+      btn.addEventListener('click', () => openConfirm(c));
+      return btn;
     }
 
     async function search(name: string, numberText: string) {
       const { number, total } = parseNumber(numberText);
       cand.replaceChildren();
+      confirmBox.hidden = true;
       candTitle.hidden = candNote.hidden = true;
       candState.replaceChildren(status('Recherche des cartes correspondantes…'));
       try {
-        const list = await findCandidates({ name, number, total });
+        const list = await findCandidates({ name, number, total, ...lastReading });
         candState.replaceChildren();
         if (!list.length) {
           candState.replaceChildren(
@@ -113,33 +273,35 @@ import Base from '../layouts/Base.astro';
           );
           return;
         }
-        candTitle.hidden = candNote.hidden = false;
-        // Lecture corrigée : on affiche le nom exact de la meilleure correspondance.
         if (list[0].score >= 0.85) {
           nameIn.value = list[0].name;
-          if (!numIn.value.includes('/') && number) numIn.value = number;
+          if (!numIn.value && number) numIn.value = number;
         }
-        cand.replaceChildren(
-          ...list.map((c) => cardTile(c, c.lang, `${quality(c.score)} · ${c.lang.toUpperCase()} · N° ${c.localId}${c.setName ? ` · ${c.setName}` : ''}`)),
-        );
+        candTitle.hidden = candNote.hidden = false;
+        cand.replaceChildren(...list.map(candidateTile));
+        // Correspondance nette : on propose directement l'ajout de la meilleure carte.
+        if (list[0].score >= 0.85 && (list.length === 1 || list[0].score - list[1].score >= 0.08)) openConfirm(list[0]);
       } catch {
         candState.replaceChildren(status('Impossible de joindre la base de cartes. Réessaie dans un instant.', false));
       }
     }
 
-    async function analyse(src: CanvasImageSource & (ImageBitmap | HTMLImageElement | HTMLCanvasElement), rect?: Rect) {
+    async function analyse(src: ImageBitmap | HTMLImageElement | HTMLCanvasElement | HTMLCanvasElement[], rect?: Rect) {
       if (busy) return;
       busy = true;
       shootBtn.disabled = true;
       cand.replaceChildren();
       candState.replaceChildren();
+      confirmBox.hidden = true;
       candTitle.hidden = candNote.hidden = true;
       try {
         onProgress(0, 'Lecture de la carte…');
         const r = await readCard(src, onProgress, rect);
         progress.hidden = true;
+        lastReading = { hp: r.hp, art: r.art };
         nameIn.value = r.name;
         numIn.value = r.number ? `${r.number}${r.total ? `/${r.total}` : ''}` : '';
+        hpLine.textContent = r.hp ? `PV lus : ${r.hp}` : '';
         if (!r.name && !r.number) {
           candState.replaceChildren(
             el('div', { class: 'panel' }, [
@@ -159,7 +321,8 @@ import Base from '../layouts/Base.astro';
       }
     }
 
-    /* Caméra avec cadre de visée */
+    /* ---------- Caméra ---------- */
+
     async function openCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -167,7 +330,7 @@ import Base from '../layouts/Base.astro';
           audio: false,
         });
       } catch {
-        candState.replaceChildren(status("Caméra indisponible ou refusée. Utilise « Choisir une photo ».", false));
+        candState.replaceChildren(status('Caméra indisponible ou refusée. Utilise « Choisir une photo ».', false));
         return;
       }
       video.srcObject = stream;
@@ -185,7 +348,6 @@ import Base from '../layouts/Base.astro';
       camBtn.textContent = 'Ouvrir la caméra';
     }
 
-    /** Convertit le cadre affiché en coordonnées de l'image vidéo (vidéo en object-fit: cover). */
     function guideRect(): Rect {
       const vb = viewer.getBoundingClientRect();
       const gb = guide.getBoundingClientRect();
@@ -195,19 +357,27 @@ import Base from '../layouts/Base.astro';
       return { x: (gb.left - vb.left - ox) / scale, y: (gb.top - vb.top - oy) / scale, w: gb.width / scale, h: gb.height / scale };
     }
 
-    camBtn.addEventListener('click', () => (stream ? closeCamera() : openCamera()));
+    const grab = () => {
+      const f = document.createElement('canvas');
+      f.width = video.videoWidth;
+      f.height = video.videoHeight;
+      f.getContext('2d')!.drawImage(video, 0, 0);
+      return f;
+    };
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+    camBtn.addEventListener('click', () => (stream ? closeCamera() : openCamera()));
     shootBtn.addEventListener('click', async () => {
-      if (!stream) return;
-      const frame = document.createElement('canvas');
-      frame.width = video.videoWidth;
-      frame.height = video.videoHeight;
-      frame.getContext('2d')!.drawImage(video, 0, 0);
-      const rect = guideRect();
-      await analyse(frame, rect);
+      if (!stream || busy) return;
+      // Rafale de 3 images : les lectures sont fusionnées (plus robuste au flou et aux reflets).
+      const frames = [grab()];
+      await wait(150); frames.push(grab());
+      await wait(150); frames.push(grab());
+      await analyse(frames, guideRect());
     });
 
-    /* Photo depuis la galerie */
+    /* ---------- Photo ---------- */
+
     photo.addEventListener('change', async () => {
       const file = photo.files?.[0];
       photo.value = '';
@@ -272,5 +442,26 @@ import Base from '../layouts/Base.astro';
     .manual { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 10px; }
     .manual .field { flex: 1 1 200px; }
     .manual .num { flex: 0 1 140px; }
+
+    .confirm {
+      display: grid; gap: 24px; grid-template-columns: 1fr; margin-bottom: 28px;
+      border-color: rgba(62, 240, 255, 0.35);
+      box-shadow: 0 0 0 1px rgba(255, 79, 216, 0.15), 0 20px 60px rgba(138, 123, 255, 0.15);
+      scroll-margin-top: 80px;
+    }
+    @media (min-width: 720px) { .confirm { grid-template-columns: 260px 1fr; align-items: start; } }
+    .confirm-visual { max-width: 260px; width: 100%; margin: 0 auto; }
+    .confirm-info { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .confirm-info h2 { margin: 0; font-size: clamp(1.4rem, 4vw, 2rem); }
+    .confirm-info p { margin: 0; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .confirm-price { font-family: var(--font-display); font-size: 2rem; font-weight: 700; }
+    .confirm-form { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .ask { font-weight: 600; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row .field { flex: 1 1 160px; }
+    .row .qty { flex: 0 1 110px; }
+    .confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .done { padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
   </style>
 </Base>

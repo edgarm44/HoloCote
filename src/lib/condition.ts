@@ -4,7 +4,7 @@
 export type Condition = 'M' | 'NM' | 'EX' | 'GD' | 'PL' | 'PO';
 
 export const CONDITIONS: { code: Condition; label: string; hint: string; factor: number }[] = [
-  { code: 'M', label: 'Mint', hint: 'Parfaite, sortie du booster', factor: 1.1 },
+  { code: 'M', label: 'Mint', hint: 'Parfaite, sortie du booster', factor: 1.0 },
   { code: 'NM', label: 'Near Mint', hint: 'Quasi parfaite', factor: 1.0 },
   { code: 'EX', label: 'Excellent', hint: 'Légère usure des bords', factor: 0.8 },
   { code: 'GD', label: 'Good', hint: 'Usure visible, petits plis', factor: 0.6 },

@@ -102,6 +102,8 @@ export function imageUrl(base: string | undefined, quality: 'low' | 'high' = 'lo
   return base ? `${base}/${quality}.webp` : null;
 }
 
+export type Finish = 'normal' | 'reverse';
+
 export interface PriceInfo {
   value: number;      // cote retenue
   low?: number;
@@ -113,30 +115,68 @@ export interface PriceInfo {
 const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
 
-/**
- * Cote d'une carte : tendance Cardmarket (EUR) en priorité, sinon moyenne,
- * puis prix « market » TCGplayer (USD) en secours.
- */
-export function bestPrice(card: Card): PriceInfo | null {
+/** Médiane des valeurs disponibles : résiste à une vente isolée anormale. */
+function median(values: (number | undefined)[]): number | undefined {
+  const v = values.filter((x): x is number => x !== undefined).sort((a, b) => a - b);
+  if (!v.length) return undefined;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
+function cardmarket(card: Card, holo: boolean): PriceInfo | null {
   const cm = card.pricing?.cardmarket;
-  if (cm) {
-    const value = num(cm.trend) ?? num(cm.avg30) ?? num(cm.avg) ?? num(cm['trend-holo']) ?? num(cm['avg-holo']);
-    if (value) {
-      return { value, low: num(cm.low) ?? num(cm['low-holo']), unit: 'EUR', source: 'Cardmarket', updated: cm.updated };
-    }
-  }
+  if (!cm) return null;
+  const k = (f: string) => num((cm as Record<string, unknown>)[holo ? `${f}-holo` : f]);
+  // Cardmarket : tendance, moyennes 7 et 30 jours ; on prend la médiane des trois.
+  const value = median([k('trend'), k('avg7'), k('avg30')]) ?? k('avg') ?? k('avg1');
+  return value ? { value, low: k('low'), unit: 'EUR', source: 'Cardmarket', updated: cm.updated } : null;
+}
+
+function tcgplayer(card: Card, keys: string[]): PriceInfo | null {
   const tp = card.pricing?.tcgplayer;
-  if (tp) {
-    for (const key of ['normal', 'holofoil', 'reverse-holofoil', '1st-edition-holofoil', '1st-edition']) {
-      const v = tp[key];
-      if (v && typeof v === 'object') {
-        const value = num(v.marketPrice) ?? num(v.midPrice);
-        if (value) return { value, low: num(v.lowPrice), unit: 'USD', source: 'TCGplayer', updated: tp.updated as string | undefined };
-      }
+  if (!tp) return null;
+  for (const key of keys) {
+    const v = tp[key];
+    if (v && typeof v === 'object') {
+      const value = num(v.marketPrice) ?? num(v.midPrice);
+      if (value) return { value, low: num(v.lowPrice), unit: 'USD', source: 'TCGplayer', updated: tp.updated as string | undefined };
     }
   }
   return null;
 }
+
+const TP_NORMAL = ['normal', 'unlimited', '1st-edition'];
+const TP_HOLO = ['holofoil', 'unlimited-holofoil', '1st-edition-holofoil'];
+const TP_REVERSE = ['reverse-holofoil', 'reverse'];
+
+/**
+ * Cote d'une carte pour une finition.
+ * - normal : version standard (ou holo pour une carte qui n'existe qu'en holo) ;
+ * - reverse : version « reverse holo » (champs « -holo » de Cardmarket).
+ * Cardmarket (EUR) en priorité, TCGplayer (USD) en secours.
+ */
+export function priceFor(card: Card, finish: Finish = 'normal'): PriceInfo | null {
+  const v = card.variants ?? {};
+  const holoOnly = v.normal === false && v.holo === true;
+  if (finish === 'reverse') {
+    return cardmarket(card, true) ?? tcgplayer(card, TP_REVERSE);
+  }
+  return (
+    cardmarket(card, false) ??
+    (holoOnly ? cardmarket(card, true) : null) ??
+    tcgplayer(card, holoOnly ? [...TP_HOLO, ...TP_NORMAL] : [...TP_NORMAL, ...TP_HOLO])
+  );
+}
+
+/** La carte existe-t-elle en reverse holo avec une cote distincte ? */
+export function hasReverse(card: Card): boolean {
+  const v = card.variants ?? {};
+  if (v.reverse === false) return false;
+  if (v.normal === false && v.holo === true && !cardmarket(card, false)) return false;
+  return !!(cardmarket(card, true) ?? tcgplayer(card, TP_REVERSE));
+}
+
+export const bestPrice = (card: Card) => priceFor(card, 'normal');
 
 export function formatPrice(value: number, unit: 'EUR' | 'USD'): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: unit, maximumFractionDigits: value < 100 ? 2 : 0 }).format(value);

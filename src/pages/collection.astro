@@ -3,39 +3,89 @@ import Base from '../layouts/Base.astro';
 import { CONDITIONS } from '../lib/condition';
 ---
 <Base title="Ma collection" active="collection" description="Ta collection de cartes, stockée dans ton navigateur.">
-  <section class="head">
-    <div>
+  <section class="hero">
+    <div class="hero-text">
+      <p class="eyebrow">Mon classeur</p>
       <h1>Ma <span class="holo-text">collection</span></h1>
-      <p class="muted">Stockée uniquement dans ce navigateur. Pense à l'exporter pour la sauvegarder ou la retrouver sur un autre appareil.</p>
+      <p class="muted">Les cartes que tu as scannées. Elles restent dans ce navigateur : exporte-les pour les sauvegarder.</p>
+      <div class="stats">
+        <div class="stat stat-main">
+          <span class="stat-label">Valeur estimée</span>
+          <span class="stat-value holo-text" id="total">—</span>
+          <span class="stat-sub" id="total-detail"></span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Cartes</span>
+          <span class="stat-value" id="count">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Différentes</span>
+          <span class="stat-value" id="unique">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Rares et +</span>
+          <span class="stat-value" id="rares">0</span>
+        </div>
+      </div>
     </div>
-    <div class="panel totals">
-      <p class="muted small">Valeur totale estimée</p>
-      <p class="total" id="total">—</p>
-      <p class="muted small" id="total-detail"></p>
-    </div>
+    <a class="gem" id="gem" hidden>
+      <span class="gem-label">Ta pépite</span>
+      <div class="gem-card" id="gem-card"></div>
+      <span class="gem-name" id="gem-name"></span>
+      <span class="gem-value" id="gem-value"></span>
+    </a>
   </section>
 
   <p id="storage-warning" class="notice" hidden>
     Ton navigateur bloque le stockage (navigation privée ?) : la collection sera perdue en fermant l'onglet. Exporte-la avant de partir.
   </p>
 
-  <div class="tools">
-    <button class="btn" id="export" type="button">Exporter (fichier)</button>
-    <label class="btn" for="import-file">Importer</label>
-    <input id="import-file" type="file" accept="application/json,.json" class="sr-only" />
-    <button class="btn btn-danger" id="clear" type="button">Supprimer ma collection</button>
+  <div class="toolbar" id="toolbar" hidden>
+    <div class="chips" role="group" aria-label="Filtrer par rareté">
+      <button type="button" data-filter="all" aria-pressed="true">Toutes</button>
+      <button type="button" data-filter="rare" aria-pressed="false">Rares et +</button>
+      <button type="button" data-filter="ultra" aria-pressed="false">Ultra rares</button>
+      <button type="button" data-filter="secret" aria-pressed="false">Secrètes</button>
+    </div>
+    <div class="toolbar-right">
+      <label class="sr-only" for="find">Chercher dans ma collection</label>
+      <input id="find" type="search" placeholder="Chercher…" autocomplete="off" />
+      <label class="sr-only" for="sort">Trier</label>
+      <select id="sort">
+        <option value="value">Plus chères</option>
+        <option value="recent">Plus récentes</option>
+        <option value="name">Nom A → Z</option>
+        <option value="rarity">Rareté</option>
+      </select>
+    </div>
   </div>
 
-  <div id="list" class="list"></div>
-  <div id="empty" class="panel empty" hidden>
-    <h2>Ta collection est vide</h2>
-    <p class="muted">Cherche une carte ou scanne-la, puis touche « Ajouter » sur sa fiche.</p>
-    <a class="btn btn-primary" id="go-search" href="#">Chercher une carte</a>
+  <div id="binder" class="binder"></div>
+  <p id="no-match" class="muted" hidden>Aucune carte ne correspond à ce filtre.</p>
+
+  <div id="empty" class="empty" hidden>
+    <div class="empty-cards" aria-hidden="true"><span></span><span></span><span></span></div>
+    <h2>Ton classeur est vide</h2>
+    <p class="muted">Scanne ta première carte : le scanner la reconnaît et te propose de l'ajouter ici.</p>
+    <a class="btn btn-primary" id="go-scan" href="#">Scanner une carte</a>
   </div>
 
-  <p class="notice">Estimation approximative : cote Near Mint multipliée par un coefficient d'état. Elle ne tient pas compte de l'authenticité ni d'une expertise.</p>
+  <section class="panel backup">
+    <div>
+      <h2>Sauvegarde</h2>
+      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil.</p>
+    </div>
+    <div class="backup-actions">
+      <button class="btn" id="export" type="button">Exporter</button>
+      <label class="btn" for="import-file">Importer</label>
+      <input id="import-file" type="file" accept="application/json,.json" class="sr-only" />
+      <button class="btn btn-danger" id="clear" type="button">Tout supprimer</button>
+    </div>
+  </section>
 
-  <dialog id="confirm">
+  <p class="notice">Estimation approximative : cote Near Mint (Cardmarket) multipliée par un coefficient d'état. Elle ne tient pas compte de l'authenticité ni d'une expertise.</p>
+
+  <dialog id="confirm-clear">
     <form method="dialog">
       <h2>Supprimer toute la collection ?</h2>
       <p class="muted">Cette action est définitive. Exporte-la d'abord si tu veux la garder.</p>
@@ -46,121 +96,175 @@ import { CONDITIONS } from '../lib/condition';
     </form>
   </dialog>
 
-  <template id="row-tpl">
-    <article class="row">
-      <a class="thumb" data-slot="link"></a>
-      <div class="meta">
-        <a class="name" data-slot="name-link"></a>
-        <span class="muted small" data-slot="sub"></span>
-        <span class="value small" data-slot="value"></span>
+  <template id="slot-tpl">
+    <article class="slot">
+      <a class="slot-card" data-slot="link">
+        <span class="qty-badge" data-slot="qty-badge"></span>
+        <span class="finish-badge" data-slot="finish-badge" hidden>Reverse</span>
+        <span class="value-tag" data-slot="value"></span>
+      </a>
+      <div class="slot-info">
+        <span class="slot-name" data-slot="name"></span>
+        <span class="slot-sub" data-slot="sub"></span>
       </div>
-      <div class="controls">
-        <label class="sr-only">État</label>
+      <div class="slot-controls">
+        <div class="stepper">
+          <button type="button" data-slot="minus" aria-label="Retirer un exemplaire">−</button>
+          <span data-slot="qty"></span>
+          <button type="button" data-slot="plus" aria-label="Ajouter un exemplaire">+</button>
+        </div>
         <select data-slot="cond">
-          {CONDITIONS.map((c) => <option value={c.code}>{c.label}</option>)}
+          {CONDITIONS.map((c) => <option value={c.code} title={c.label}>{c.code} · {c.label}</option>)}
         </select>
-        <label class="sr-only">Quantité</label>
-        <input data-slot="qty" type="number" min="1" max="999" inputmode="numeric" />
-        <button class="btn icon" data-slot="remove" type="button" aria-label="Retirer">✕</button>
+        <button type="button" class="remove" data-slot="remove" aria-label="Retirer">✕</button>
       </div>
     </article>
   </template>
 
   <script>
     import { getItems, updateItem, removeItem, clearAll, exportJson, importJson, storageAvailable, type Item } from '../lib/collection';
-    import { conditionFactor, conditionLabel, type Condition } from '../lib/condition';
-    import { getCard, bestPrice, formatPrice, imageUrl, type PriceInfo } from '../lib/tcgdex';
-    import { el, toast, url } from '../lib/ui';
+    import { conditionFactor, type Condition } from '../lib/condition';
+    import { getCard, priceFor, formatPrice, type Card, type PriceInfo } from '../lib/tcgdex';
+    import { rarityTier, type Tier } from '../lib/rarity';
+    import { holoCard, el, toast, url } from '../lib/ui';
 
-    const list = document.getElementById('list')!;
-    const empty = document.getElementById('empty')!;
-    const total = document.getElementById('total')!;
-    const totalDetail = document.getElementById('total-detail')!;
-    const tpl = document.getElementById('row-tpl') as HTMLTemplateElement;
-    (document.getElementById('go-search') as HTMLAnchorElement).href = url('/');
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const binder = $('binder');
+    const tpl = $<HTMLTemplateElement>('slot-tpl');
+    const sortSel = $<HTMLSelectElement>('sort');
+    const findIn = $<HTMLInputElement>('find');
+    const chips = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    $<HTMLAnchorElement>('go-scan').href = url('/scanner/');
+    if (!storageAvailable()) $('storage-warning').hidden = false;
 
-    if (!storageAvailable()) document.getElementById('storage-warning')!.hidden = false;
+    const cards = new Map<string, Card | null>(); // détails chargés depuis TCGdex
+    const ckey = (i: Pick<Item, 'cardId' | 'lang'>) => `${i.lang}:${i.cardId}`;
+    let filter: 'all' | 'rare' | 'ultra' | 'secret' = 'all';
 
-    const prices = new Map<string, PriceInfo | null>();
-    const pkey = (i: Pick<Item, 'cardId' | 'lang'>) => `${i.lang}:${i.cardId}`;
+    const TIER_RANK: Record<Tier, number> = { common: 0, uncommon: 1, rare: 2, ultra: 3, secret: 4 };
+
+    function priceOf(it: Item): PriceInfo | null | undefined {
+      const c = cards.get(ckey(it));
+      if (c === undefined) return undefined;
+      return c ? priceFor(c, it.finish) : null;
+    }
+    const lineValue = (it: Item, p: PriceInfo) => p.value * conditionFactor(it.condition) * it.quantity;
+    const unitEur = (it: Item) => {
+      const p = priceOf(it);
+      return p ? (p.unit === 'EUR' ? p.value : p.value * 0.9) * conditionFactor(it.condition) : -1;
+    };
 
     function render() {
       const items = getItems();
-      empty.hidden = items.length > 0;
-      list.replaceChildren(
-        ...items.map((it) => {
-          const node = tpl.content.cloneNode(true) as DocumentFragment;
-          const s = (n: string) => node.querySelector(`[data-slot="${n}"]`) as HTMLElement;
-          const href = url(`/carte/?id=${encodeURIComponent(it.cardId)}&lang=${it.lang}`);
-          const link = s('link') as HTMLAnchorElement;
-          link.href = href;
-          const src = imageUrl(it.image, 'low');
-          link.append(src ? el('img', { src, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : el('span', { class: 'ph' }));
-          const nl = s('name-link') as HTMLAnchorElement;
-          nl.href = href;
-          nl.textContent = it.name;
-          s('sub').textContent = [it.setName, it.rarity, it.lang.toUpperCase()].filter(Boolean).join(' · ');
-          const p = prices.get(pkey(it));
-          s('value').textContent = p === undefined ? 'Cote en cours…' : p === null ? 'Pas de cote'
-            : `${formatPrice(p.value * conditionFactor(it.condition) * it.quantity, p.unit)} (${conditionLabel(it.condition)} × ${it.quantity})`;
+      $('empty').hidden = items.length > 0;
+      $('toolbar').hidden = items.length === 0;
+      renderStats(items);
 
-          const cond = s('cond') as HTMLSelectElement;
-          cond.value = it.condition;
-          cond.setAttribute('aria-label', `État de ${it.name}`);
-          cond.addEventListener('change', () => { updateItem(it, { condition: cond.value as Condition }); render(); });
-
-          const qty = s('qty') as HTMLInputElement;
-          qty.value = String(it.quantity);
-          qty.setAttribute('aria-label', `Quantité de ${it.name}`);
-          qty.addEventListener('change', () => { updateItem(it, { quantity: Number(qty.value) }); render(); });
-
-          s('remove').setAttribute('aria-label', `Retirer ${it.name}`);
-          s('remove').addEventListener('click', () => { removeItem(it); render(); toast(`${it.name} retirée`); });
-          return node;
-        }),
+      const q = findIn.value.trim().toLowerCase();
+      let shown = items.filter((it) => {
+        const t = TIER_RANK[rarityTier(it.rarity)];
+        if (filter === 'rare' && t < 2) return false;
+        if (filter === 'ultra' && t < 3) return false;
+        if (filter === 'secret' && t < 4) return false;
+        return !q || it.name.toLowerCase().includes(q) || (it.setName ?? '').toLowerCase().includes(q);
+      });
+      const sort = sortSel.value;
+      shown = shown.sort((a, b) =>
+        sort === 'name' ? a.name.localeCompare(b.name, 'fr')
+        : sort === 'recent' ? b.addedAt - a.addedAt
+        : sort === 'rarity' ? TIER_RANK[rarityTier(b.rarity)] - TIER_RANK[rarityTier(a.rarity)] || unitEur(b) - unitEur(a)
+        : unitEur(b) - unitEur(a),
       );
-      renderTotal(items);
+      $('no-match').hidden = !(items.length && !shown.length);
+      binder.replaceChildren(...shown.map(slotFor));
     }
 
-    function renderTotal(items: Item[]) {
+    function slotFor(it: Item): DocumentFragment {
+      const node = tpl.content.cloneNode(true) as DocumentFragment;
+      const s = (n: string) => node.querySelector(`[data-slot="${n}"]`) as HTMLElement;
+      const tier = rarityTier(it.rarity);
+      (node.querySelector('.slot') as HTMLElement).dataset.tier = tier;
+      const link = s('link') as HTMLAnchorElement;
+      link.href = url(`/carte/?id=${encodeURIComponent(it.cardId)}&lang=${it.lang}`);
+      link.prepend(holoCard(it.image, it.name));
+      s('qty-badge').textContent = `×${it.quantity}`;
+      s('qty-badge').hidden = it.quantity < 2;
+      s('finish-badge').hidden = it.finish !== 'reverse';
+      const p = priceOf(it);
+      s('value').textContent = p === undefined ? '…' : p ? formatPrice(lineValue(it, p), p.unit) : 'Sans cote';
+      s('name').textContent = it.name;
+      s('sub').textContent = [it.setName, it.lang.toUpperCase()].filter(Boolean).join(' · ');
+      s('qty').textContent = String(it.quantity);
+
+      s('minus').addEventListener('click', () => {
+        if (it.quantity <= 1) { removeItem(it); toast(`${it.name} retirée`); }
+        else updateItem(it, { quantity: it.quantity - 1 });
+        render();
+      });
+      s('plus').addEventListener('click', () => { updateItem(it, { quantity: it.quantity + 1 }); render(); });
+      const cond = s('cond') as HTMLSelectElement;
+      cond.value = it.condition;
+      cond.setAttribute('aria-label', `État de ${it.name}`);
+      cond.addEventListener('change', () => { updateItem(it, { condition: cond.value as Condition }); render(); });
+      s('remove').setAttribute('aria-label', `Retirer ${it.name}`);
+      s('remove').addEventListener('click', () => { removeItem(it); render(); toast(`${it.name} retirée`); });
+      return node;
+    }
+
+    function renderStats(items: Item[]) {
       const sums: Record<string, number> = {};
-      let missing = 0, pending = 0, cards = 0;
+      let count = 0, missing = 0, pending = 0, rares = 0;
+      let gem: { it: Item; p: PriceInfo; eur: number } | null = null;
       for (const it of items) {
-        cards += it.quantity;
-        const p = prices.get(pkey(it));
+        count += it.quantity;
+        if (TIER_RANK[rarityTier(it.rarity)] >= 2) rares += it.quantity;
+        const p = priceOf(it);
         if (p === undefined) { pending++; continue; }
         if (p === null) { missing += it.quantity; continue; }
-        sums[p.unit] = (sums[p.unit] ?? 0) + p.value * conditionFactor(it.condition) * it.quantity;
+        sums[p.unit] = (sums[p.unit] ?? 0) + lineValue(it, p);
+        const eur = unitEur(it);
+        if (!gem || eur > gem.eur) gem = { it, p, eur };
       }
       const parts = Object.entries(sums).map(([u, v]) => formatPrice(v, u as 'EUR' | 'USD'));
-      total.textContent = parts.length ? parts.join(' + ') : items.length ? '—' : '0 €';
-      totalDetail.textContent = [
-        `${cards} carte${cards > 1 ? 's' : ''}`,
-        pending ? 'calcul en cours…' : '',
-        missing ? `${missing} sans cote` : '',
-        sums.USD ? 'USD = cote du marché américain' : '',
-      ].filter(Boolean).join(' · ');
+      $('total').textContent = parts.length ? parts.join(' + ') : items.length ? '—' : '0 €';
+      $('total-detail').textContent = [pending ? 'calcul en cours…' : '', missing ? `${missing} sans cote` : '', sums.USD ? 'USD : marché américain' : '']
+        .filter(Boolean).join(' · ');
+      $('count').textContent = String(count);
+      $('unique').textContent = String(items.length);
+      $('rares').textContent = String(rares);
+
+      const gemEl = $<HTMLAnchorElement>('gem');
+      gemEl.hidden = !gem;
+      if (gem) {
+        gemEl.href = url(`/carte/?id=${encodeURIComponent(gem.it.cardId)}&lang=${gem.it.lang}`);
+        $('gem-card').replaceChildren(holoCard(gem.it.image, gem.it.name, 'high'));
+        $('gem-name').textContent = gem.it.name;
+        $('gem-value').textContent = formatPrice(gem.p.value * conditionFactor(gem.it.condition), gem.p.unit);
+      }
     }
 
-    async function loadPrices() {
-      const todo = [...new Map(getItems().map((i) => [pkey(i), i])).values()].filter((i) => !prices.has(pkey(i)));
+    async function loadCards() {
+      const todo = [...new Map(getItems().map((i) => [ckey(i), i])).values()].filter((i) => !cards.has(ckey(i)));
       let idx = 0;
       const worker = async () => {
         while (idx < todo.length) {
           const it = todo[idx++];
-          try {
-            const card = await getCard(it.cardId, it.lang);
-            prices.set(pkey(it), card ? bestPrice(card) : null);
-          } catch {
-            prices.set(pkey(it), null);
-          }
+          cards.set(ckey(it), await getCard(it.cardId, it.lang).catch(() => null));
         }
       };
       await Promise.all(Array.from({ length: 6 }, worker));
       render();
     }
 
-    document.getElementById('export')!.addEventListener('click', () => {
+    chips.forEach((b) => b.addEventListener('click', () => {
+      filter = b.dataset.filter as typeof filter;
+      chips.forEach((c) => c.setAttribute('aria-pressed', String(c === b)));
+      render();
+    }));
+    sortSel.addEventListener('change', render);
+    findIn.addEventListener('input', render);
+
+    $('export').addEventListener('click', () => {
       const blob = new Blob([exportJson()], { type: 'application/json' });
       const a = el('a', { href: URL.createObjectURL(blob), download: `holocote-collection-${new Date().toISOString().slice(0, 10)}.json` });
       document.body.append(a);
@@ -168,7 +272,7 @@ import { CONDITIONS } from '../lib/condition';
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     });
 
-    const importInput = document.getElementById('import-file') as HTMLInputElement;
+    const importInput = $<HTMLInputElement>('import-file');
     importInput.addEventListener('change', async () => {
       const f = importInput.files?.[0];
       importInput.value = '';
@@ -177,48 +281,122 @@ import { CONDITIONS } from '../lib/condition';
       try {
         // Avec une collection existante, l'import ajoute les cartes (fusion) au lieu de tout remplacer.
         const n = importJson(await f.text(), getItems().length > 0 ? 'merge' : 'replace');
-        toast(`${n} ligne${n > 1 ? 's' : ''} importée${n > 1 ? 's' : ''}`);
+        toast(`${n} carte${n > 1 ? 's' : ''} importée${n > 1 ? 's' : ''}`);
         render();
-        loadPrices();
+        loadCards();
       } catch {
         toast("Ce fichier n'est pas une collection HoloCote");
       }
     });
 
-    const dialog = document.getElementById('confirm') as HTMLDialogElement;
-    document.getElementById('clear')!.addEventListener('click', () => dialog.showModal());
+    const dialog = $<HTMLDialogElement>('confirm-clear');
+    $('clear').addEventListener('click', () => dialog.showModal());
     dialog.addEventListener('close', () => {
-      if (dialog.returnValue === 'ok') { clearAll(); prices.clear(); render(); toast('Collection supprimée'); }
+      if (dialog.returnValue === 'ok') { clearAll(); render(); toast('Collection supprimée'); }
     });
 
     render();
-    loadPrices();
+    loadCards();
   </script>
 
   <style>
-    .head { display: grid; gap: 18px; grid-template-columns: 1fr; padding: 24px 0 12px; }
-    @media (min-width: 820px) { .head { grid-template-columns: 1fr 320px; align-items: end; } }
-    .totals p { margin: 0; }
-    .total { font-family: var(--font-display); font-size: 2rem; font-weight: 700; }
-    .tools { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 20px; }
-    .list { display: flex; flex-direction: column; gap: 10px; }
-    .row {
-      display: grid; grid-template-columns: 56px 1fr; gap: 12px 14px; align-items: center;
-      padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+    .hero { display: grid; gap: 28px; grid-template-columns: 1fr; padding: 20px 0 28px; align-items: center; }
+    @media (min-width: 860px) { .hero { grid-template-columns: 1fr 260px; } }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.75rem; color: var(--cyan); margin: 0 0 6px; font-weight: 700; }
+    .hero-text h1 { margin-bottom: 8px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+    .stat {
+      display: flex; flex-direction: column; gap: 2px; padding: 14px 16px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
     }
-    @media (min-width: 720px) { .row { grid-template-columns: 56px 1fr auto; } }
-    .thumb { width: 56px; aspect-ratio: 245 / 342; border-radius: 4px; overflow: hidden; background: var(--bg-2); display: block; }
-    .thumb img { width: 100%; height: 100%; object-fit: cover; }
-    .meta { display: flex; flex-direction: column; min-width: 0; }
-    .name { color: var(--text); font-weight: 600; text-decoration: none; }
-    .name:hover { text-decoration: underline; }
-    .value { color: var(--cyan); }
-    .controls { display: flex; gap: 8px; grid-column: 1 / -1; }
-    @media (min-width: 720px) { .controls { grid-column: auto; } }
-    .controls select { flex: 1 1 140px; min-width: 0; }
-    .controls input { width: 80px; flex: 0 0 80px; }
-    .icon { padding: 0; width: 46px; flex: 0 0 46px; }
-    .empty { text-align: center; padding: 36px 20px; }
+    .stat-main {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, rgba(62, 240, 255, 0.08), rgba(255, 79, 216, 0.08));
+      border-color: rgba(138, 123, 255, 0.35);
+    }
+    .stat-label { font-size: 0.7rem; white-space: nowrap; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-value { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; }
+    .stat-main .stat-value { font-size: clamp(2rem, 6vw, 2.8rem); }
+    .stat-sub { font-size: 0.8rem; color: var(--muted); }
+
+    .gem {
+      position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      text-decoration: none; color: var(--text); padding: 18px; border-radius: 22px;
+      background: radial-gradient(circle at 50% 35%, rgba(255, 210, 90, 0.18), transparent 65%), var(--surface);
+      border: 1px solid rgba(255, 210, 90, 0.3);
+    }
+    .gem-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.18em; color: var(--gold); font-weight: 700; }
+    .gem-card { width: 100%; max-width: 200px; filter: drop-shadow(0 0 24px rgba(255, 210, 90, 0.35)); }
+    .gem-name { font-weight: 600; text-align: center; }
+    .gem-value { font-family: var(--font-display); font-weight: 700; color: var(--gold); }
+
+    .toolbar { display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chips button {
+      border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+      padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+    }
+    .chips button[aria-pressed='true'] { color: #0a0812; background: var(--holo); border-color: transparent; }
+    .toolbar-right { display: flex; gap: 8px; flex: 1 1 280px; justify-content: flex-end; }
+    .toolbar-right input { flex: 1 1 140px; max-width: 220px; }
+    .toolbar-right select { flex: 0 0 auto; width: auto; }
+
+    .binder {
+      display: grid; gap: 18px 14px;
+      grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+      padding: 12px; border-radius: 22px;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 100% 28px,
+        var(--bg-2);
+      border: 1px solid var(--line);
+      margin-bottom: 24px;
+    }
+    .binder:empty { display: none; }
+    @media (min-width: 720px) { .binder { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 22px 18px; padding: 22px; } }
+    .slot { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .slot-card { position: relative; display: block; border-radius: 10px; }
+    .slot[data-tier='rare'] .slot-card { box-shadow: 0 0 0 1px rgba(62, 240, 255, 0.35), 0 0 18px rgba(62, 240, 255, 0.15); }
+    .slot[data-tier='ultra'] .slot-card { box-shadow: 0 0 0 1px rgba(255, 79, 216, 0.45), 0 0 22px rgba(255, 79, 216, 0.22); }
+    .slot[data-tier='secret'] .slot-card { box-shadow: 0 0 0 2px rgba(255, 210, 90, 0.6), 0 0 28px rgba(255, 210, 90, 0.3); }
+    .qty-badge, .finish-badge {
+      position: absolute; top: 8px; z-index: 2; padding: 3px 8px; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 700; backdrop-filter: blur(6px);
+    }
+    .qty-badge { right: 8px; background: var(--magenta); color: #0a0812; }
+    .finish-badge { left: 8px; background: rgba(7, 6, 13, 0.75); color: var(--cyan); border: 1px solid rgba(62, 240, 255, 0.4); }
+    .value-tag {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 22px 10px 8px;
+      border-radius: 0 0 10px 10px; text-align: right;
+      background: linear-gradient(transparent, rgba(7, 6, 13, 0.9));
+      font-family: var(--font-display); font-weight: 700; font-size: 0.95rem;
+    }
+    .slot-info { display: flex; flex-direction: column; min-width: 0; }
+    .slot-name { font-weight: 600; font-size: 0.92rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slot-sub { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slot-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+    .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+    .stepper button { width: 30px; height: 34px; border: 0; background: none; color: var(--text); cursor: pointer; font-size: 1.05rem; }
+    .stepper span { min-width: 22px; text-align: center; font-weight: 700; font-size: 0.9rem; }
+    .slot-controls select { order: 3; flex: 1 1 100%; min-width: 0; min-height: 36px; padding: 4px 6px; font-size: 0.8rem; border-radius: 10px; }
+    .remove { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
+    .remove:hover { color: var(--danger); border-color: rgba(255, 90, 122, 0.5); }
+
+    .empty { text-align: center; padding: 48px 20px; border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 22px; margin-bottom: 24px; }
+    .empty-cards { position: relative; height: 120px; margin-bottom: 18px; }
+    .empty-cards span {
+      position: absolute; left: 50%; top: 0; width: 76px; height: 106px; border-radius: 8px;
+      background: var(--holo); background-size: 200% 100%; animation: shimmer 6s linear infinite; opacity: 0.85;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .empty-cards span:nth-child(1) { transform: translateX(-110%) rotate(-12deg); opacity: 0.4; }
+    .empty-cards span:nth-child(2) { transform: translateX(-50%); }
+    .empty-cards span:nth-child(3) { transform: translateX(10%) rotate(12deg); opacity: 0.4; }
+
+    .backup { display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .backup h2 { margin-bottom: 4px; font-size: 1.1rem; }
+    .backup p { margin: 0; }
+    .backup-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
     dialog {
       background: var(--bg-2); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius);
       padding: 24px; max-width: min(440px, calc(100vw - 32px));

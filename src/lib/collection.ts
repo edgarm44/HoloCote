@@ -3,7 +3,7 @@
 // sauvegarder ou changer d'appareil.
 
 import { isCondition, type Condition } from './condition';
-import type { Lang } from './tcgdex';
+import type { Finish, Lang } from './tcgdex';
 
 export interface Item {
   cardId: string;
@@ -13,6 +13,7 @@ export interface Item {
   setName?: string;
   rarity?: string;
   condition: Condition;
+  finish: Finish;
   quantity: number;
   addedAt: number;
 }
@@ -62,8 +63,10 @@ export function storageAvailable(): boolean {
   }
 }
 
-const sameLine = (a: Pick<Item, 'cardId' | 'lang' | 'condition'>, b: Pick<Item, 'cardId' | 'lang' | 'condition'>) =>
-  a.cardId === b.cardId && a.lang === b.lang && a.condition === b.condition;
+export type ItemKey = Pick<Item, 'cardId' | 'lang' | 'condition' | 'finish'>;
+
+const sameLine = (a: ItemKey, b: ItemKey) =>
+  a.cardId === b.cardId && a.lang === b.lang && a.condition === b.condition && a.finish === b.finish;
 
 export function getItems(): Item[] {
   return [...load().items].sort((a, b) => b.addedAt - a.addedAt);
@@ -81,7 +84,7 @@ export function addItem(item: Omit<Item, 'addedAt'>): void {
   save(store);
 }
 
-export function updateItem(key: Pick<Item, 'cardId' | 'lang' | 'condition'>, patch: Partial<Pick<Item, 'quantity' | 'condition'>>): void {
+export function updateItem(key: ItemKey, patch: Partial<Pick<Item, 'quantity' | 'condition'>>): void {
   const store = load();
   const item = store.items.find((i) => sameLine(i, key));
   if (!item) return;
@@ -98,7 +101,7 @@ export function updateItem(key: Pick<Item, 'cardId' | 'lang' | 'condition'>, pat
   save(store);
 }
 
-export function removeItem(key: Pick<Item, 'cardId' | 'lang' | 'condition'>): void {
+export function removeItem(key: ItemKey): void {
   const store = load();
   store.items = store.items.filter((i) => !sameLine(i, key));
   save(store);
@@ -166,6 +169,7 @@ function validate(data: unknown): Store | null {
       setName: str(r.setName),
       rarity: str(r.rarity, 80),
       condition: r.condition,
+      finish: r.finish === 'reverse' ? 'reverse' : 'normal',
       quantity: clampQty(r.quantity as number),
       addedAt: typeof r.addedAt === 'number' ? r.addedAt : Date.now(),
     });

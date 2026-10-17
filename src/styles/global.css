@@ -215,3 +215,7 @@ input:focus-visible, select:focus-visible {
   max-width: calc(100vw - 32px);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Tuiles cliquables créées par script (scanner) */
+.tile-btn { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.tile-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 8px; }
