@@ -4,20 +4,27 @@ import Base from '../layouts/Base.astro';
 <Base title="Scanner" active="scanner" description="Prends ta carte en photo pour retrouver sa cote et sa rareté.">
   <section class="intro">
     <h1>Scanner <span class="holo-text">une carte</span></h1>
-    <p class="muted">Prends ta carte en photo, bien à plat, de face et sans reflet, en remplissant l'image. Le scanner lit le nom et le numéro (ex. 136/198), puis te propose les cartes correspondantes.</p>
+    <p class="muted">Place ta carte dans le cadre, à plat, bien éclairée et sans reflet. Le scanner lit son nom et son numéro (ex. 136/198) puis retrouve la carte.</p>
   </section>
 
   <div class="layout">
     <div class="panel capture">
-      <label class="drop" for="photo">
-        <img id="preview" alt="Aperçu de ta photo" hidden />
-        <span id="drop-text">
-          <strong>Prendre une photo</strong><br />
-          <span class="muted small">ou choisir une image</span>
-        </span>
-      </label>
-      <input id="photo" type="file" accept="image/*" capture="environment" class="sr-only" />
-      <p class="muted small">Ta photo est analysée sur ton appareil : elle n'est jamais envoyée ni enregistrée.</p>
+      <div class="viewer" id="viewer">
+        <video id="video" playsinline muted hidden></video>
+        <img id="preview" alt="Ta photo" hidden />
+        <div class="guide" id="guide" hidden><span></span></div>
+        <div class="idle" id="idle">
+          <p><strong>Vise ta carte</strong></p>
+          <p class="muted small">Elle doit remplir le cadre</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="cam-btn" type="button">Ouvrir la caméra</button>
+        <button class="btn btn-primary" id="shoot-btn" type="button" hidden>Scanner</button>
+        <label class="btn" for="photo">Choisir une photo</label>
+        <input id="photo" type="file" accept="image/*" class="sr-only" />
+      </div>
+      <p class="muted small">L'image est analysée sur ton appareil : elle n'est jamais envoyée ni enregistrée.</p>
       <div id="progress" hidden>
         <div class="bar"><span id="progress-fill"></span></div>
         <p id="progress-label" class="muted small"></p>
@@ -37,7 +44,7 @@ import Base from '../layouts/Base.astro';
         </div>
         <button class="btn" type="submit">Relancer la recherche</button>
       </form>
-      <p class="muted small">Le scanner peut se tromper : corrige le nom ou le numéro si besoin.</p>
+      <p class="muted small">Le numéro est imprimé en bas de la carte. S'il est bien lu, la bonne carte sort presque toujours en premier. Corrige-le si besoin.</p>
     </div>
   </div>
 
@@ -49,24 +56,45 @@ import Base from '../layouts/Base.astro';
   </section>
 
   <script>
-    import { readCard, findCandidates, parseNumber } from '../lib/scan';
+    import { readCard, findCandidates, parseNumber, loadImage, warmUp, preloadIndexes, type Rect } from '../lib/scan';
     import { cardTile, status, el } from '../lib/ui';
 
-    const photo = document.getElementById('photo') as HTMLInputElement;
-    const preview = document.getElementById('preview') as HTMLImageElement;
-    const dropText = document.getElementById('drop-text')!;
-    const progress = document.getElementById('progress')!;
-    const fill = document.getElementById('progress-fill')!;
-    const plabel = document.getElementById('progress-label')!;
-    const nameIn = document.getElementById('name') as HTMLInputElement;
-    const numIn = document.getElementById('number') as HTMLInputElement;
-    const manual = document.getElementById('manual') as HTMLFormElement;
-    const cand = document.getElementById('cand')!;
-    const candState = document.getElementById('cand-state')!;
-    const candTitle = document.getElementById('cand-title')!;
-    const candNote = document.getElementById('cand-note')!;
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const video = $<HTMLVideoElement>('video');
+    const viewer = $('viewer');
+    const guide = $('guide');
+    const idle = $('idle');
+    const preview = $<HTMLImageElement>('preview');
+    const camBtn = $<HTMLButtonElement>('cam-btn');
+    const shootBtn = $<HTMLButtonElement>('shoot-btn');
+    const photo = $<HTMLInputElement>('photo');
+    const progress = $('progress');
+    const fill = $('progress-fill');
+    const plabel = $('progress-label');
+    const nameIn = $<HTMLInputElement>('name');
+    const numIn = $<HTMLInputElement>('number');
+    const manual = $<HTMLFormElement>('manual');
+    const cand = $('cand');
+    const candState = $('cand-state');
+    const candTitle = $('cand-title');
+    const candNote = $('cand-note');
 
+    let stream: MediaStream | null = null;
+    let busy = false;
     let previewUrl: string | null = null;
+
+    warmUp();
+    preloadIndexes();
+
+    const onProgress = (p: number, label: string) => {
+      progress.hidden = false;
+      fill.style.width = `${Math.round(p * 100)}%`;
+      plabel.textContent = label;
+    };
+
+    function quality(score: number) {
+      return score >= 0.85 ? 'Correspondance forte' : score >= 0.6 ? 'Correspondance probable' : 'Correspondance faible';
+    }
 
     async function search(name: string, numberText: string) {
       const { number, total } = parseNumber(numberText);
@@ -80,39 +108,35 @@ import Base from '../layouts/Base.astro';
           candState.replaceChildren(
             el('div', { class: 'panel' }, [
               el('p', {}, ['Aucune carte trouvée.']),
-              el('p', { class: 'muted small' }, ['Corrige le nom ou le numéro ci-dessus, ou reprends la photo plus près, avec plus de lumière.']),
+              el('p', { class: 'muted small' }, ['Corrige le nom ou le numéro ci-dessus, ou recommence avec plus de lumière.']),
             ]),
           );
           return;
         }
         candTitle.hidden = candNote.hidden = false;
+        // Lecture corrigée : on affiche le nom exact de la meilleure correspondance.
+        if (list[0].score >= 0.85) {
+          nameIn.value = list[0].name;
+          if (!numIn.value.includes('/') && number) numIn.value = number;
+        }
         cand.replaceChildren(
-          ...list.map((c) => cardTile(c, c.lang, `${c.lang.toUpperCase()} · N° ${c.localId}${c.setName ? ` · ${c.setName}` : ''}`)),
+          ...list.map((c) => cardTile(c, c.lang, `${quality(c.score)} · ${c.lang.toUpperCase()} · N° ${c.localId}${c.setName ? ` · ${c.setName}` : ''}`)),
         );
       } catch {
         candState.replaceChildren(status('Impossible de joindre la base de cartes. Réessaie dans un instant.', false));
       }
     }
 
-    photo.addEventListener('change', async () => {
-      const file = photo.files?.[0];
-      if (!file) return;
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(file);
-      preview.src = previewUrl;
-      preview.hidden = false;
-      dropText.hidden = true;
-
-      progress.hidden = false;
-      fill.style.width = '0%';
-      plabel.textContent = 'Préparation du scanner…';
+    async function analyse(src: CanvasImageSource & (ImageBitmap | HTMLImageElement | HTMLCanvasElement), rect?: Rect) {
+      if (busy) return;
+      busy = true;
+      shootBtn.disabled = true;
       cand.replaceChildren();
       candState.replaceChildren();
+      candTitle.hidden = candNote.hidden = true;
       try {
-        const r = await readCard(file, (p, label) => {
-          fill.style.width = `${Math.round(p * 100)}%`;
-          plabel.textContent = label;
-        });
+        onProgress(0, 'Lecture de la carte…');
+        const r = await readCard(src, onProgress, rect);
         progress.hidden = true;
         nameIn.value = r.name;
         numIn.value = r.number ? `${r.number}${r.total ? `/${r.total}` : ''}` : '';
@@ -120,7 +144,7 @@ import Base from '../layouts/Base.astro';
           candState.replaceChildren(
             el('div', { class: 'panel' }, [
               el('p', {}, ["Je n'arrive pas à lire la carte."]),
-              el('p', { class: 'muted small' }, ['Reprends la photo de plus près, bien droite, ou tape le nom ci-dessus.']),
+              el('p', { class: 'muted small' }, ['Rapproche-toi pour que la carte remplisse le cadre, évite les reflets, ou tape le nom ci-dessus.']),
             ]),
           );
           return;
@@ -128,9 +152,77 @@ import Base from '../layouts/Base.astro';
         await search(r.name, numIn.value);
       } catch {
         progress.hidden = true;
-        candState.replaceChildren(status('Le scanner n\'a pas pu démarrer (connexion ?). Tape le nom à la place.', false));
+        candState.replaceChildren(status("Le scanner n'a pas pu démarrer. Tape le nom à la place.", false));
       } finally {
-        photo.value = '';
+        busy = false;
+        shootBtn.disabled = false;
+      }
+    }
+
+    /* Caméra avec cadre de visée */
+    async function openCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+      } catch {
+        candState.replaceChildren(status("Caméra indisponible ou refusée. Utilise « Choisir une photo ».", false));
+        return;
+      }
+      video.srcObject = stream;
+      await video.play();
+      video.hidden = guide.hidden = shootBtn.hidden = false;
+      preview.hidden = idle.hidden = true;
+      camBtn.textContent = 'Fermer la caméra';
+    }
+
+    function closeCamera() {
+      stream?.getTracks().forEach((t) => t.stop());
+      stream = null;
+      video.hidden = guide.hidden = shootBtn.hidden = true;
+      if (preview.hidden) idle.hidden = false;
+      camBtn.textContent = 'Ouvrir la caméra';
+    }
+
+    /** Convertit le cadre affiché en coordonnées de l'image vidéo (vidéo en object-fit: cover). */
+    function guideRect(): Rect {
+      const vb = viewer.getBoundingClientRect();
+      const gb = guide.getBoundingClientRect();
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const scale = Math.max(vb.width / vw, vb.height / vh);
+      const ox = (vb.width - vw * scale) / 2, oy = (vb.height - vh * scale) / 2;
+      return { x: (gb.left - vb.left - ox) / scale, y: (gb.top - vb.top - oy) / scale, w: gb.width / scale, h: gb.height / scale };
+    }
+
+    camBtn.addEventListener('click', () => (stream ? closeCamera() : openCamera()));
+
+    shootBtn.addEventListener('click', async () => {
+      if (!stream) return;
+      const frame = document.createElement('canvas');
+      frame.width = video.videoWidth;
+      frame.height = video.videoHeight;
+      frame.getContext('2d')!.drawImage(video, 0, 0);
+      const rect = guideRect();
+      await analyse(frame, rect);
+    });
+
+    /* Photo depuis la galerie */
+    photo.addEventListener('change', async () => {
+      const file = photo.files?.[0];
+      photo.value = '';
+      if (!file) return;
+      closeCamera();
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      preview.src = previewUrl;
+      preview.hidden = false;
+      idle.hidden = true;
+      try {
+        const img = await loadImage(file);
+        await analyse(img as ImageBitmap | HTMLImageElement);
+      } catch {
+        candState.replaceChildren(status("Impossible d'ouvrir cette image.", false));
       }
     });
 
@@ -140,22 +232,40 @@ import Base from '../layouts/Base.astro';
       if (name.length < 2 && !numIn.value.trim()) return;
       search(name, numIn.value);
     });
+
+    window.addEventListener('pagehide', closeCamera);
   </script>
 
   <style>
     .intro { max-width: 760px; padding: 24px 0 8px; }
     .layout { display: grid; gap: 18px; grid-template-columns: 1fr; margin-bottom: 28px; }
-    @media (min-width: 820px) { .layout { grid-template-columns: 360px 1fr; align-items: start; } }
-    .drop {
-      display: grid; place-items: center; text-align: center; cursor: pointer;
-      aspect-ratio: 245 / 342; max-width: 300px; margin: 0 auto 12px;
-      border: 2px dashed rgba(255, 255, 255, 0.2); border-radius: 16px; overflow: hidden;
-      background: radial-gradient(circle at 50% 30%, rgba(138, 123, 255, 0.15), transparent 70%);
-      transition: border-color 0.2s;
+    @media (min-width: 820px) { .layout { grid-template-columns: 380px 1fr; align-items: start; } }
+    .viewer {
+      position: relative; width: 100%; max-width: 340px; margin: 0 auto 14px;
+      aspect-ratio: 3 / 4; border-radius: 16px; overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, rgba(138, 123, 255, 0.15), transparent 70%), var(--bg-2);
+      border: 1px solid var(--line);
     }
-    .drop:hover, .drop:focus-within { border-color: var(--cyan); }
-    .drop img { width: 100%; height: 100%; object-fit: cover; }
-    #photo:focus-visible + p { outline: 2px solid var(--cyan); }
+    .viewer video, .viewer img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .viewer img { object-fit: contain; }
+    .guide {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      height: 86%; aspect-ratio: 63 / 88; border-radius: 4.5% / 3.2%;
+      box-shadow: 0 0 0 9999px rgba(7, 6, 13, 0.55);
+      outline: 2px solid var(--cyan);
+    }
+    .guide span {
+      position: absolute; left: 0; right: 0; height: 2px; top: 0;
+      background: var(--holo); box-shadow: 0 0 12px var(--magenta);
+      animation: sweep 2.4s ease-in-out infinite alternate;
+    }
+    @keyframes sweep { to { top: calc(100% - 2px); } }
+    .idle {
+      position: absolute; inset: 14%; display: grid; place-content: center; text-align: center;
+      border: 2px dashed rgba(255, 255, 255, 0.2); border-radius: 12px;
+    }
+    .idle p { margin: 0; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
     .bar { height: 8px; border-radius: 99px; background: var(--bg-2); overflow: hidden; }
     .bar span { display: block; height: 100%; width: 0; background: var(--holo); transition: width 0.2s; }
     .reading h2 { margin-bottom: 14px; }
