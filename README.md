@@ -30,12 +30,13 @@ npm run build    # génère dist/
 ```
 src/
   layouts/Base.astro      en-tête, pied de page (disclaimer)
-  pages/                  accueil (recherche), carte, scanner, collection, pages légales
+  pages/                  accueil, recherche, marché, carte, scanner, collection, pages légales
   lib/tcgdex.ts           accès API TCGdex, choix de la cote
   lib/rarity.ts           paliers de rareté, badge de cote
   lib/condition.ts        états de carte et coefficients
   lib/collection.ts       stockage local, export / import
   lib/scan.ts             OCR et recherche des candidats
+  lib/market.ts           cours, variations, indice HoloCote (page Marché)
 ```
 
 ## Cadre légal

@@ -219,3 +219,36 @@ input:focus-visible, select:focus-visible {
 /* Tuiles cliquables créées par script (scanner) */
 .tile-btn { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .tile-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 8px; }
+
+/* Marché : couleurs de tendance, mini-graphiques, bandeau défilant */
+:root { --up: #3dffa8; --down: #ff5a7a; }
+.up { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--muted); }
+.spark { display: block; overflow: visible; }
+.spark-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.spark-line.up { stroke: var(--up); }
+.spark-line.down { stroke: var(--down); }
+.spark-line.flat { stroke: var(--muted); }
+.spark-area { stroke: none; opacity: 0.16; }
+.spark-area.up { fill: var(--up); }
+.spark-area.down { fill: var(--down); }
+.spark-area.flat { fill: var(--muted); }
+.spark-dot.up { fill: var(--up); }
+.spark-dot.down { fill: var(--down); }
+.spark-dot.flat { fill: var(--muted); }
+
+.ticker {
+  position: relative; overflow: hidden; white-space: nowrap;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.ticker-track { display: inline-flex; gap: 32px; padding: 10px 0; animation: ticker 60s linear infinite; }
+.ticker:hover .ticker-track { animation-play-state: paused; }
+@keyframes ticker { to { transform: translateX(-50%); } }
+.ticker a { display: inline-flex; gap: 8px; align-items: baseline; text-decoration: none; color: var(--text); font-size: 0.9rem; }
+.ticker .tk-name { font-weight: 600; }
+.ticker .tk-price { font-variant-numeric: tabular-nums; color: var(--muted); }
+.ticker .tk-chg { font-weight: 700; font-variant-numeric: tabular-nums; }

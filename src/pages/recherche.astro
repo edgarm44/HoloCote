@@ -1,0 +1,103 @@
+---
+import Base from '../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Recherche" active="search" description="Cherche une carte par son nom : rareté, cote, fiche détaillée.">
+  <section class="hero">
+    <h1>Chercher <span class="holo-text">une carte</span></h1>
+    <p class="muted lead">Tape son nom, découvre sa rareté et sa cote. Ou <a href={`${base}/scanner/`}>scanne-la</a> avec ton téléphone.</p>
+
+    <form id="search-form" class="search" role="search">
+      <label class="sr-only" for="q">Nom de la carte</label>
+      <input id="q" name="q" type="search" placeholder="Dracaufeu, Pikachu, Mew…" autocomplete="off" minlength="2" required />
+      <div class="segmented" role="group" aria-label="Langue des cartes">
+        <button type="button" data-lang="fr" aria-pressed="true">FR</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
+      <button class="btn btn-primary" type="submit">Chercher</button>
+    </form>
+  </section>
+
+  <section aria-live="polite">
+    <p id="summary" class="muted small"></p>
+    <div id="results" class="grid"></div>
+    <div id="state"></div>
+  </section>
+
+  <script>
+    import { searchCards, type Lang } from '../lib/tcgdex';
+    import { cardTile, status, getLang, rememberLang, el } from '../lib/ui';
+
+    const form = document.getElementById('search-form') as HTMLFormElement;
+    const input = document.getElementById('q') as HTMLInputElement;
+    const results = document.getElementById('results')!;
+    const state = document.getElementById('state')!;
+    const summary = document.getElementById('summary')!;
+    const langButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-lang]')];
+
+    let lang: Lang = getLang();
+    let seq = 0;
+
+    const setLang = (l: Lang) => {
+      lang = l;
+      rememberLang(l);
+      langButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === l)));
+    };
+    setLang(lang);
+
+    async function run(q: string) {
+      const my = ++seq;
+      results.replaceChildren();
+      summary.textContent = '';
+      state.replaceChildren(status('Recherche en cours…'));
+      const params = new URLSearchParams({ q, lang });
+      history.replaceState(null, '', `?${params}`);
+      try {
+        const cards = await searchCards(q, lang);
+        if (my !== seq) return;
+        state.replaceChildren();
+        if (cards.length === 0) {
+          state.replaceChildren(
+            el('div', { class: 'panel' }, [
+              el('p', {}, [`Aucune carte trouvée pour « ${q} » en ${lang === 'fr' ? 'français' : 'anglais'}.`]),
+              el('p', { class: 'muted small' }, ["Vérifie l'orthographe ou essaie l'autre langue (Dracaufeu = Charizard)."]),
+            ]),
+          );
+          return;
+        }
+        summary.textContent = `${cards.length}${cards.length >= 36 ? '+' : ''} carte${cards.length > 1 ? 's' : ''} trouvée${cards.length > 1 ? 's' : ''}`;
+        results.replaceChildren(...cards.map((c) => cardTile(c, lang)));
+      } catch {
+        if (my !== seq) return;
+        state.replaceChildren(status('Impossible de joindre la base de cartes. Réessaie dans un instant.', false));
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (q.length >= 2) run(q);
+    });
+    langButtons.forEach((b) =>
+      b.addEventListener('click', () => {
+        setLang(b.dataset.lang as Lang);
+        const q = input.value.trim();
+        if (q.length >= 2) run(q);
+      }),
+    );
+
+    const initial = new URLSearchParams(location.search).get('q');
+    if (initial) {
+      input.value = initial;
+      run(initial);
+    }
+  </script>
+
+  <style>
+    .hero { padding: 32px 0 28px; max-width: 760px; }
+    .lead { font-size: 1.1rem; }
+    .search { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+    .search input { flex: 1 1 260px; font-size: 1.05rem; }
+    .search .btn { flex: 0 0 auto; }
+  </style>
+</Base>
