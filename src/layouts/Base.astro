@@ -1,0 +1,119 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  active?: 'search' | 'scanner' | 'collection' | 'legal';
+}
+const { title, description = 'Cote et rareté de tes cartes à collectionner, scanner gratuit et collection privée.', active } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : `${title} · HoloCote`;
+---
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#07060d" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body>
+    <a class="sr-only" href="#contenu">Aller au contenu</a>
+    <header class="site-header">
+      <div class="bar">
+        <a class="logo" href={`${base}/`} aria-label="HoloCote, accueil">
+          <span class="logo-mark" aria-hidden="true"></span>
+          <span class="holo-text">HoloCote</span>
+        </a>
+        <nav aria-label="Navigation principale">
+          <a href={`${base}/`} aria-current={active === 'search' ? 'page' : undefined}>Recherche</a>
+          <a href={`${base}/scanner/`} aria-current={active === 'scanner' ? 'page' : undefined}>Scanner</a>
+          <a href={`${base}/collection/`} aria-current={active === 'collection' ? 'page' : undefined}>
+            Collection <span class="count" id="nav-count" hidden></span>
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="contenu">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        HoloCote est un site de fan indépendant et non officiel. Il n'est ni affilié, ni approuvé, ni sponsorisé par
+        Nintendo, Creatures Inc., GAME FREAK inc. ou The Pokémon Company. Pokémon et les noms associés sont des marques de
+        leurs détenteurs respectifs. Les cotes sont des estimations indicatives : ni offre d'achat, ni garantie de valeur,
+        ni conseil d'investissement.
+      </p>
+      <p class="links">
+        <a href={`${base}/mentions-legales/`}>Mentions légales</a>
+        <a href={`${base}/confidentialite/`}>Confidentialité</a>
+        <span>Données : <a href="https://tcgdex.dev" rel="noopener">TCGdex</a></span>
+      </p>
+    </footer>
+
+    <script>
+      import { countCards } from '../lib/collection';
+      const badge = document.getElementById('nav-count');
+      const refresh = () => {
+        const n = countCards();
+        if (badge) {
+          badge.hidden = n === 0;
+          badge.textContent = String(n);
+        }
+      };
+      refresh();
+      window.addEventListener('holocote:collection', refresh);
+      window.addEventListener('storage', refresh);
+    </script>
+
+    <style>
+      .site-header {
+        position: sticky; top: 0; z-index: 20;
+        background: rgba(7, 6, 13, 0.75);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--line);
+      }
+      .bar {
+        max-width: 1180px; margin: 0 auto; padding: 10px 16px;
+        display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      }
+      .logo {
+        display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+        font-family: var(--font-display); font-weight: 700; font-size: 1.25rem;
+      }
+      .logo-mark {
+        width: 22px; height: 30px; border-radius: 4px; background: var(--holo); background-size: 200% 100%;
+        animation: shimmer 6s linear infinite; transform: rotate(-8deg);
+        box-shadow: 0 0 16px rgba(255, 79, 216, 0.5);
+      }
+      nav { display: flex; gap: 4px; }
+      nav a {
+        color: var(--muted); text-decoration: none; padding: 8px 12px; border-radius: 10px; font-weight: 600; font-size: 0.95rem;
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      nav a:hover { color: var(--text); background: var(--surface); }
+      nav a[aria-current='page'] { color: var(--text); background: var(--surface-2); }
+      .count {
+        min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; font-size: 0.75rem;
+        display: inline-grid; place-items: center; background: var(--magenta); color: #0a0812;
+      }
+      .site-footer {
+        border-top: 1px solid var(--line);
+        padding: 24px 16px 32px; color: var(--muted); font-size: 0.8rem;
+      }
+      .site-footer p { max-width: 1180px; margin: 0 auto 10px; }
+      .links { display: flex; gap: 18px; flex-wrap: wrap; }
+      .links a { color: var(--muted); }
+      @media (max-width: 480px) {
+        nav a { padding: 8px 9px; font-size: 0.9rem; }
+      }
+    </style>
+  </body>
+</html>

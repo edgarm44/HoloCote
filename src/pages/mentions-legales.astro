@@ -1,0 +1,57 @@
+---
+import Base from '../layouts/Base.astro';
+import { CONTACT_EMAIL, LAST_UPDATE } from '../config';
+---
+<Base title="Mentions légales" active="legal">
+  <article class="legal">
+    <h1>Mentions légales</h1>
+    <p class="muted small">Dernière mise à jour : {LAST_UPDATE}</p>
+
+    <h2>Éditeur</h2>
+    <p>
+      Site personnel édité à titre non professionnel par un particulier. Conformément à l'article 6-III-2 de la loi
+      n° 2004-575 du 21 juin 2004 pour la confiance dans l'économie numérique, l'éditeur a choisi de préserver son anonymat ;
+      les éléments permettant de l'identifier ont été communiqués à l'hébergeur.
+    </p>
+    <p>Contact : <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p>
+
+    <h2>Hébergeur</h2>
+    <p>GitHub, Inc. (service GitHub Pages) — 88 Colin P Kelly Jr Street, San Francisco, CA 94107, États-Unis — <a href="https://github.com" rel="noopener">github.com</a></p>
+
+    <h2>Propriété intellectuelle</h2>
+    <p>
+      Pokémon, les noms des cartes, leurs illustrations et les symboles de rareté sont la propriété de Nintendo, Creatures Inc.,
+      GAME FREAK inc. et The Pokémon Company. Ils sont cités uniquement pour identifier les cartes, à des fins d'information
+      et sans but commercial. HoloCote n'est ni affilié, ni approuvé, ni sponsorisé par ces sociétés.
+    </p>
+    <p>
+      Les images des cartes ne sont pas hébergées par HoloCote : elles sont affichées directement depuis les serveurs de
+      TCGdex. Tout titulaire de droits peut demander le retrait d'un contenu à l'adresse de contact ; la demande sera
+      traitée dans les meilleurs délais.
+    </p>
+    <p>Le code, le design et les textes propres à HoloCote appartiennent à leur auteur.</p>
+
+    <h2>Sources des données</h2>
+    <p>
+      Données des cartes et images : <a href="https://tcgdex.dev" rel="noopener">TCGdex</a>. Cotes : Cardmarket et TCGplayer,
+      via TCGdex. HoloCote ne garantit ni l'exactitude, ni l'exhaustivité, ni l'actualité de ces données.
+    </p>
+
+    <h2>Limitation de responsabilité</h2>
+    <p>
+      Les cotes sont des moyennes de marché à un instant donné, affichées à titre purement indicatif. La valeur réelle
+      d'une carte dépend de son état, de son authenticité, de sa langue, de son édition, ainsi que de l'offre et de la demande.
+      L'estimation selon l'état repose sur des coefficients approximatifs. Le scanner utilise une reconnaissance de texte
+      automatique qui peut se tromper : vérifie toujours la carte proposée.
+    </p>
+    <p>
+      Les informations du site ne constituent ni une offre d'achat ou de vente, ni une garantie de valeur, ni un conseil
+      d'investissement. HoloCote ne peut être tenu responsable d'une décision d'achat, de vente ou d'échange prise sur la base
+      de ces informations.
+    </p>
+  </article>
+  <style>
+    .legal { max-width: 760px; padding-top: 16px; }
+    .legal h2 { margin-top: 1.6em; }
+  </style>
+</Base>

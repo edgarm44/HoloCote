@@ -1,0 +1,166 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Scanner" active="scanner" description="Prends ta carte en photo pour retrouver sa cote et sa rareté.">
+  <section class="intro">
+    <h1>Scanner <span class="holo-text">une carte</span></h1>
+    <p class="muted">Prends ta carte en photo, bien à plat, de face et sans reflet, en remplissant l'image. Le scanner lit le nom et le numéro (ex. 136/198), puis te propose les cartes correspondantes.</p>
+  </section>
+
+  <div class="layout">
+    <div class="panel capture">
+      <label class="drop" for="photo">
+        <img id="preview" alt="Aperçu de ta photo" hidden />
+        <span id="drop-text">
+          <strong>Prendre une photo</strong><br />
+          <span class="muted small">ou choisir une image</span>
+        </span>
+      </label>
+      <input id="photo" type="file" accept="image/*" capture="environment" class="sr-only" />
+      <p class="muted small">Ta photo est analysée sur ton appareil : elle n'est jamais envoyée ni enregistrée.</p>
+      <div id="progress" hidden>
+        <div class="bar"><span id="progress-fill"></span></div>
+        <p id="progress-label" class="muted small"></p>
+      </div>
+    </div>
+
+    <div class="panel reading">
+      <h2>Lecture</h2>
+      <form id="manual" class="manual">
+        <div class="field">
+          <label for="name">Nom lu</label>
+          <input id="name" type="text" placeholder="Nom de la carte" autocomplete="off" />
+        </div>
+        <div class="field num">
+          <label for="number">Numéro</label>
+          <input id="number" type="text" placeholder="136/198" inputmode="numeric" autocomplete="off" />
+        </div>
+        <button class="btn" type="submit">Relancer la recherche</button>
+      </form>
+      <p class="muted small">Le scanner peut se tromper : corrige le nom ou le numéro si besoin.</p>
+    </div>
+  </div>
+
+  <section aria-live="polite" class="candidates">
+    <h2 id="cand-title" hidden>Est-ce ta carte ?</h2>
+    <p id="cand-note" class="notice" hidden>Vérifie que c'est bien ta carte avant de l'ajouter : touche-la pour voir sa fiche.</p>
+    <div id="cand" class="grid"></div>
+    <div id="cand-state"></div>
+  </section>
+
+  <script>
+    import { readCard, findCandidates, parseNumber } from '../lib/scan';
+    import { cardTile, status, el } from '../lib/ui';
+
+    const photo = document.getElementById('photo') as HTMLInputElement;
+    const preview = document.getElementById('preview') as HTMLImageElement;
+    const dropText = document.getElementById('drop-text')!;
+    const progress = document.getElementById('progress')!;
+    const fill = document.getElementById('progress-fill')!;
+    const plabel = document.getElementById('progress-label')!;
+    const nameIn = document.getElementById('name') as HTMLInputElement;
+    const numIn = document.getElementById('number') as HTMLInputElement;
+    const manual = document.getElementById('manual') as HTMLFormElement;
+    const cand = document.getElementById('cand')!;
+    const candState = document.getElementById('cand-state')!;
+    const candTitle = document.getElementById('cand-title')!;
+    const candNote = document.getElementById('cand-note')!;
+
+    let previewUrl: string | null = null;
+
+    async function search(name: string, numberText: string) {
+      const { number, total } = parseNumber(numberText);
+      cand.replaceChildren();
+      candTitle.hidden = candNote.hidden = true;
+      candState.replaceChildren(status('Recherche des cartes correspondantes…'));
+      try {
+        const list = await findCandidates({ name, number, total });
+        candState.replaceChildren();
+        if (!list.length) {
+          candState.replaceChildren(
+            el('div', { class: 'panel' }, [
+              el('p', {}, ['Aucune carte trouvée.']),
+              el('p', { class: 'muted small' }, ['Corrige le nom ou le numéro ci-dessus, ou reprends la photo plus près, avec plus de lumière.']),
+            ]),
+          );
+          return;
+        }
+        candTitle.hidden = candNote.hidden = false;
+        cand.replaceChildren(
+          ...list.map((c) => cardTile(c, c.lang, `${c.lang.toUpperCase()} · N° ${c.localId}${c.setName ? ` · ${c.setName}` : ''}`)),
+        );
+      } catch {
+        candState.replaceChildren(status('Impossible de joindre la base de cartes. Réessaie dans un instant.', false));
+      }
+    }
+
+    photo.addEventListener('change', async () => {
+      const file = photo.files?.[0];
+      if (!file) return;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      preview.src = previewUrl;
+      preview.hidden = false;
+      dropText.hidden = true;
+
+      progress.hidden = false;
+      fill.style.width = '0%';
+      plabel.textContent = 'Préparation du scanner…';
+      cand.replaceChildren();
+      candState.replaceChildren();
+      try {
+        const r = await readCard(file, (p, label) => {
+          fill.style.width = `${Math.round(p * 100)}%`;
+          plabel.textContent = label;
+        });
+        progress.hidden = true;
+        nameIn.value = r.name;
+        numIn.value = r.number ? `${r.number}${r.total ? `/${r.total}` : ''}` : '';
+        if (!r.name && !r.number) {
+          candState.replaceChildren(
+            el('div', { class: 'panel' }, [
+              el('p', {}, ["Je n'arrive pas à lire la carte."]),
+              el('p', { class: 'muted small' }, ['Reprends la photo de plus près, bien droite, ou tape le nom ci-dessus.']),
+            ]),
+          );
+          return;
+        }
+        await search(r.name, numIn.value);
+      } catch {
+        progress.hidden = true;
+        candState.replaceChildren(status('Le scanner n\'a pas pu démarrer (connexion ?). Tape le nom à la place.', false));
+      } finally {
+        photo.value = '';
+      }
+    });
+
+    manual.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = nameIn.value.trim();
+      if (name.length < 2 && !numIn.value.trim()) return;
+      search(name, numIn.value);
+    });
+  </script>
+
+  <style>
+    .intro { max-width: 760px; padding: 24px 0 8px; }
+    .layout { display: grid; gap: 18px; grid-template-columns: 1fr; margin-bottom: 28px; }
+    @media (min-width: 820px) { .layout { grid-template-columns: 360px 1fr; align-items: start; } }
+    .drop {
+      display: grid; place-items: center; text-align: center; cursor: pointer;
+      aspect-ratio: 245 / 342; max-width: 300px; margin: 0 auto 12px;
+      border: 2px dashed rgba(255, 255, 255, 0.2); border-radius: 16px; overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, rgba(138, 123, 255, 0.15), transparent 70%);
+      transition: border-color 0.2s;
+    }
+    .drop:hover, .drop:focus-within { border-color: var(--cyan); }
+    .drop img { width: 100%; height: 100%; object-fit: cover; }
+    #photo:focus-visible + p { outline: 2px solid var(--cyan); }
+    .bar { height: 8px; border-radius: 99px; background: var(--bg-2); overflow: hidden; }
+    .bar span { display: block; height: 100%; width: 0; background: var(--holo); transition: width 0.2s; }
+    .reading h2 { margin-bottom: 14px; }
+    .manual { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 10px; }
+    .manual .field { flex: 1 1 200px; }
+    .manual .num { flex: 0 1 140px; }
+  </style>
+</Base>

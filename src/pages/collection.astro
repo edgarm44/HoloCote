@@ -1,0 +1,229 @@
+---
+import Base from '../layouts/Base.astro';
+import { CONDITIONS } from '../lib/condition';
+---
+<Base title="Ma collection" active="collection" description="Ta collection de cartes, stockée dans ton navigateur.">
+  <section class="head">
+    <div>
+      <h1>Ma <span class="holo-text">collection</span></h1>
+      <p class="muted">Stockée uniquement dans ce navigateur. Pense à l'exporter pour la sauvegarder ou la retrouver sur un autre appareil.</p>
+    </div>
+    <div class="panel totals">
+      <p class="muted small">Valeur totale estimée</p>
+      <p class="total" id="total">—</p>
+      <p class="muted small" id="total-detail"></p>
+    </div>
+  </section>
+
+  <p id="storage-warning" class="notice" hidden>
+    Ton navigateur bloque le stockage (navigation privée ?) : la collection sera perdue en fermant l'onglet. Exporte-la avant de partir.
+  </p>
+
+  <div class="tools">
+    <button class="btn" id="export" type="button">Exporter (fichier)</button>
+    <label class="btn" for="import-file">Importer</label>
+    <input id="import-file" type="file" accept="application/json,.json" class="sr-only" />
+    <button class="btn btn-danger" id="clear" type="button">Supprimer ma collection</button>
+  </div>
+
+  <div id="list" class="list"></div>
+  <div id="empty" class="panel empty" hidden>
+    <h2>Ta collection est vide</h2>
+    <p class="muted">Cherche une carte ou scanne-la, puis touche « Ajouter » sur sa fiche.</p>
+    <a class="btn btn-primary" id="go-search" href="#">Chercher une carte</a>
+  </div>
+
+  <p class="notice">Estimation approximative : cote Near Mint multipliée par un coefficient d'état. Elle ne tient pas compte de l'authenticité ni d'une expertise.</p>
+
+  <dialog id="confirm">
+    <form method="dialog">
+      <h2>Supprimer toute la collection ?</h2>
+      <p class="muted">Cette action est définitive. Exporte-la d'abord si tu veux la garder.</p>
+      <div class="dialog-actions">
+        <button class="btn" value="cancel">Annuler</button>
+        <button class="btn btn-danger" value="ok">Tout supprimer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="row-tpl">
+    <article class="row">
+      <a class="thumb" data-slot="link"></a>
+      <div class="meta">
+        <a class="name" data-slot="name-link"></a>
+        <span class="muted small" data-slot="sub"></span>
+        <span class="value small" data-slot="value"></span>
+      </div>
+      <div class="controls">
+        <label class="sr-only">État</label>
+        <select data-slot="cond">
+          {CONDITIONS.map((c) => <option value={c.code}>{c.label}</option>)}
+        </select>
+        <label class="sr-only">Quantité</label>
+        <input data-slot="qty" type="number" min="1" max="999" inputmode="numeric" />
+        <button class="btn icon" data-slot="remove" type="button" aria-label="Retirer">✕</button>
+      </div>
+    </article>
+  </template>
+
+  <script>
+    import { getItems, updateItem, removeItem, clearAll, exportJson, importJson, storageAvailable, type Item } from '../lib/collection';
+    import { conditionFactor, conditionLabel, type Condition } from '../lib/condition';
+    import { getCard, bestPrice, formatPrice, imageUrl, type PriceInfo } from '../lib/tcgdex';
+    import { el, toast, url } from '../lib/ui';
+
+    const list = document.getElementById('list')!;
+    const empty = document.getElementById('empty')!;
+    const total = document.getElementById('total')!;
+    const totalDetail = document.getElementById('total-detail')!;
+    const tpl = document.getElementById('row-tpl') as HTMLTemplateElement;
+    (document.getElementById('go-search') as HTMLAnchorElement).href = url('/');
+
+    if (!storageAvailable()) document.getElementById('storage-warning')!.hidden = false;
+
+    const prices = new Map<string, PriceInfo | null>();
+    const pkey = (i: Pick<Item, 'cardId' | 'lang'>) => `${i.lang}:${i.cardId}`;
+
+    function render() {
+      const items = getItems();
+      empty.hidden = items.length > 0;
+      list.replaceChildren(
+        ...items.map((it) => {
+          const node = tpl.content.cloneNode(true) as DocumentFragment;
+          const s = (n: string) => node.querySelector(`[data-slot="${n}"]`) as HTMLElement;
+          const href = url(`/carte/?id=${encodeURIComponent(it.cardId)}&lang=${it.lang}`);
+          const link = s('link') as HTMLAnchorElement;
+          link.href = href;
+          const src = imageUrl(it.image, 'low');
+          link.append(src ? el('img', { src, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : el('span', { class: 'ph' }));
+          const nl = s('name-link') as HTMLAnchorElement;
+          nl.href = href;
+          nl.textContent = it.name;
+          s('sub').textContent = [it.setName, it.rarity, it.lang.toUpperCase()].filter(Boolean).join(' · ');
+          const p = prices.get(pkey(it));
+          s('value').textContent = p === undefined ? 'Cote en cours…' : p === null ? 'Pas de cote'
+            : `${formatPrice(p.value * conditionFactor(it.condition) * it.quantity, p.unit)} (${conditionLabel(it.condition)} × ${it.quantity})`;
+
+          const cond = s('cond') as HTMLSelectElement;
+          cond.value = it.condition;
+          cond.setAttribute('aria-label', `État de ${it.name}`);
+          cond.addEventListener('change', () => { updateItem(it, { condition: cond.value as Condition }); render(); });
+
+          const qty = s('qty') as HTMLInputElement;
+          qty.value = String(it.quantity);
+          qty.setAttribute('aria-label', `Quantité de ${it.name}`);
+          qty.addEventListener('change', () => { updateItem(it, { quantity: Number(qty.value) }); render(); });
+
+          s('remove').setAttribute('aria-label', `Retirer ${it.name}`);
+          s('remove').addEventListener('click', () => { removeItem(it); render(); toast(`${it.name} retirée`); });
+          return node;
+        }),
+      );
+      renderTotal(items);
+    }
+
+    function renderTotal(items: Item[]) {
+      const sums: Record<string, number> = {};
+      let missing = 0, pending = 0, cards = 0;
+      for (const it of items) {
+        cards += it.quantity;
+        const p = prices.get(pkey(it));
+        if (p === undefined) { pending++; continue; }
+        if (p === null) { missing += it.quantity; continue; }
+        sums[p.unit] = (sums[p.unit] ?? 0) + p.value * conditionFactor(it.condition) * it.quantity;
+      }
+      const parts = Object.entries(sums).map(([u, v]) => formatPrice(v, u as 'EUR' | 'USD'));
+      total.textContent = parts.length ? parts.join(' + ') : items.length ? '—' : '0 €';
+      totalDetail.textContent = [
+        `${cards} carte${cards > 1 ? 's' : ''}`,
+        pending ? 'calcul en cours…' : '',
+        missing ? `${missing} sans cote` : '',
+        sums.USD ? 'USD = cote du marché américain' : '',
+      ].filter(Boolean).join(' · ');
+    }
+
+    async function loadPrices() {
+      const todo = [...new Map(getItems().map((i) => [pkey(i), i])).values()].filter((i) => !prices.has(pkey(i)));
+      let idx = 0;
+      const worker = async () => {
+        while (idx < todo.length) {
+          const it = todo[idx++];
+          try {
+            const card = await getCard(it.cardId, it.lang);
+            prices.set(pkey(it), card ? bestPrice(card) : null);
+          } catch {
+            prices.set(pkey(it), null);
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: 6 }, worker));
+      render();
+    }
+
+    document.getElementById('export')!.addEventListener('click', () => {
+      const blob = new Blob([exportJson()], { type: 'application/json' });
+      const a = el('a', { href: URL.createObjectURL(blob), download: `holocote-collection-${new Date().toISOString().slice(0, 10)}.json` });
+      document.body.append(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    });
+
+    const importInput = document.getElementById('import-file') as HTMLInputElement;
+    importInput.addEventListener('change', async () => {
+      const f = importInput.files?.[0];
+      importInput.value = '';
+      if (!f) return;
+      if (f.size > 2_000_000) { toast('Fichier trop gros'); return; }
+      try {
+        // Avec une collection existante, l'import ajoute les cartes (fusion) au lieu de tout remplacer.
+        const n = importJson(await f.text(), getItems().length > 0 ? 'merge' : 'replace');
+        toast(`${n} ligne${n > 1 ? 's' : ''} importée${n > 1 ? 's' : ''}`);
+        render();
+        loadPrices();
+      } catch {
+        toast("Ce fichier n'est pas une collection HoloCote");
+      }
+    });
+
+    const dialog = document.getElementById('confirm') as HTMLDialogElement;
+    document.getElementById('clear')!.addEventListener('click', () => dialog.showModal());
+    dialog.addEventListener('close', () => {
+      if (dialog.returnValue === 'ok') { clearAll(); prices.clear(); render(); toast('Collection supprimée'); }
+    });
+
+    render();
+    loadPrices();
+  </script>
+
+  <style>
+    .head { display: grid; gap: 18px; grid-template-columns: 1fr; padding: 24px 0 12px; }
+    @media (min-width: 820px) { .head { grid-template-columns: 1fr 320px; align-items: end; } }
+    .totals p { margin: 0; }
+    .total { font-family: var(--font-display); font-size: 2rem; font-weight: 700; }
+    .tools { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 20px; }
+    .list { display: flex; flex-direction: column; gap: 10px; }
+    .row {
+      display: grid; grid-template-columns: 56px 1fr; gap: 12px 14px; align-items: center;
+      padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+    }
+    @media (min-width: 720px) { .row { grid-template-columns: 56px 1fr auto; } }
+    .thumb { width: 56px; aspect-ratio: 245 / 342; border-radius: 4px; overflow: hidden; background: var(--bg-2); display: block; }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .meta { display: flex; flex-direction: column; min-width: 0; }
+    .name { color: var(--text); font-weight: 600; text-decoration: none; }
+    .name:hover { text-decoration: underline; }
+    .value { color: var(--cyan); }
+    .controls { display: flex; gap: 8px; grid-column: 1 / -1; }
+    @media (min-width: 720px) { .controls { grid-column: auto; } }
+    .controls select { flex: 1 1 140px; min-width: 0; }
+    .controls input { width: 80px; flex: 0 0 80px; }
+    .icon { padding: 0; width: 46px; flex: 0 0 46px; }
+    .empty { text-align: center; padding: 36px 20px; }
+    dialog {
+      background: var(--bg-2); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 24px; max-width: min(440px, calc(100vw - 32px));
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+    .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+  </style>
+</Base>

@@ -1,0 +1,183 @@
+---
+import Base from '../layouts/Base.astro';
+import { CONDITIONS } from '../lib/condition';
+---
+<Base title="Fiche carte" active="search">
+  <div id="view">
+    <div class="status" role="status"><div class="spinner"></div>Chargement de la carte…</div>
+  </div>
+
+  <template id="tpl">
+    <article class="card-page">
+      <div class="visual" data-slot="visual"></div>
+      <div class="info">
+        <p class="muted small" data-slot="set"></p>
+        <h1 data-slot="name"></h1>
+        <div class="badges" data-slot="badges"></div>
+
+        <div class="panel price">
+          <p class="muted small">Cote estimée (Near Mint)</p>
+          <p class="price-value" data-slot="price"></p>
+          <p class="muted small" data-slot="price-detail"></p>
+          <p class="notice" data-slot="price-note"></p>
+        </div>
+
+        <form class="panel add" data-slot="form">
+          <h2>Ajouter à ma collection</h2>
+          <div class="row">
+            <div class="field">
+              <label for="condition">État</label>
+              <select id="condition" name="condition">
+                {CONDITIONS.map((c) => <option value={c.code} selected={c.code === 'NM'}>{c.label} — {c.hint}</option>)}
+              </select>
+            </div>
+            <div class="field qty">
+              <label for="qty">Quantité</label>
+              <input id="qty" name="qty" type="number" min="1" max="999" value="1" inputmode="numeric" />
+            </div>
+          </div>
+          <p class="muted small" data-slot="estimate"></p>
+          <button class="btn btn-primary" type="submit">Ajouter</button>
+          <p class="muted small">Ta collection reste dans ce navigateur, rien n'est envoyé sur internet.</p>
+        </form>
+
+        <dl class="facts" data-slot="facts"></dl>
+      </div>
+    </article>
+  </template>
+
+  <script>
+    import { getCard, bestPrice, formatPrice, formatDate, type Lang } from '../lib/tcgdex';
+    import { rarityTier, tierLabel, valueBadge, USD_TO_EUR } from '../lib/rarity';
+    import { conditionFactor, type Condition } from '../lib/condition';
+    import { addItem } from '../lib/collection';
+    import { holoCard, el, status, toast, url } from '../lib/ui';
+
+    const view = document.getElementById('view')!;
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id') ?? '';
+    const lang: Lang = params.get('lang') === 'en' ? 'en' : 'fr';
+
+    async function main() {
+      if (!/^[\w.\-]+$/.test(id)) {
+        view.replaceChildren(status('Carte introuvable.', false));
+        return;
+      }
+      let card;
+      try {
+        card = await getCard(id, lang);
+      } catch {
+        view.replaceChildren(status('Impossible de joindre la base de cartes. Réessaie dans un instant.', false));
+        return;
+      }
+      if (!card) {
+        view.replaceChildren(status("Cette carte n'existe pas dans cette langue.", false));
+        return;
+      }
+
+      document.title = `${card.name} · HoloCote`;
+      const node = (document.getElementById('tpl') as HTMLTemplateElement).content.cloneNode(true) as DocumentFragment;
+      const slot = (name: string) => node.querySelector(`[data-slot="${name}"]`) as HTMLElement;
+
+      slot('visual').append(holoCard(card.image, card.name, 'high'));
+      slot('name').textContent = card.name;
+      const official = card.set.cardCount?.official;
+      slot('set').textContent = `${card.set.name} · N° ${card.localId}${official ? `/${official}` : ''}`;
+
+      const tier = rarityTier(card.rarity);
+      const price = bestPrice(card);
+      const eur = price ? (price.unit === 'EUR' ? price.value : price.value * USD_TO_EUR) : null;
+      const vb = valueBadge(eur);
+      slot('badges').append(
+        el('span', { class: `badge tier-${tier}`, title: 'Rareté officielle' }, [card.rarity ?? tierLabel[tier]]),
+        el('span', { class: `badge value-${vb.level}`, title: 'Badge HoloCote basé sur la cote' }, [vb.label]),
+      );
+
+      if (price) {
+        slot('price').textContent = formatPrice(price.value, price.unit);
+        slot('price-detail').textContent = [
+          price.low ? `Prix le plus bas constaté : ${formatPrice(price.low, price.unit)}` : '',
+        ].filter(Boolean).join(' · ');
+        const date = formatDate(price.updated);
+        slot('price-note').textContent = `Cote indicative${date ? ` du ${date}` : ''}, source ${price.source}${price.unit === 'USD' ? ' (marché américain, en dollars)' : ''}. Les prix réels varient selon l'état, la langue et l'édition.`;
+      } else {
+        slot('price').textContent = '—';
+        slot('price-note').textContent = "Pas de cote disponible pour cette carte. Essaie la version dans l'autre langue.";
+      }
+
+      const facts = slot('facts');
+      const addFact = (k: string, v?: string | number) => {
+        if (v === undefined || v === '') return;
+        facts.append(el('dt', {}, [k]), el('dd', {}, [String(v)]));
+      };
+      addFact('Illustrateur', card.illustrator);
+      addFact('Catégorie', card.category);
+      addFact('PV', card.hp);
+      addFact('Type', card.types?.join(', '));
+      addFact('Langue', lang === 'fr' ? 'Français' : 'Anglais');
+      const other = lang === 'fr' ? 'en' : 'fr';
+      facts.append(
+        el('dt', {}, ['Autre langue']),
+        el('dd', {}, [el('a', { href: url(`/carte/?id=${encodeURIComponent(card.id)}&lang=${other}`) }, [other === 'en' ? 'Voir la version anglaise' : 'Voir la version française'])]),
+      );
+
+      const form = slot('form') as HTMLFormElement;
+      const estimate = slot('estimate');
+      const condSel = form.querySelector('#condition') as HTMLSelectElement;
+      const qtyInput = form.querySelector('#qty') as HTMLInputElement;
+      const refreshEstimate = () => {
+        if (!price) { estimate.textContent = ''; return; }
+        const q = Math.max(1, Math.min(999, Number(qtyInput.value) || 1));
+        const v = price.value * conditionFactor(condSel.value as Condition) * q;
+        estimate.textContent = `Valeur estimée : ${formatPrice(v, price.unit)} (coefficient d'état approximatif)`;
+      };
+      condSel.addEventListener('change', refreshEstimate);
+      qtyInput.addEventListener('input', refreshEstimate);
+      refreshEstimate();
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        addItem({
+          cardId: card.id,
+          lang,
+          name: card.name,
+          image: card.image,
+          setName: card.set.name,
+          rarity: card.rarity,
+          condition: condSel.value as Condition,
+          quantity: Number(qtyInput.value) || 1,
+        });
+        toast(`${card.name} ajoutée à ta collection`);
+      });
+
+      if (eur !== null && eur >= 50) {
+        form.append(el('p', { class: 'notice' }, ["Carte de valeur : avant de la vendre ou de l'échanger, parles-en à un adulte."]));
+      }
+
+      view.replaceChildren(node);
+    }
+    main();
+  </script>
+
+  <style>
+    .card-page { display: grid; gap: 32px; grid-template-columns: 1fr; padding-top: 12px; }
+    @media (min-width: 820px) { .card-page { grid-template-columns: minmax(280px, 400px) 1fr; align-items: start; } }
+    .visual { max-width: 400px; width: 100%; margin: 0 auto; }
+    @media (min-width: 820px) { .visual { position: sticky; top: 90px; } }
+    .info { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    .info h1 { margin: 0; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .price p { margin: 0; }
+    .price .notice { margin-top: 10px; }
+    .price-value { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; }
+    .add { display: flex; flex-direction: column; gap: 14px; }
+    .add h2 { margin: 0; }
+    .add p { margin: 0; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row .field { flex: 1 1 220px; }
+    .row .qty { flex: 0 1 120px; }
+    .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; font-size: 0.95rem; }
+    .facts dt { color: var(--muted); }
+    .facts dd { margin: 0; }
+  </style>
+</Base>
