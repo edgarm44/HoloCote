@@ -73,11 +73,11 @@ import { CONDITIONS } from '../lib/condition';
   <section class="panel backup">
     <div>
       <h2>Sauvegarde</h2>
-      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil.</p>
+      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil. Une sauvegarde se restaure sur une collection vide.</p>
     </div>
     <div class="backup-actions">
       <button class="btn" id="export" type="button">Exporter</button>
-      <label class="btn" for="import-file">Importer</label>
+      <label class="btn" for="import-file">Restaurer une sauvegarde</label>
       <input id="import-file" type="file" accept="application/json,.json" class="sr-only" />
       <button class="btn btn-danger" id="clear" type="button">Tout supprimer</button>
     </div>
@@ -276,10 +276,11 @@ import { CONDITIONS } from '../lib/condition';
       importInput.value = '';
       if (!f) return;
       if (f.size > 2_000_000) { toast('Fichier trop gros'); return; }
+      // Une sauvegarde ne s'ajoute pas à une collection existante : impossible de s'ajouter des cartes sans les scanner.
+      if (getItems().length > 0) { toast("Pour restaurer une sauvegarde, ta collection doit être vide (bouton « Tout supprimer »)."); return; }
       try {
-        // Avec une collection existante, l'import ajoute les cartes (fusion) au lieu de tout remplacer.
-        const n = importJson(await f.text(), getItems().length > 0 ? 'merge' : 'replace');
-        toast(`${n} carte${n > 1 ? 's' : ''} importée${n > 1 ? 's' : ''}`);
+        const n = importJson(await f.text(), 'replace');
+        toast(`${n} carte${n > 1 ? 's' : ''} restaurée${n > 1 ? 's' : ''}`);
         render();
         loadCards();
       } catch {

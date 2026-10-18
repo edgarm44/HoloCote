@@ -94,7 +94,7 @@ import { CONDITIONS } from '../lib/condition';
       <p class="muted small" data-slot="price-note"></p>
 
       <form data-slot="form" class="confirm-form">
-        <p class="ask">C'est bien ta carte ? Ajoute-la à ta collection.</p>
+        <p class="ask">C'est bien ta carte ? Ajoute-la à ta collection. Tu en as plusieurs ? Scanne chaque exemplaire.</p>
         <div class="row">
           <div class="field" data-slot="finish-field">
             <label for="finish">Finition</label>
@@ -108,10 +108,6 @@ import { CONDITIONS } from '../lib/condition';
             <select id="condition">
               {CONDITIONS.map((c) => <option value={c.code} selected={c.code === 'NM'}>{c.label} — {c.hint}</option>)}
             </select>
-          </div>
-          <div class="field qty">
-            <label for="qty">Quantité</label>
-            <input id="qty" type="number" min="1" max="999" value="1" inputmode="numeric" />
           </div>
         </div>
         <p class="muted small" data-slot="estimate"></p>
@@ -208,7 +204,6 @@ import { CONDITIONS } from '../lib/condition';
     let current: { card: Card; lang: 'fr' | 'en' } | null = null;
     const finishSel = $<HTMLSelectElement>('finish');
     const condSel = $<HTMLSelectElement>('condition');
-    const qtyIn = $<HTMLInputElement>('qty');
 
     function refreshPrice() {
       if (!current) return;
@@ -225,8 +220,7 @@ import { CONDITIONS } from '../lib/condition';
         slot('price').textContent = formatPrice(p.value, p.unit);
         const d = formatDate(p.updated);
         slot('price-note').textContent = `Cote ${finish === 'reverse' ? 'reverse holo ' : ''}indicative${d ? ` du ${d}` : ''}, source ${p.source}${p.unit === 'USD' ? ' (marché américain)' : ''}.`;
-        const q = Math.max(1, Math.min(999, Number(qtyIn.value) || 1));
-        slot('estimate').textContent = `Valeur estimée : ${formatPrice(p.value * conditionFactor(condSel.value as Condition) * q, p.unit)}`;
+        slot('estimate').textContent = `Valeur estimée dans cet état : ${formatPrice(p.value * conditionFactor(condSel.value as Condition), p.unit)}`;
       } else {
         slot('price').textContent = 'Pas de cote';
         slot('price-note').textContent = "Aucune vente récente connue pour cette carte.";
@@ -254,7 +248,6 @@ import { CONDITIONS } from '../lib/condition';
       slot('finish-field').hidden = !rev;
       finishSel.value = 'normal';
       condSel.value = 'NM';
-      qtyIn.value = '1';
       (slot('details') as HTMLAnchorElement).href = url(`/carte/?id=${encodeURIComponent(card.id)}&lang=${c.lang}`);
       slot('form').hidden = false;
       slot('done').hidden = true;
@@ -264,7 +257,6 @@ import { CONDITIONS } from '../lib/condition';
     }
 
     [finishSel, condSel].forEach((s) => s.addEventListener('change', refreshPrice));
-    qtyIn.addEventListener('input', refreshPrice);
 
     slot('form').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -279,7 +271,7 @@ import { CONDITIONS } from '../lib/condition';
         rarity: card.rarity,
         condition: condSel.value as Condition,
         finish: finishSel.value as Finish,
-        quantity: Number(qtyIn.value) || 1,
+        quantity: 1, // un scan = un exemplaire
       });
       slot('form').hidden = true;
       slot('done').hidden = false;
@@ -951,7 +943,6 @@ import { CONDITIONS } from '../lib/condition';
     .ask { font-weight: 600; }
     .row { display: flex; gap: 12px; flex-wrap: wrap; }
     .row .field { flex: 1 1 160px; }
-    .row .qty { flex: 0 1 110px; }
     .confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .done { padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
   </style>
