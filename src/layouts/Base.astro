@@ -101,6 +101,12 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
       import { countCards } from '../lib/collection';
       import { countFavorites, onFavoritesChange } from '../lib/favorites';
       import { checkAlerts, currentAlerts, onAlertsChange, alertText } from '../lib/alerts';
+      // TCGdex n'a pas toutes les images en français : si une image FR manque, on essaie la version anglaise.
+      document.addEventListener('error', (e) => {
+        const img = e.target as HTMLImageElement;
+        if (!(img instanceof HTMLImageElement) || img.dataset.fbk) return;
+        if (/assets\.tcgdex\.net\/fr\//.test(img.src)) { img.dataset.fbk = '1'; img.src = img.src.replace('/fr/', '/en/'); }
+      }, true);
       // Onglet actif visible quand la barre défile (tablette)
       const navEl = document.querySelector<HTMLElement>('header nav');
       const cur = navEl?.querySelector<HTMLElement>('a[aria-current="page"]');

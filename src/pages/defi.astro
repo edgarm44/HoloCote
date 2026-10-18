@@ -110,7 +110,7 @@ import Base from '../layouts/Base.astro';
   </p>
 
   <script>
-    import { POOL_NAMES, MAX_TRIES, todayNumber, msToMidnight, cardOfDay, randomCard, species, isRight, typeFr, getDay, saveDay, stats, type MysteryCard, type DayRecord } from '../lib/mystery';
+    import { POOL_NAMES, MAX_TRIES, todayNumber, msToMidnight, dayCandidates, cardById, randomCard, species, isRight, typeFr, getDay, saveDay, stats, type MysteryCard, type DayRecord } from '../lib/mystery';
     import { suggestNames } from '../lib/smartsearch';
     import { normalize } from '../lib/cardindex';
     import { getCard, priceFor, formatPrice, type Card } from '../lib/tcgdex';
@@ -203,13 +203,13 @@ import Base from '../layouts/Base.astro';
       $('r-set').textContent = [card.set?.name, card.rarity, card.illustrator ? `Illustration : ${card.illustrator}` : ''].filter(Boolean).join(' · ');
       const p = priceFor(card, 'normal');
       $('r-price').replaceChildren(...(p ? [el('span', { class: 'muted small' }, ['Cote du jour ']), el('strong', {}, [formatPrice(p.value, p.unit)])] : [el('span', { class: 'muted small' }, ['Cote indisponible'])]));
-      $('r-card').replaceChildren(holoCard(card.image, card.name, 'high'));
+      $('r-card').replaceChildren(holoCard(card.image, card.name, cardImg.endsWith('low.webp') ? 'low' : 'high'));
       ($('r-link') as HTMLAnchorElement).href = url(`/carte/?id=${encodeURIComponent(card.id)}&lang=fr`);
       const c = card;
       $('r-fav').replaceChildren(favButton(c.id, 'fr', async () => favInfo(c), { label: true }));
       // Récompense : la carte trouvée lors du défi du jour peut rejoindre le classeur (une seule fois, jamais en entraînement).
       const canClaim = mode === 'daily' && rec.won;
-      $('claim-box').hidden = !(canClaim || mode === 'train');
+      $('claim-box').hidden = false;
       const cb = $('claim') as HTMLButtonElement;
       cb.hidden = !canClaim;
       cb.disabled = !!rec.claimed;
@@ -217,6 +217,7 @@ import Base from '../layouts/Base.astro';
       $('claim-lbl').textContent = rec.claimed ? 'Dans ton classeur' : 'Ajouter à mon classeur';
       $('claim-note').textContent = mode === 'train'
         ? "En entraînement, la carte ne peut pas être ajoutée au classeur : seule la carte du défi du jour se gagne."
+        : !rec.won ? "Perdu : la carte ne rejoint pas ton classeur cette fois. Reviens demain pour une nouvelle chance !"
         : rec.claimed ? 'Ta récompense du jour est rangée dans ta collection (état Near Mint).' : 'Ta récompense : la carte rejoint ta collection, une seule fois par défi.';
       $('share').hidden = mode !== 'daily';
       $('countdown-wrap').hidden = mode !== 'daily';
@@ -257,6 +258,7 @@ import Base from '../layouts/Base.astro';
       const g = raw.trim();
       if (g && rec.guesses.some((x) => x && normalize(x) === normalize(g))) { toast('Tu as déjà proposé ce nom.'); return; }
       rec.guesses.push(g);
+      rec.cardId = mc.id;
       const ok = !!g && isRight(g, mc.answer);
       if (ok) rec.won = true;
       if (ok || rec.guesses.length >= MAX_TRIES) rec.done = true;
@@ -274,7 +276,7 @@ import Base from '../layouts/Base.astro';
     let active = -1;
     let seq = 0;
     const input = $('guess') as HTMLInputElement;
-    function closeList() { $('guess-list').hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; }
+    function closeList() { seq++; options = []; $('guess-list').hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; }
     function drawList() {
       const list = $('guess-list');
       list.replaceChildren(...options.map((o, i) => {
@@ -335,8 +337,8 @@ import Base from '../layouts/Base.astro';
         toast('Résultat copié : colle-le où tu veux.');
       } catch { /* partage annulé */ }
     });
-    $('train').addEventListener('click', () => { mode = 'train'; start(randomCard(mc?.id)); window.scrollTo({ top: 0, behavior: 'smooth' }); });
-    $('back-daily').addEventListener('click', () => { mode = 'daily'; start(cardOfDay(today)); });
+    $('train').addEventListener('click', () => { mode = 'train'; start([randomCard(mc?.id), randomCard(mc?.id), randomCard(mc?.id)]); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    $('back-daily').addEventListener('click', () => { mode = 'daily'; start(dayCandidates(today)); });
     const tick = () => {
       const ms = msToMidnight();
       const h = Math.floor(ms / 3.6e6), m = Math.floor((ms % 3.6e6) / 6e4), s = Math.floor((ms % 6e4) / 1000);
@@ -346,32 +348,71 @@ import Base from '../layouts/Base.astro';
     tick();
     setInterval(tick, 1000);
 
-    async function start(next: MysteryCard) {
-      mc = next;
+    let cardImg = '';
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+
+    /** Vérifie qu'une image se charge vraiment (TCGdex n'a pas toutes les images en français). */
+    function probeImg(src: string): Promise<boolean> {
+      return new Promise((res) => {
+        const i = new Image();
+        i.referrerPolicy = 'no-referrer';
+        const t = setTimeout(() => res(false), 9000);
+        i.onload = () => { clearTimeout(t); res(i.naturalWidth > 0); };
+        i.onerror = () => { clearTimeout(t); res(false); };
+        i.src = src;
+      });
+    }
+
+    /** Charge une carte et trouve une image utilisable (français, sinon anglais). */
+    async function loadMystery(c: MysteryCard): Promise<{ card: Card; img: string } | null> {
+      const [fr, en] = await Promise.all([getCard(c.id, 'fr').catch(() => null), getCard(c.id, 'en').catch(() => null)]);
+      const info = fr ?? en;
+      if (!info) return null;
+      const bases = [fr?.image, en?.image, fr?.image?.replace('/fr/', '/en/')].filter((x, i, a): x is string => !!x && a.indexOf(x) === i);
+      for (const b of bases) {
+        for (const q of ['high', 'low']) {
+          const src = `${b}/${q}.webp`;
+          if (await probeImg(src)) return { card: { ...info, image: b }, img: src };
+        }
+      }
+      return null;
+    }
+
+    async function start(candidates: MysteryCard[]) {
       rec = mode === 'daily' ? getDay(today) : { guesses: [], won: false, done: false };
       $('arena').hidden = true;
       $('mx-state').replaceChildren(el('div', { class: 'status', role: 'status' }, [el('div', { class: 'spinner' }), 'On mélange le paquet…']));
-      card = await getCard(mc.id, 'fr').catch(() => null) ?? await getCard(mc.id, 'en').catch(() => null);
-      if (!card?.image) {
+      // Partie déjà commencée aujourd'hui : on reprend la même carte.
+      const saved = mode === 'daily' ? cardById(rec.cardId) : undefined;
+      const list = saved ? [saved, ...candidates.filter((c) => c !== saved)] : candidates;
+      let found: { card: Card; img: string } | null = null;
+      for (const c of list) {
+        found = await loadMystery(c);
+        if (found) { mc = c; break; }
+      }
+      if (!found) {
         const retry = el('button', { type: 'button', class: 'btn' }, ['Réessayer']);
-        retry.addEventListener('click', () => start(mc));
-        $('mx-state').replaceChildren(el('div', { class: 'status' }, ["Impossible de charger la carte du défi pour l'instant. ", retry]));
+        retry.addEventListener('click', () => start(candidates));
+        $('mx-state').replaceChildren(el('div', { class: 'status' }, ["Impossible de charger la carte du défi : vérifie ta connexion. ", retry]));
         return;
       }
+      if (mode === 'daily' && rec.cardId && rec.cardId !== mc.id) rec = { guesses: [], won: false, done: false };
+      card = found.card;
+      cardImg = found.img;
       const h = hash(mc.id);
       const box = $('mx-card');
       box.style.setProperty('--ox', `${32 + (h % 37)}%`);
       box.style.setProperty('--oy', `${24 + ((h >> 5) % 20)}%`);
-      const img = $('mx-img') as HTMLImageElement;
-      img.src = `${card.image}/high.webp`;
+      ($('mx-img') as HTMLImageElement).src = cardImg;
       $('mx-state').replaceChildren();
       $('arena').hidden = false;
       $('confetti').replaceChildren();
       render();
-      if (!rec.done) setTimeout(() => input.focus({ preventScroll: true }), 50);
+      // Sur téléphone, pas de clavier qui surgit à l'ouverture de la page.
+      if (!rec.done && !coarse) setTimeout(() => input.focus({ preventScroll: true }), 50);
     }
 
-    start(cardOfDay(today));
+    start(dayCandidates(today));
   </script>
 
   <style>
@@ -427,7 +468,7 @@ import Base from '../layouts/Base.astro';
     .train-banner { padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; background: rgba(255, 210, 90, 0.08); border: 1px dashed rgba(255, 210, 90, 0.45); font-size: 0.9rem; }
     .link-btn { background: none; border: 0; padding: 0; color: var(--cyan); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 0.88rem; }
     .guess-label { display: block; font-family: var(--font-display); font-weight: 800; font-size: clamp(1.3rem, 3vw, 2rem); letter-spacing: -0.03em; margin-bottom: 14px; }
-    .guess-row { display: flex; gap: 10px; }
+    .guess-row { display: flex; gap: 10px; position: relative; z-index: 3; }
     .guess-field { position: relative; flex: 1; min-width: 0; }
     .guess-field input { width: 100%; min-height: 56px; font-size: 1.1rem; border-radius: 16px; padding: 0 18px; }
     .go { min-height: 56px; padding: 0 26px; border-radius: 16px; font-size: 1rem; }
@@ -511,7 +552,7 @@ import Base from '../layouts/Base.astro';
     }
     @media (max-width: 520px) {
       .stage-col { max-width: 270px; }
-      .guess-row { flex-direction: column; }
+      .go { padding: 0 16px; }
       .r-body { grid-template-columns: 110px 1fr; gap: 14px; }
       .how { grid-template-columns: 1fr; }
     }

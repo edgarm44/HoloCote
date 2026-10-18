@@ -26,7 +26,17 @@ export function holoCard(image: string | undefined, alt: string, quality: 'low' 
   const src = imageUrl(image, quality);
   if (src) {
     const img = el('img', { src, alt, loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
-    img.addEventListener('error', () => img.replaceWith(el('div', { class: 'placeholder' }, [alt])));
+    // Image française absente chez TCGdex : on tente l'anglaise (ici ou via le filet global de la page),
+    // puis un cadre de remplacement si elle manque aussi.
+    let fails = 0;
+    img.addEventListener('error', () => {
+      fails++;
+      if (fails === 1 && /\/(fr|en)\//.test(src)) {
+        if (img.src.includes('/fr/')) { img.dataset.fbk = '1'; img.src = img.src.replace('/fr/', '/en/'); }
+        return;
+      }
+      if (img.isConnected) img.replaceWith(el('div', { class: 'placeholder' }, [alt]));
+    });
     box.append(img);
   } else {
     box.append(el('div', { class: 'placeholder' }, [alt, el('br'), 'Image indisponible']));

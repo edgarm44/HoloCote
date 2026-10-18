@@ -135,12 +135,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       if (!base) return Promise.resolve({ img: null, clean: true });
       if (!imgCache.has(base)) {
         imgCache.set(base, (async () => {
-          const src = `${base}/high.webp`;
-          const a = await loadImg(src, true);
-          if (a) return { img: a, clean: true };
-          // Sans autorisation CORS, l'image s'affiche mais ne peut pas être exportée.
-          const b = await loadImg(src, false);
-          return { img: b, clean: !b };
+          // Image française parfois absente chez TCGdex : repli sur l'anglaise.
+          for (const src of [`${base}/high.webp`, `${base.replace('/fr/', '/en/')}/high.webp`].filter((x, i, arr) => arr.indexOf(x) === i)) {
+            const a = await loadImg(src, true);
+            if (a) return { img: a, clean: true };
+            // Sans autorisation CORS, l'image s'affiche mais ne peut pas être exportée.
+            const b = await loadImg(src, false);
+            if (b) return { img: b, clean: false };
+          }
+          return { img: null, clean: true };
         })());
       }
       return imgCache.get(base)!;

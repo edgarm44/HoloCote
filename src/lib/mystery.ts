@@ -68,6 +68,20 @@ export function cardOfDay(n: number): MysteryCard {
   const k = ((n - 1) % ORDER.length + ORDER.length) % ORDER.length;
   return POOL[ORDER[k]];
 }
+/**
+ * Carte du jour puis cartes de secours (si une image est introuvable chez TCGdex, tout le monde
+ * bascule sur la même carte suivante, la partie reste identique pour tous).
+ */
+export function dayCandidates(n: number): MysteryCard[] {
+  const out: MysteryCard[] = [];
+  for (let k = 0; out.length < 6 && k < ORDER.length; k++) {
+    const c = cardOfDay(n + k * 23);
+    if (!out.includes(c)) out.push(c);
+  }
+  return out;
+}
+export const cardById = (id?: string) => POOL.find((p) => p.id === id);
+
 export function randomCard(exclude?: string): MysteryCard {
   const list = POOL.filter((p) => p.id !== exclude);
   return list[Math.floor(Math.random() * list.length)];
@@ -118,7 +132,7 @@ const TYPES_FR: Record<string, string> = {
 export const typeFr = (t: string) => TYPES_FR[t] ?? t;
 
 /* Parties enregistrées */
-export interface DayRecord { guesses: string[]; won: boolean; done: boolean; claimed?: boolean }
+export interface DayRecord { guesses: string[]; won: boolean; done: boolean; claimed?: boolean; cardId?: string }
 const KEY = 'holocote.mystery.v1';
 type Store = Record<string, DayRecord>;
 function read(): Store {
