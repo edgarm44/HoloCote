@@ -361,12 +361,14 @@ function imageFingerprint(base?: string): Promise<Float32Array | undefined> {
  * sinon on essaie la détection automatique, puis l'image entière.
  * Plusieurs images (rafale de la caméra) : on fusionne les meilleures lectures.
  */
-export async function readCard(input: Source | Source[], onProgress: Progress, card?: Rect): Promise<ScanReading> {
+/** `card` : un cadrage pour toutes les images, ou une liste de cadrages par image (caméra). */
+export async function readCard(input: Source | Source[], onProgress: Progress, card?: Rect | Rect[][]): Promise<ScanReading> {
   const worker = await getWorker(onProgress);
   const frames = Array.isArray(input) ? input : [input];
   const jobs: { src: Source; rect: Rect }[] = [];
-  for (const src of frames) {
-    const rects = card ? [card] : ([detectCard(src), centeredCard(src), centeredCard(src, 0.85)].filter(Boolean) as Rect[]);
+  for (const [k, src] of frames.entries()) {
+    const given = Array.isArray(card) ? card[k] : card ? [card] : undefined;
+    const rects = given?.length ? given : ([detectCard(src), centeredCard(src), centeredCard(src, 0.85)].filter(Boolean) as Rect[]);
     rects.forEach((rect) => jobs.push({ src, rect }));
   }
   const q = (x: ScanReading) => (x.name.length >= 4 ? 1 : 0) + (x.number ? 1 : 0) + (x.total ? 0.5 : 0) + (x.hp ? 0.25 : 0);

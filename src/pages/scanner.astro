@@ -19,7 +19,11 @@ import { CONDITIONS } from '../lib/condition';
       <div class="viewer" id="viewer">
         <video id="video" playsinline muted hidden></video>
         <img id="preview" alt="Ta photo" hidden />
-        <div class="guide" id="guide" hidden><span></span></div>
+        <div class="guide" id="guide" hidden><span></span><i class="g-prog" id="g-prog"></i></div>
+        <span class="focus-ring" id="focus-ring" hidden></span>
+        <div class="flash" id="flash" aria-hidden="true"></div>
+        <button type="button" class="tap-play" id="tap-play" hidden>Touche ici pour lancer la caméra</button>
+        <div class="cam-loading" id="cam-loading" hidden><div class="spinner"></div><span>Ouverture de la caméra…</span></div>
         <div class="cam-tools" id="cam-tools" hidden>
           <button type="button" id="torch-btn" hidden aria-pressed="false" aria-label="Lampe">
             <svg viewBox="0 0 24 24"><path d="M7 2h10l-2 6H9L7 2zM9 8h6v12a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V8zM12 12v3" /></svg>
@@ -35,17 +39,27 @@ import { CONDITIONS } from '../lib/condition';
         </div>
       </div>
       <div class="cam-hint" id="cam-hint" hidden></div>
+      <div class="cam-error" id="cam-error" hidden role="alert">
+        <p class="ce-title">La caméra ne s'est pas ouverte</p>
+        <p class="muted small" id="cam-error-text"></p>
+        <div class="ce-actions">
+          <button type="button" class="btn btn-primary" id="cam-retry">Réessayer</button>
+          <label class="btn" for="snap">Prendre une photo avec l'appareil</label>
+        </div>
+      </div>
       <div class="actions">
         <button class="btn btn-primary" id="cam-btn" type="button">Ouvrir la caméra</button>
         <button class="btn btn-primary" id="shoot-btn" type="button" hidden>Scanner</button>
+        <label class="btn snap-btn" for="snap">Prendre une photo</label>
         <label class="btn" for="photo">Choisir une photo</label>
+        <input id="snap" type="file" accept="image/*" capture="environment" class="sr-only" />
         <input id="photo" type="file" accept="image/*" class="sr-only" />
       </div>
       <label class="auto" id="auto-wrap" hidden>
         <input type="checkbox" id="auto-scan" checked />
         <span>Scan automatique quand l'image est nette et stable</span>
       </label>
-      <p class="muted small">L'image est analysée sur ton appareil : elle n'est jamais envoyée ni enregistrée.</p>
+      <p class="muted small">L'image est analysée sur ton appareil : elle n'est jamais envoyée ni enregistrée. Touche l'image pour faire la mise au point.</p>
       <div id="progress" hidden>
         <div class="bar"><span id="progress-fill"></span></div>
         <p id="progress-label" class="muted small"></p>
@@ -143,7 +157,7 @@ import { CONDITIONS } from '../lib/condition';
   </section>
 
   <script>
-    import { readCard, findCandidates, parseNumber, loadImage, warmUp, preloadIndexes, type Rect, type Candidate, type ScanReading } from '../lib/scan';
+    import { readCard, findCandidates, parseNumber, loadImage, warmUp, preloadIndexes, detectCard, type Rect, type Candidate, type ScanReading } from '../lib/scan';
     import { getCard, priceFor, hasReverse, formatPrice, formatDate, type Card, type Finish } from '../lib/tcgdex';
     import { rarityTier, tierLabel, valueBadge, USD_TO_EUR } from '../lib/rarity';
     import { conditionFactor, type Condition } from '../lib/condition';
@@ -330,7 +344,7 @@ import { CONDITIONS } from '../lib/condition';
       }
     }
 
-    async function analyse(src: ImageBitmap | HTMLImageElement | HTMLCanvasElement | HTMLCanvasElement[], rect?: Rect) {
+    async function analyse(src: ImageBitmap | HTMLImageElement | HTMLCanvasElement | HTMLCanvasElement[], rect?: Rect | Rect[][]) {
       if (busy) return;
       busy = true;
       shootBtn.disabled = true;
@@ -400,9 +414,17 @@ import { CONDITIONS } from '../lib/condition';
     renderHist();
 
     /* ---------- Caméra ---------- */
+    // Ouverture robuste : plusieurs essais de réglages, messages d'erreur précis, reprise automatique,
+    // mise au point au toucher, lampe, zoom, rafale recadrée sur la carte (légère en mémoire).
 
     const camHint = $('cam-hint');
     const camTools = $('cam-tools');
+    const camError = $('cam-error');
+    const camLoading = $('cam-loading');
+    const tapPlay = $<HTMLButtonElement>('tap-play');
+    const focusRing = $('focus-ring');
+    const flash = $('flash');
+    const gProg = $('g-prog');
     const torchBtn = $<HTMLButtonElement>('torch-btn');
     const zoomBtn = $<HTMLButtonElement>('zoom-btn');
     const switchBtn = $<HTMLButtonElement>('switch-btn');
@@ -412,41 +434,123 @@ import { CONDITIONS } from '../lib/condition';
     let deviceIdx = 0;
     let loopTimer = 0;
     let stableSince = 0;
+    let blurSince = 0;
     let lastSig: Float32Array | null = null;
     let sharpMax = 0;
+    let opening = false;
+    let resumeOnShow = false;
+    let lastShot = 0;
 
-    type Caps = MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number }; focusMode?: string[] };
+    type Caps = MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number; step?: number }; focusMode?: string[] };
     const track = () => stream?.getVideoTracks()[0];
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    try { autoScan.checked = localStorage.getItem('holocote.autoscan') !== '0'; } catch { /* rien */ }
+    autoScan.addEventListener('change', () => { try { localStorage.setItem('holocote.autoscan', autoScan.checked ? '1' : '0'); } catch { /* rien */ } });
 
-    /** Caméras arrière, la principale d'abord (on évite ultra grand-angle et téléobjectif, flous de près). */
+    /** Message clair selon la cause de l'échec. */
+    function cameraMessage(e: unknown): string {
+      const name = (e as { name?: string })?.name ?? '';
+      const ua = navigator.userAgent;
+      if (!window.isSecureContext) return "La caméra n'est disponible que sur une adresse sécurisée (https).";
+      if (!navigator.mediaDevices?.getUserMedia) {
+        if (/Instagram|FBAN|FBAV|Snapchat|TikTok|musical_ly|Line\/|Discord|wv\)/i.test(ua))
+          return "Le navigateur intégré de cette appli bloque la caméra. Ouvre le site dans Safari ou Chrome (menu ⋯ puis « Ouvrir dans le navigateur »), ou prends une photo avec l'appareil.";
+        return "Ce navigateur ne donne pas accès à la caméra. Mets-le à jour ou essaie Chrome, Safari ou Firefox, ou prends une photo avec l'appareil.";
+      }
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
+        return /iPhone|iPad|iPod/i.test(ua)
+          ? "L'accès à la caméra a été refusé. Touche « aA » dans la barre d'adresse, puis Réglages du site web > Appareil photo > Autoriser, et réessaie."
+          : "L'accès à la caméra a été refusé. Touche le cadenas à gauche de l'adresse, autorise la caméra pour ce site, puis réessaie.";
+      }
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') return 'Aucune caméra utilisable n\'a été trouvée sur cet appareil.';
+      if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError')
+        return "La caméra est déjà utilisée par une autre appli (appareil photo, appel vidéo…). Ferme-la, puis réessaie.";
+      return `La caméra n'a pas pu démarrer${name ? ` (${name})` : ''}. Réessaie, ou prends une photo avec l'appareil.`;
+    }
+    function showCamError(e: unknown) {
+      $('cam-error-text').textContent = cameraMessage(e);
+      camError.hidden = false;
+    }
+
+    /** Caméras arrière, la principale d'abord (on évite ultra grand-angle, téléobjectif et caméras de profondeur). */
     async function backCameras(): Promise<string[]> {
-      const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
-      const back = devs.filter((d) => /back|rear|arri|environment|trás|posterior/i.test(d.label));
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput' && d.deviceId);
+      const back = devs.filter((d) => /back|rear|arri|environment|trás|posterior|world/i.test(d.label));
       const list = back.length ? back : devs;
-      const score = (l: string) => (/ultra|wide|0[.,]5|tele|zoom|macro|depth|profondeur/i.test(l) ? 1 : 0);
+      const score = (l: string) => (/triple|dual(?! wide)/i.test(l) ? -1 : /ultra|wide|0[.,]5|tele|zoom|macro|depth|profondeur|infrared|ir\b/i.test(l) ? 1 : 0);
       return list.sort((a, b) => score(a.label) - score(b.label)).map((d) => d.deviceId);
     }
 
-    async function start(deviceId?: string) {
-      stream?.getTracks().forEach((t) => t.stop());
-      const video_: MediaTrackConstraints = {
-        width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 30 },
-        ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } }),
-      };
-      stream = await navigator.mediaDevices.getUserMedia({ video: video_, audio: false });
-      video.srcObject = stream;
-      await video.play();
-      await tuneTrack();
+    /** Demande un flux vidéo en assouplissant les exigences à chaque échec. */
+    async function getStream(deviceId?: string): Promise<MediaStream> {
+      const base = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } };
+      const tries: (MediaTrackConstraints | true)[] = [
+        { ...base, width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 30, max: 30 } },
+        { ...base, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        { ...base },
+        ...(deviceId ? [] : [true as const]),
+      ];
+      let last: unknown;
+      for (const video_ of tries) {
+        try {
+          return await navigator.mediaDevices.getUserMedia({ video: video_, audio: false });
+        } catch (e) {
+          last = e;
+          const n = (e as { name?: string }).name;
+          if (n === 'NotAllowedError' || n === 'PermissionDeniedError' || n === 'SecurityError') throw e;
+          await wait(120);
+        }
+      }
+      throw last;
     }
 
-    /** Mise au point continue, et réglages de lampe / zoom si l'appareil les propose. */
+    async function start(deviceId?: string) {
+      stopStream();
+      await wait(80); // certains Android refusent un nouveau flux tant que l'ancien n'est pas libéré
+      stream = await getStream(deviceId);
+      const t = track();
+      t?.addEventListener('ended', () => {
+        if (!stream) return;
+        closeCamera();
+        showCamError({ name: 'NotReadableError' });
+      });
+      video.muted = true;
+      video.setAttribute('playsinline', '');
+      video.setAttribute('autoplay', '');
+      video.srcObject = stream;
+      video.hidden = false;
+      await new Promise<void>((res) => {
+        if (video.readyState >= 1) return res();
+        video.addEventListener('loadedmetadata', () => res(), { once: true });
+        setTimeout(res, 4000);
+      });
+      try {
+        await video.play();
+        tapPlay.hidden = true;
+      } catch {
+        // Lecture bloquée (mode économie d'énergie, réglage du navigateur) : un toucher suffit.
+        tapPlay.hidden = false;
+      }
+      for (let i = 0; i < 40 && !video.videoWidth; i++) await wait(50);
+      await tuneTrack();
+    }
+    tapPlay.addEventListener('click', async () => { try { await video.play(); tapPlay.hidden = true; } catch { /* rien */ } });
+
+    function stopStream() {
+      stream?.getTracks().forEach((t) => t.stop());
+      stream = null;
+    }
+
+    /** Mise au point, exposition et balance des blancs automatiques ; lampe et zoom si disponibles. */
     async function tuneTrack() {
       const t = track();
       if (!t) return;
-      const caps = (t.getCapabilities?.() ?? {}) as Caps;
+      const caps = (t.getCapabilities?.() ?? {}) as Caps & { exposureMode?: string[]; whiteBalanceMode?: string[] };
       const advanced: Record<string, unknown>[] = [];
       if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' });
-      if (advanced.length) await t.applyConstraints({ advanced } as MediaTrackConstraints).catch(() => {});
+      if (caps.exposureMode?.includes('continuous')) advanced.push({ exposureMode: 'continuous' });
+      if (caps.whiteBalanceMode?.includes('continuous')) advanced.push({ whiteBalanceMode: 'continuous' });
+      for (const a of advanced) await t.applyConstraints({ advanced: [a] } as MediaTrackConstraints).catch(() => {});
       torchBtn.hidden = !caps.torch;
       torchBtn.setAttribute('aria-pressed', 'false');
       zoomBtn.hidden = !(caps.zoom && caps.zoom.max >= 1.5);
@@ -456,56 +560,106 @@ import { CONDITIONS } from '../lib/condition';
     }
 
     async function openCamera() {
+      if (opening) return;
+      opening = true;
+      camError.hidden = true;
+      preview.hidden = idle.hidden = true;
+      camLoading.hidden = false;
+      camBtn.disabled = true;
       try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
         await start();
-        // Les noms des caméras ne sont lisibles qu'après autorisation : on choisit alors la principale.
+        // Les noms des caméras ne sont lisibles qu'après autorisation : on bascule alors sur la principale.
         deviceIds = await backCameras().catch(() => []);
-        const current = track()?.getSettings().deviceId;
-        if (deviceIds.length > 1 && deviceIds[0] !== current) {
-          await start(deviceIds[0]).catch(() => start());
+        const cur = track()?.getSettings().deviceId;
+        const facing = track()?.getSettings().facingMode;
+        if (deviceIds.length > 1 && cur && deviceIds[0] !== cur && facing !== 'user') {
+          const ok = await start(deviceIds[0]).then(() => true).catch(() => false);
+          if (!ok) await start();
         }
         deviceIdx = Math.max(0, deviceIds.indexOf(track()?.getSettings().deviceId ?? ''));
         switchBtn.hidden = deviceIds.length < 2;
         camTools.hidden = torchBtn.hidden && zoomBtn.hidden && switchBtn.hidden;
-      } catch {
-        candState.replaceChildren(status('Caméra indisponible ou refusée. Utilise « Choisir une photo ».', false));
+      } catch (e) {
+        stopStream();
+        video.hidden = true;
+        camLoading.hidden = true;
+        idle.hidden = !preview.hidden;
+        camBtn.disabled = false;
+        opening = false;
+        showCamError(e);
         return;
       }
-      video.hidden = guide.hidden = shootBtn.hidden = camHint.hidden = false;
+      camLoading.hidden = true;
+      camBtn.disabled = false;
+      opening = false;
+      guide.hidden = shootBtn.hidden = camHint.hidden = false;
       autoWrap.hidden = false;
-      preview.hidden = idle.hidden = true;
       camBtn.textContent = 'Fermer la caméra';
       sharpMax = 0;
+      setHint('Place ta carte dans le cadre', 'info');
       startLoop();
     }
 
     function closeCamera() {
       window.clearInterval(loopTimer);
-      stream?.getTracks().forEach((t) => t.stop());
-      stream = null;
-      video.hidden = guide.hidden = shootBtn.hidden = camHint.hidden = camTools.hidden = true;
+      stopStream();
+      video.srcObject = null;
+      video.hidden = guide.hidden = shootBtn.hidden = camHint.hidden = camTools.hidden = tapPlay.hidden = focusRing.hidden = true;
       autoWrap.hidden = true;
+      camLoading.hidden = true;
       if (preview.hidden) idle.hidden = false;
       camBtn.textContent = 'Ouvrir la caméra';
     }
 
     torchBtn.addEventListener('click', async () => {
       const on = torchBtn.getAttribute('aria-pressed') !== 'true';
-      await track()?.applyConstraints({ advanced: [{ torch: on }] } as unknown as MediaTrackConstraints).catch(() => {});
-      torchBtn.setAttribute('aria-pressed', String(on));
+      const t = track();
+      if (!t) return;
+      const ok = await t.applyConstraints({ advanced: [{ torch: on }] } as unknown as MediaTrackConstraints).then(() => true).catch(() => false);
+      if (ok) torchBtn.setAttribute('aria-pressed', String(on));
+      else toast("La lampe n'a pas pu s'allumer sur cet appareil.");
     });
+    async function setZoom(next: number) {
+      await track()?.applyConstraints({ advanced: [{ zoom: next }] } as unknown as MediaTrackConstraints).catch(() => {});
+      zoomBtn.textContent = next > 1 ? `×${Math.round(next * 10) / 10}` : '×1';
+      sharpMax = 0;
+    }
     zoomBtn.addEventListener('click', async () => {
       const caps = (track()?.getCapabilities?.() ?? {}) as Caps;
       if (!caps.zoom) return;
-      const next = zoomBtn.textContent === '×1' ? Math.min(2, caps.zoom.max) : Math.max(1, caps.zoom.min);
-      await track()?.applyConstraints({ advanced: [{ zoom: next }] } as unknown as MediaTrackConstraints).catch(() => {});
-      zoomBtn.textContent = next > 1 ? `×${next}` : '×1';
+      await setZoom(zoomBtn.textContent === '×1' ? Math.min(2, caps.zoom.max) : Math.max(1, caps.zoom.min));
     });
     switchBtn.addEventListener('click', async () => {
       if (deviceIds.length < 2) return;
       deviceIdx = (deviceIdx + 1) % deviceIds.length;
-      await start(deviceIds[deviceIdx]).catch(() => {});
+      camLoading.hidden = false;
+      await start(deviceIds[deviceIdx]).catch(async () => { await start().catch((e) => { closeCamera(); showCamError(e); }); });
+      camLoading.hidden = true;
       sharpMax = 0;
+    });
+
+    /** Mise au point au toucher (Chrome Android) ; ailleurs, relance l'autofocus. */
+    viewer.addEventListener('pointerdown', async (e) => {
+      if (!stream || (e.target as HTMLElement).closest('button')) return;
+      const vb = viewer.getBoundingClientRect();
+      const px = e.clientX - vb.left, py = e.clientY - vb.top;
+      focusRing.style.left = `${px}px`;
+      focusRing.style.top = `${py}px`;
+      focusRing.hidden = false;
+      focusRing.classList.remove('go'); void focusRing.offsetWidth; focusRing.classList.add('go');
+      setTimeout(() => { focusRing.hidden = true; }, 900);
+      const t = track();
+      if (!t || !video.videoWidth) return;
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const scale = Math.max(vb.width / vw, vb.height / vh);
+      const x = (px - (vb.width - vw * scale) / 2) / scale / vw, y = (py - (vb.height - vh * scale) / 2) / scale / vh;
+      const caps = (t.getCapabilities?.() ?? {}) as Caps;
+      const pt = { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+      const single = caps.focusMode?.includes('single-shot') ? 'single-shot' : caps.focusMode?.includes('continuous') ? 'continuous' : null;
+      await t.applyConstraints({ advanced: [{ pointsOfInterest: [pt], ...(single ? { focusMode: single } : {}) }] } as unknown as MediaTrackConstraints).catch(() => {});
+      sharpMax = 0;
+      if (single === 'single-shot') setTimeout(() => { t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as unknown as MediaTrackConstraints).catch(() => {}); }, 2500);
     });
 
     function guideRect(): Rect {
@@ -517,26 +671,34 @@ import { CONDITIONS } from '../lib/condition';
       return { x: (gb.left - vb.left - ox) / scale, y: (gb.top - vb.top - oy) / scale, w: gb.width / scale, h: gb.height / scale };
     }
 
-    const grab = () => {
+    /** Image recadrée autour du cadre (+ marge), limitée en taille : rapide et léger en mémoire. */
+    function grabCrop(r: Rect, margin = 0.12) {
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const x0 = Math.max(0, r.x - r.w * margin), y0 = Math.max(0, r.y - r.h * margin);
+      const x1 = Math.min(vw, r.x + r.w * (1 + margin)), y1 = Math.min(vh, r.y + r.h * (1 + margin));
+      const sw = x1 - x0, sh = y1 - y0;
+      if (!(sw >= 16 && sh >= 16)) return null;
+      const k = Math.min(1, 1800 / Math.max(sw, sh));
       const f = document.createElement('canvas');
-      f.width = video.videoWidth;
-      f.height = video.videoHeight;
-      f.getContext('2d')!.drawImage(video, 0, 0);
-      return f;
-    };
-    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      f.width = Math.round(sw * k); f.height = Math.round(sh * k);
+      const ctx = f.getContext('2d')!;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(video, x0, y0, sw, sh, 0, 0, f.width, f.height);
+      const inner: Rect = { x: (r.x - x0) * k, y: (r.y - y0) * k, w: r.w * k, h: r.h * k };
+      return { f, inner };
+    }
 
-    /** Netteté (variance du laplacien), luminosité et petite signature de la zone du cadre. */
+    /** Netteté (variance du laplacien), luminosité, reflets et petite signature de la zone du cadre. */
     const probe = document.createElement('canvas');
     function measure(src: CanvasImageSource, r: Rect) {
-      const W = 160, H = Math.round(160 * (r.h / r.w));
+      const W = 160, H = Math.max(8, Math.round(160 * (r.h / r.w)));
       probe.width = W; probe.height = H;
       const ctx = probe.getContext('2d', { willReadFrequently: true })!;
       ctx.drawImage(src, r.x, r.y, r.w, r.h, 0, 0, W, H);
       const d = ctx.getImageData(0, 0, W, H).data;
       const g = new Float32Array(W * H);
-      let sum = 0;
-      for (let i = 0; i < W * H; i++) { g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; sum += g[i]; }
+      let sum = 0, hot = 0;
+      for (let i = 0; i < W * H; i++) { g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; sum += g[i]; if (g[i] > 248) hot++; }
       let lapSum = 0, lapSq = 0, n = 0;
       for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
         const i = y * W + x;
@@ -551,67 +713,100 @@ import { CONDITIONS } from '../lib/condition';
           for (let x = Math.floor((bx * W) / 8); x < Math.floor(((bx + 1) * W) / 8); x += 2) { s += g[y * W + x]; c++; }
         sig[by * 8 + bx] = c ? s / c : 0;
       }
-      return { sharp, light: sum / (W * H), sig };
+      // Contraste entre blocs : une table vide ou un mur donnent une image uniforme (pas de carte).
+      let mean = 0; for (const v of sig) mean += v; mean /= 64;
+      let dev = 0; for (const v of sig) dev += Math.abs(v - mean); dev /= 64;
+      return { sharp, light: sum / (W * H), glare: hot / (W * H), detail: dev, sig };
     }
 
     function setHint(text: string, kind: 'warn' | 'ok' | 'info') {
-      camHint.textContent = text;
+      if (camHint.textContent !== text) camHint.textContent = text;
       camHint.dataset.kind = kind;
       guide.dataset.kind = kind;
     }
 
-    /** Guidage en direct : lumière, netteté, stabilité ; déclenche le scan automatique. */
+    /** Guidage en direct : présence de la carte, lumière, reflets, netteté, stabilité ; scan automatique. */
     function startLoop() {
       window.clearInterval(loopTimer);
       stableSince = 0;
+      blurSince = 0;
       lastSig = null;
       loopTimer = window.setInterval(() => {
-        if (!stream || busy || !video.videoWidth) return;
-        const m = measure(video, guideRect());
-        sharpMax = Math.max(sharpMax * 0.995, m.sharp);
+        gProg.style.setProperty('--p', '0');
+        if (!stream || busy || !video.videoWidth || video.paused || guide.hidden) return;
+        const gr = guideRect();
+        if (!(gr.w > 16 && gr.h > 16)) return;
+        const m = measure(video, gr);
+        sharpMax = Math.max(sharpMax * 0.99, m.sharp);
         let moved = 1e9;
         if (lastSig) { moved = 0; for (let i = 0; i < 64; i++) moved += Math.abs(m.sig[i] - lastSig[i]); moved /= 64; }
         lastSig = m.sig;
-        const stable = moved < 6;
-        const sharpOk = m.sharp > 25 && m.sharp >= sharpMax * 0.6;
-        if (m.light < 40) { setHint('Trop sombre : allume la lampe ou rapproche-toi d\'une fenêtre', 'warn'); stableSince = 0; return; }
-        if (m.light > 225) { setHint('Trop de lumière ou un reflet : incline un peu la carte', 'warn'); stableSince = 0; return; }
-        if (!stable) { setHint('Tiens le téléphone immobile', 'info'); stableSince = 0; return; }
-        if (!sharpOk) { setHint('Image floue : recule un peu ou essaie le zoom ×2', 'warn'); stableSince = 0; return; }
-        if (!stableSince) stableSince = performance.now();
-        setHint(autoScan.checked ? 'Parfait, ne bouge plus…' : 'Image nette : appuie sur Scanner', 'ok');
-        if (autoScan.checked && performance.now() - stableSince > 700) {
-          stableSince = 0;
-          shoot();
+        const stable = moved < 7;
+        const sharpOk = m.sharp > 22 && m.sharp >= sharpMax * 0.55;
+        const reset = () => { stableSince = 0; };
+        if (m.light < 38) { setHint(torchBtn.hidden ? "Trop sombre : rapproche-toi d'une lampe ou d'une fenêtre" : 'Trop sombre : allume la lampe (en haut à droite)', 'warn'); return reset(); }
+        if (m.glare > 0.04 || m.light > 228) { setHint('Reflet sur la carte : incline-la un peu', 'warn'); return reset(); }
+        if (m.detail < 6) { setHint('Place ta carte dans le cadre', 'info'); return reset(); }
+        if (!stable) { setHint('Ne bouge plus…', 'info'); return reset(); }
+        if (!sharpOk) {
+          if (!blurSince) blurSince = performance.now();
+          const long = performance.now() - blurSince > 2500;
+          setHint(long && !zoomBtn.hidden && zoomBtn.textContent === '×1' ? 'Toujours flou : recule le téléphone et touche ×2' : long ? "Toujours flou : recule un peu et touche l'image pour la mise au point" : 'Mise au point…', 'warn');
+          return reset();
         }
-      }, 250);
+        blurSince = 0;
+        if (!stableSince) stableSince = performance.now();
+        const held = performance.now() - stableSince;
+        if (autoScan.checked) {
+          gProg.style.setProperty('--p', String(Math.min(1, held / 650)));
+          setHint('Parfait, ne bouge plus…', 'ok');
+          if (held > 650 && performance.now() - lastShot > 2500) { stableSince = 0; shoot(); }
+        } else setHint('Image nette : appuie sur Scanner', 'ok');
+      }, 200);
     }
 
-    /** Rafale de 8 images en ~0,8 s ; on garde les 3 plus nettes. */
+    /** Rafale de 6 images recadrées ; on garde les 3 plus nettes. La vidéo se fige pendant la lecture. */
     async function shoot() {
-      if (!stream || busy) return;
+      if (!stream || busy || !video.videoWidth) return;
       const rect = guideRect();
-      const shots: { f: HTMLCanvasElement; s: number }[] = [];
-      for (let i = 0; i < 8; i++) {
-        const f = grab();
-        shots.push({ f, s: measure(f, rect).sharp });
-        await wait(100);
+      if (!(rect.w > 16 && rect.h > 16)) return;
+      lastShot = performance.now();
+      const shots: { f: HTMLCanvasElement; inner: Rect; s: number }[] = [];
+      for (let i = 0; i < 6; i++) {
+        const c = grabCrop(rect);
+        if (c) shots.push({ ...c, s: measure(c.f, c.inner).sharp });
+        await wait(90);
       }
+      if (!shots.length) { lastShot = 0; return; }
+      navigator.vibrate?.(30);
+      flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
+      video.pause();
       shots.sort((a, b) => b.s - a.s);
+      const best = shots.slice(0, 3);
+      // Deux cadrages par image : la carte détectée dans la photo (si elle est nette) et le cadre de visée.
+      const jobs = best.map((x) => {
+        const d = detectCard(x.f);
+        const okD = d && d.w > x.inner.w * 0.7 && d.w < x.inner.w * 1.25;
+        return { f: x.f, rects: okD ? [d!, x.inner] : [x.inner] };
+      });
       setHint('Lecture en cours…', 'info');
-      await analyse(shots.slice(0, 3).map((x) => x.f), rect);
-      if (stream) setHint('Vise une autre carte', 'info');
+      await analyse(jobs.map((j) => j.f), jobs.map((j) => j.rects));
+      if (stream) { video.play().catch(() => { tapPlay.hidden = false; }); setHint('Vise une autre carte', 'info'); }
     }
 
     camBtn.addEventListener('click', () => (stream ? closeCamera() : openCamera()));
+    $('cam-retry').addEventListener('click', () => openCamera());
     shootBtn.addEventListener('click', () => shoot());
-    document.addEventListener('visibilitychange', () => { if (document.hidden) closeCamera(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { resumeOnShow = !!stream; closeCamera(); }
+      else if (resumeOnShow) { resumeOnShow = false; openCamera(); }
+    });
 
     /* ---------- Photo ---------- */
 
-    photo.addEventListener('change', async () => {
-      const file = photo.files?.[0];
-      photo.value = '';
+    const onFile = async (input: HTMLInputElement) => {
+      const file = input.files?.[0];
+      input.value = '';
       if (!file) return;
       closeCamera();
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -625,7 +820,9 @@ import { CONDITIONS } from '../lib/condition';
       } catch {
         candState.replaceChildren(status("Impossible d'ouvrir cette image.", false));
       }
-    });
+    };
+    photo.addEventListener('change', () => onFile(photo));
+    $<HTMLInputElement>('snap').addEventListener('change', (e) => onFile(e.currentTarget as HTMLInputElement));
 
     manual.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -675,7 +872,7 @@ import { CONDITIONS } from '../lib/condition';
       position: relative; width: 100%; max-width: 340px; margin: 0 auto 14px;
       aspect-ratio: 3 / 4; border-radius: 16px; overflow: hidden;
       background: radial-gradient(circle at 50% 30%, rgba(138, 123, 255, 0.15), transparent 70%), var(--bg-2);
-      border: 1px solid var(--line);
+      border: 1px solid var(--line); touch-action: manipulation;
     }
     .viewer video, .viewer img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
     .viewer img { object-fit: contain; }
@@ -691,6 +888,21 @@ import { CONDITIONS } from '../lib/condition';
       animation: sweep 2.4s ease-in-out infinite alternate;
     }
     @keyframes sweep { to { top: calc(100% - 2px); } }
+    .g-prog { position: absolute; left: 0; bottom: -10px; height: 4px; width: calc(var(--p, 0) * 100%); border-radius: 4px; background: var(--up); box-shadow: 0 0 10px var(--up); transition: width 0.2s linear; }
+    .focus-ring { position: absolute; z-index: 4; width: 70px; height: 70px; margin: -35px 0 0 -35px; border: 2px solid var(--gold); border-radius: 12px; pointer-events: none; }
+    .focus-ring.go { animation: focus 0.8s ease-out forwards; }
+    @keyframes focus { 0% { transform: scale(1.5); opacity: 0; } 25% { transform: scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    .flash { position: absolute; inset: 0; z-index: 5; background: #fff; opacity: 0; pointer-events: none; }
+    .flash.go { animation: flash 0.35s ease-out; }
+    @keyframes flash { 0% { opacity: 0.85; } 100% { opacity: 0; } }
+    .tap-play { position: absolute; inset: 0; z-index: 6; border: 0; background: rgba(7, 6, 13, 0.7); color: var(--text); font-weight: 700; font-size: 1rem; cursor: pointer; }
+    .cam-loading { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); font-size: 0.9rem; }
+    .cam-error { margin: 0 0 14px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(255, 90, 122, 0.5); background: rgba(255, 90, 122, 0.08); }
+    .cam-error p { margin: 0 0 8px; }
+    .ce-title { font-weight: 700; color: var(--down); }
+    .ce-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    @media (hover: hover) and (pointer: fine) { .snap-btn { display: none !important; } }
+    @media (max-width: 819px) { .viewer { max-width: 440px; } }
     .idle {
       position: absolute; inset: 14%; display: grid; place-content: center; text-align: center;
       border: 2px dashed rgba(255, 255, 255, 0.2); border-radius: 12px;
