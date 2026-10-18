@@ -76,12 +76,21 @@ export function countCards(): number {
   return load().items.reduce((n, i) => n + i.quantity, 0);
 }
 
-export function addItem(item: Omit<Item, 'addedAt'>): void {
+/** La carte est-elle déjà dans le classeur (même carte, même langue) ? */
+export function hasCard(cardId: string, lang: Lang): boolean {
+  return load().items.some((i) => i.cardId === cardId && i.lang === lang);
+}
+
+/**
+ * Ajoute une carte au classeur. Une carte rangée ne peut être ni dupliquée ni supprimée :
+ * si elle y est déjà, rien ne change et la fonction renvoie false.
+ */
+export function addItem(item: Omit<Item, 'addedAt'>): boolean {
   const store = load();
-  const existing = store.items.find((i) => sameLine(i, item));
-  if (existing) existing.quantity = Math.min(999, existing.quantity + item.quantity);
-  else store.items.push({ ...item, quantity: clampQty(item.quantity), addedAt: Date.now() });
+  if (store.items.some((i) => i.cardId === item.cardId && i.lang === item.lang)) return false;
+  store.items.push({ ...item, quantity: 1, addedAt: Date.now() });
   save(store);
+  return true;
 }
 
 export function updateItem(key: ItemKey, patch: Partial<Pick<Item, 'quantity' | 'condition'>>): void {
@@ -101,22 +110,6 @@ export function updateItem(key: ItemKey, patch: Partial<Pick<Item, 'quantity' | 
   save(store);
 }
 
-export function removeItem(key: ItemKey): void {
-  const store = load();
-  store.items = store.items.filter((i) => !sameLine(i, key));
-  save(store);
-}
-
-export function clearAll(): void {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* rien */
-  }
-  memory = { app: 'holocote', version: 1, items: [] };
-  window.dispatchEvent(new CustomEvent('holocote:collection'));
-}
-
 export function exportJson(): string {
   return JSON.stringify(load(), null, 2);
 }
@@ -125,16 +118,16 @@ export function exportJson(): string {
 export function importJson(text: string, mode: 'merge' | 'replace'): number {
   const incoming = validate(JSON.parse(text));
   if (!incoming) throw new Error('Fichier non reconnu');
+  // Une carte n'apparaît qu'une fois dans le classeur : les doublons d'un fichier sont ignorés.
+  const seen = new Set<string>();
+  incoming.items = incoming.items.filter((it) => { const k = `${it.lang}:${it.cardId}`; if (seen.has(k)) return false; seen.add(k); return true; });
   if (mode === 'replace') {
     save(incoming);
     return incoming.items.length;
   }
   const store = load();
   for (const it of incoming.items) {
-    const ex = store.items.find((i) => sameLine(i, it));
-    // Même ligne issue de la même sauvegarde (même date d'ajout) : on ne double pas, on garde la plus grande quantité.
-    if (ex) ex.quantity = clampQty(ex.addedAt === it.addedAt ? Math.max(ex.quantity, it.quantity) : ex.quantity + it.quantity);
-    else store.items.push(it);
+    if (!store.items.some((i) => i.cardId === it.cardId && i.lang === it.lang)) store.items.push(it);
   }
   save(store);
   return incoming.items.length;

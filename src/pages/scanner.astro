@@ -94,7 +94,7 @@ import { CONDITIONS } from '../lib/condition';
       <p class="muted small" data-slot="price-note"></p>
 
       <form data-slot="form" class="confirm-form">
-        <p class="ask">C'est bien ta carte ? Ajoute-la à ta collection. Tu en as plusieurs ? Scanne chaque exemplaire.</p>
+        <p class="ask">C'est bien ta carte ? Ajoute-la à ta collection.</p>
         <div class="row">
           <div class="field" data-slot="finish-field">
             <label for="finish">Finition</label>
@@ -157,7 +157,7 @@ import { CONDITIONS } from '../lib/condition';
     import { getCard, priceFor, hasReverse, formatPrice, formatDate, type Card, type Finish } from '../lib/tcgdex';
     import { rarityTier, tierLabel, valueBadge, USD_TO_EUR } from '../lib/rarity';
     import { conditionFactor, type Condition } from '../lib/condition';
-    import { addItem } from '../lib/collection';
+    import { addItem, hasCard } from '../lib/collection';
     import { holoCard, status, el, toast, url } from '../lib/ui';
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -251,6 +251,14 @@ import { CONDITIONS } from '../lib/condition';
       (slot('details') as HTMLAnchorElement).href = url(`/carte/?id=${encodeURIComponent(card.id)}&lang=${c.lang}`);
       slot('form').hidden = false;
       slot('done').hidden = true;
+      // Une carte déjà rangée ne peut pas être ajoutée une deuxième fois.
+      const owned = hasCard(card.id, c.lang);
+      const submitBtn = slot('form').querySelector<HTMLButtonElement>('button[type=submit]')!;
+      submitBtn.disabled = owned;
+      submitBtn.textContent = owned ? 'Déjà dans ton classeur' : 'Ajouter à ma collection';
+      slot('form').querySelector('.ask')!.textContent = owned
+        ? 'Cette carte est déjà dans ton classeur : chaque carte n\'y est rangée qu\'une fois.'
+        : "C'est bien ta carte ? Ajoute-la à ta collection.";
       refreshPrice();
       confirmBox.hidden = false;
       confirmBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -262,7 +270,7 @@ import { CONDITIONS } from '../lib/condition';
       e.preventDefault();
       if (!current) return;
       const { card, lang } = current;
-      addItem({
+      const added = addItem({
         cardId: card.id,
         lang,
         name: card.name,
@@ -273,6 +281,7 @@ import { CONDITIONS } from '../lib/condition';
         finish: finishSel.value as Finish,
         quantity: 1, // un scan = un exemplaire
       });
+      if (!added) { toast('Cette carte est déjà dans ton classeur.'); return; }
       slot('form').hidden = true;
       slot('done').hidden = false;
       setStep(4);

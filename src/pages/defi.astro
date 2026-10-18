@@ -218,7 +218,7 @@ import { mascotSvg } from '../lib/mascot';
     import { normalize } from '../lib/cardindex';
     import { getCard, priceFor, formatPrice, type Card } from '../lib/tcgdex';
     import { favButton } from '../lib/favorites';
-    import { addItem } from '../lib/collection';
+    import { addItem, hasCard } from '../lib/collection';
     import { el, url, holoCard, toast, favInfo } from '../lib/ui';
 
     const $ = (id: string) => document.getElementById(id)!;
@@ -314,10 +314,11 @@ import { mascotSvg } from '../lib/mascot';
       $('claim-box').hidden = false;
       const cb = $('claim') as HTMLButtonElement;
       cb.hidden = !canClaim;
-      cb.disabled = !!rec.claimed;
-      cb.classList.toggle('done', !!rec.claimed);
-      $('claim-lbl').textContent = rec.claimed ? 'Dans ton classeur' : 'Ajouter à mon classeur';
-      $('claim-note').textContent = mode === 'train'
+      const owned = canClaim && !rec.claimed && hasCard(card.id, 'fr');
+      cb.disabled = !!rec.claimed || owned;
+      cb.classList.toggle('done', !!rec.claimed || owned);
+      $('claim-lbl').textContent = rec.claimed ? 'Dans ton classeur' : owned ? 'Déjà dans ton classeur' : 'Ajouter à mon classeur';
+      $('claim-note').textContent = owned ? "Tu as déjà cette carte dans ton classeur : chaque carte n'y est rangée qu'une fois." : mode === 'train'
         ? "En entraînement, la carte ne peut pas être ajoutée au classeur : seule la carte du défi du jour se gagne."
         : !rec.won ? "Perdu : la carte ne rejoint pas ton classeur cette fois. Reviens demain pour une nouvelle chance !"
         : rec.claimed ? 'Ta récompense du jour est rangée dans ta collection (état Near Mint).' : 'Ta récompense : la carte rejoint ta collection, une seule fois par défi.';
@@ -421,7 +422,7 @@ import { mascotSvg } from '../lib/mascot';
       if (mode !== 'daily' || !rec.won || rec.claimed || !card) return;
       const fresh = getDay(today);
       if (fresh.claimed) { rec = fresh; showResult(); return; } // déjà ajoutée (autre onglet)
-      addItem({ cardId: card.id, lang: 'fr', name: card.name, image: card.image, setName: card.set?.name, rarity: card.rarity, condition: 'NM', finish: 'normal', quantity: 1 });
+      if (!addItem({ cardId: card.id, lang: 'fr', name: card.name, image: card.image, setName: card.set?.name, rarity: card.rarity, condition: 'NM', finish: 'normal', quantity: 1 })) { toast('Cette carte est déjà dans ton classeur.'); showResult(); return; }
       rec.claimed = true;
       saveDay(today, rec);
       showResult();
@@ -535,7 +536,7 @@ import { mascotSvg } from '../lib/mascot';
     import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, type BoosterState, type Pulled } from '../lib/booster';
     import { todayNumber, msToMidnight, getDay } from '../lib/mystery';
     import { loadMarket, type Quote } from '../lib/market';
-    import { addItem } from '../lib/collection';
+    import { addItem, hasCard } from '../lib/collection';
     import { formatPrice } from '../lib/tcgdex';
     import { mascotSvg } from '../lib/mascot';
     import { el, url, holoCard, toast, status } from '../lib/ui';
@@ -637,10 +638,11 @@ import { mascotSvg } from '../lib/mascot';
       }
       btn.hidden = false;
       $('bx-claim-note').hidden = false;
-      btn.disabled = !!bState?.claimed || !c;
-      btn.textContent = bState?.claimed ? 'Dans ton classeur' : 'Ajouter à mon classeur';
-      btn.classList.toggle('done', !!bState?.claimed);
-      $('bx-claim-note').textContent = bState?.claimed ? 'Rangée dans ta collection. Reviens demain pour un nouveau booster.' : 'La dixième carte du booster rejoint ta collection (état Near Mint), une fois par jour.';
+      const owned = !bState?.claimed && !!c && hasCard(c.id, 'fr');
+      btn.disabled = !!bState?.claimed || !c || owned;
+      btn.textContent = bState?.claimed ? 'Dans ton classeur' : owned ? 'Déjà dans ton classeur' : 'Ajouter à mon classeur';
+      btn.classList.toggle('done', !!bState?.claimed || owned);
+      $('bx-claim-note').textContent = bState?.claimed ? 'Rangée dans ta collection. Reviens demain pour un nouveau booster.' : owned ? "Tu as déjà cette carte dans ton classeur : chaque carte n'y est rangée qu'une fois." : 'La dixième carte du booster rejoint ta collection (état Near Mint), une fois par jour.';
     }
 
     function renderSummary() {
@@ -752,7 +754,7 @@ import { mascotSvg } from '../lib/mascot';
         const fresh = getBooster();
         const c = pulled[pulled.length - 1]?.card;
         if (!bState || !c || fresh?.claimed) { if (fresh) bState = fresh; renderHit(true); return; }
-        addItem({ cardId: c.id, lang: 'fr', name: c.name, image: c.image, setName: c.set?.name, rarity: c.rarity, condition: 'NM', finish: 'normal', quantity: 1 });
+        if (!addItem({ cardId: c.id, lang: 'fr', name: c.name, image: c.image, setName: c.set?.name, rarity: c.rarity, condition: 'NM', finish: 'normal', quantity: 1 })) { toast('Cette carte est déjà dans ton classeur.'); renderHit(true); return; }
         bState.claimed = true;
         bState.opened = true;
         saveBooster(bState);
@@ -862,10 +864,11 @@ import { mascotSvg } from '../lib/mascot';
       $('du-reward-k').textContent = d.claimed ? 'Récompense récupérée' : 'Ta récompense';
       $('du-reward-t').textContent = `${cheap.name} (${fmt(cheap.price)}), la moins chère des deux.`;
       const btn = $('du-claim') as HTMLButtonElement;
-      btn.disabled = !!d.claimed;
-      btn.textContent = d.claimed ? 'Dans ton classeur' : 'Ajouter à mon classeur';
-      btn.classList.toggle('done', !!d.claimed);
-      $('du-reward-note').textContent = d.claimed ? 'Rangée dans ta collection. Nouveau duel demain.' : 'Elle rejoint ta collection (état Near Mint). Un seul duel du jour : reviens demain.';
+      const owned = !d.claimed && hasCard(cheap.id, cheap.lang);
+      btn.disabled = !!d.claimed || owned;
+      btn.textContent = d.claimed ? 'Dans ton classeur' : owned ? 'Déjà dans ton classeur' : 'Ajouter à mon classeur';
+      btn.classList.toggle('done', !!d.claimed || owned);
+      $('du-reward-note').textContent = d.claimed ? 'Rangée dans ta collection. Nouveau duel demain.' : owned ? "Tu as déjà cette carte dans ton classeur : chaque carte n'y est rangée qu'une fois." : 'Elle rejoint ta collection (état Near Mint). Un seul duel du jour : reviens demain.';
       $('du-reward').hidden = false;
     }
 
@@ -940,7 +943,7 @@ import { mascotSvg } from '../lib/mascot';
         const d = getDaily();
         if (!d?.ok || d.claimed || !pair) return;
         const cheap = pair[0].price <= pair[1].price ? pair[0] : pair[1];
-        addItem({ cardId: cheap.id, lang: cheap.lang, name: cheap.name, image: cheap.image, setName: cheap.setName, rarity: cheap.rarity, condition: 'NM', finish: 'normal', quantity: 1 });
+        if (!addItem({ cardId: cheap.id, lang: cheap.lang, name: cheap.name, image: cheap.image, setName: cheap.setName, rarity: cheap.rarity, condition: 'NM', finish: 'normal', quantity: 1 })) { toast('Cette carte est déjà dans ton classeur.'); renderReward(d); return; }
         const nd = { ...d, claimed: true };
         saveDaily(nd);
         renderReward(nd);
@@ -1067,9 +1070,6 @@ import { mascotSvg } from '../lib/mascot';
     .du-card.picked.lose { border-color: var(--down); opacity: 1; }
     .du-card:disabled { cursor: default; }
     .du-vs { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; color: #0a0812; background: var(--holo); box-shadow: 0 0 30px rgba(255, 79, 216, 0.4); }
-    .du-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); margin: 4px 0 22px; }
-    .du-tabs button { border: 0; background: none; color: var(--muted); padding: 8px 16px; border-radius: 999px; font-weight: 700; cursor: pointer; font: inherit; }
-    .du-tabs button[aria-pressed='true'] { background: var(--holo); color: #0a0812; }
     .du-reward { display: grid; grid-template-columns: 120px 1fr; gap: 20px; align-items: center; max-width: 620px; margin: -14px auto 34px; padding: 18px; border-radius: 20px;
       background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, linear-gradient(120deg, #3dffa8, #3ef0ff) border-box; border: 1px solid transparent; }
     .du-reward-card { width: 120px; }
@@ -1129,7 +1129,6 @@ import { mascotSvg } from '../lib/mascot';
     .tries { text-align: center; font-family: var(--font-display); font-weight: 700; margin: 0; font-size: 0.95rem; }
 
     .console { min-width: 0; }
-    .train-banner { padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; background: rgba(255, 210, 90, 0.08); border: 1px dashed rgba(255, 210, 90, 0.45); font-size: 0.9rem; }
     .link-btn { background: none; border: 0; padding: 0; color: var(--cyan); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 0.88rem; }
     .guess-label { display: block; font-family: var(--font-display); font-weight: 800; font-size: clamp(1.3rem, 3vw, 2rem); letter-spacing: -0.03em; margin-bottom: 14px; }
     .guess-row { display: flex; gap: 10px; position: relative; z-index: 3; }
