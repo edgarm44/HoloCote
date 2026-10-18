@@ -22,9 +22,19 @@ import Base from '../layouts/Base.astro';
       </div>
       <div id="index-chart" class="index-chart"></div>
       <p class="muted small">Base 100 = valeur moyenne des cartes suivies sur 30 jours.</p>
-      <button type="button" class="btn refresh" id="refresh">Actualiser les cours</button>
     </div>
   </section>
+
+  <div class="control-bar" id="control-bar">
+    <div class="cb-info">
+      <span class="cb-live"><span class="pulse"></span><span id="cb-date">Cotes Cardmarket</span></span>
+      <span class="cb-ago" id="cb-ago">Chargement…</span>
+    </div>
+    <button type="button" class="refresh-btn" id="refresh">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4" /></svg>
+      <span class="rb-label">Actualiser les cours</span>
+    </button>
+  </div>
 
   <div id="ticker-slot" class="ticker-slot"></div>
 
@@ -294,12 +304,25 @@ import Base from '../layouts/Base.astro';
       $('portfolio').hidden = false;
     }
 
+    let loadedAt = 0;
+    const agoText = () => {
+      if (!loadedAt) return 'Chargement…';
+      const m = Math.round((Date.now() - loadedAt) / 60000);
+      return m < 1 ? 'Mis à jour à l\'instant' : m === 1 ? 'Mis à jour il y a 1 minute' : `Mis à jour il y a ${m} minutes`;
+    };
+    setInterval(() => { $('cb-ago').textContent = agoText(); }, 30000);
     $('refresh').addEventListener('click', async () => {
       const b = $('refresh') as HTMLButtonElement;
-      b.disabled = true; b.textContent = 'Actualisation…';
+      if (b.classList.contains('loading')) return;
+      b.classList.add('loading');
+      b.querySelector('.rb-label')!.textContent = 'Actualisation…';
       await main(true);
-      b.disabled = false; b.textContent = 'Actualiser les cours';
+      b.classList.remove('loading');
+      b.querySelector('.rb-label')!.textContent = 'Actualiser les cours';
+      b.classList.add('done');
+      setTimeout(() => b.classList.remove('done'), 1600);
     });
+    $('cp-index').addEventListener('click', () => { chartState = { kind: 'index' }; renderChart(); });
 
     async function main(force = false) {
       let market;
@@ -326,7 +349,9 @@ import Base from '../layouts/Base.astro';
         $('index-chart').replaceChildren(sparkline(pts, 320, 70));
       }
       const updated = quotes.map((q) => q.updated).filter(Boolean).sort().pop();
-      if (updated) $('live-text').textContent = `Cotes du ${formatDate(updated)}`;
+      if (updated) { $('live-text').textContent = `Cotes du ${formatDate(updated)}`; $('cb-date').textContent = `Cotes Cardmarket du ${formatDate(updated)}`; }
+      loadedAt = market.loadedAt;
+      $('cb-ago').textContent = agoText();
 
       $('ticker-slot').replaceChildren(ticker(quotes.filter((q) => q.change7 !== undefined), href, eur));
 
@@ -359,6 +384,63 @@ import Base from '../layouts/Base.astro';
   </script>
 
   <style>
+
+    /* Barre de contrôle (toujours visible) */
+    .control-bar {
+      position: sticky; top: 64px; z-index: 12;
+      display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+      margin: 0 0 18px; padding: 10px 10px 10px 18px; border-radius: 999px;
+      background: rgba(14, 12, 26, 0.88); border: 1px solid rgba(62, 240, 255, 0.28);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+    @media (max-width: 720px) { .control-bar { top: 54px; border-radius: 20px; padding: 10px; } }
+    .cb-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .cb-live { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.92rem; }
+    .cb-ago { color: var(--muted); font-size: 0.8rem; padding-left: 16px; }
+    .refresh-btn {
+      display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px; border: 0; border-radius: 999px; cursor: pointer;
+      font: inherit; font-weight: 800; font-size: 1rem; color: #0a0812;
+      background: var(--holo); background-size: 200% 100%; animation: shimmer 6s linear infinite;
+      box-shadow: 0 0 0 0 rgba(62, 240, 255, 0.5), 0 10px 30px rgba(255, 79, 216, 0.35);
+      transition: transform 0.15s, box-shadow 0.3s;
+    }
+    .refresh-btn:hover { transform: translateY(-1px); box-shadow: 0 0 0 4px rgba(62, 240, 255, 0.18), 0 14px 36px rgba(255, 79, 216, 0.45); }
+    .refresh-btn:active { transform: scale(0.97); }
+    .refresh-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+    .refresh-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .refresh-btn.loading svg { animation: spin360 0.9s linear infinite; }
+    .refresh-btn.loading { opacity: 0.85; cursor: progress; }
+    .refresh-btn.done { box-shadow: 0 0 0 6px rgba(61, 255, 168, 0.35), 0 14px 36px rgba(61, 255, 168, 0.35); }
+    @keyframes spin360 { to { transform: rotate(360deg); } }
+    @media (max-width: 520px) { .refresh-btn { width: 100%; justify-content: center; } }
+
+    /* Indice */
+    .index-card { position: relative; border: 1px solid transparent !important;
+      background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, linear-gradient(135deg, rgba(62,240,255,.6), rgba(138,123,255,.35), rgba(255,79,216,.6)) border-box !important; }
+
+    /* Hausses / baisses / plus chères */
+    .mover { position: relative; overflow: hidden; padding-top: 22px; }
+    .mover::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; }
+    .movers .mover:nth-child(1)::before { background: linear-gradient(90deg, var(--up), var(--cyan)); }
+    .movers .mover:nth-child(2)::before { background: linear-gradient(90deg, var(--down), var(--magenta)); }
+    .movers .mover:nth-child(3)::before { background: linear-gradient(90deg, var(--gold), #ffb35a); }
+    .mover h2 { font-size: 1.15rem !important; letter-spacing: -0.01em; }
+    .mover ol { counter-reset: mv; }
+    .mover :global(li a) { grid-template-columns: 22px 36px 1fr auto !important; }
+    .mover :global(li a)::before { counter-increment: mv; content: counter(mv); color: var(--muted); font-weight: 800; font-family: var(--font-display); font-size: 0.85rem; }
+    .mover :global(.chg), .mover :global(.mv-price) { padding: 4px 10px; border-radius: 999px; font-size: 0.85rem; }
+    .mover :global(.chg.up) { background: rgba(61, 255, 168, 0.12); }
+    .mover :global(.chg.down) { background: rgba(255, 90, 122, 0.12); }
+    .mover :global(.mv-price) { background: rgba(255, 210, 90, 0.12); color: var(--gold); }
+
+    /* Tableau */
+    .table :global(.row-wrap:nth-child(even) .tr) { background: rgba(255, 255, 255, 0.018); }
+    .table :global(.row-wrap .num .chg) { display: inline-block; min-width: 64px; text-align: center; padding: 4px 8px; border-radius: 8px; }
+    .table :global(.row-wrap .num .chg.up) { background: rgba(61, 255, 168, 0.12); }
+    .table :global(.row-wrap .num .chg.down) { background: rgba(255, 90, 122, 0.12); }
+    .table :global(.rank) { font-family: var(--font-display); font-weight: 800; }
+    .table :global(.row-wrap:nth-child(-n+3) .rank) { color: var(--gold); }
 
     .mk-title { font-size: clamp(3.2rem, 11vw, 7.5rem); line-height: 0.88; letter-spacing: -0.05em; font-weight: 800; margin: 0 0 10px; }
     .mk-slogan { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.2rem, 3vw, 1.8rem); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 12px;
@@ -406,7 +488,6 @@ import Base from '../layouts/Base.astro';
       border-color: rgba(138, 123, 255, 0.35);
     }
     .index-card p { margin: 6px 0 0; }
-    .refresh { margin-top: 12px; min-height: 40px; font-size: 0.9rem; }
     .index-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .index-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
     .live { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); }

@@ -1,15 +1,15 @@
 ---
 import Base from '../layouts/Base.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
+const words = ['Scanne', 'Suis', 'Chasse', 'Range'];
 ---
 <Base title="HoloCote" active="home">
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 
   <section class="hero">
     <div class="hero-text">
-      <h1 class="mega"><span>Tes cartes</span><span>valent</span><span class="foil">de l'or.</span></h1>
-      <p class="lead">Scanne-les, suis leur cote comme à la bourse et garde l'œil sur celles que tu chasses. Gratuit, sans compte, sans pub.</p>
+      <h1 class="mega"><span>Sors tes cartes.</span><span>On s'occupe</span><span class="foil">de la cote.</span></h1>
+      <p class="lead">Un scan et tu sais ce que vaut ta carte. Suis le marché comme à la bourse, traque celles qui te manquent et range les autres dans ton classeur.</p>
 
       <form class="hero-search" action={`${base}/recherche/`} method="get" role="search">
         <label class="sr-only" for="hq">Nom de la carte</label>
@@ -27,6 +27,12 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
           Scanner ma carte
         </a>
         <a class="btn btn-ghost btn-xl" href={`${base}/marche/`}>Voir le marché</a>
+      </div>
+
+      <div class="live-strip" id="live-strip" hidden>
+        <div class="ls-item"><span class="ls-value" id="ls-index">—</span><span class="ls-label">Indice</span></div>
+        <div class="ls-item"><span class="ls-value up" id="ls-top">—</span><span class="ls-label" id="ls-top-name">Plus forte hausse</span></div>
+        <div class="ls-item"><span class="ls-value" id="ls-n">—</span><span class="ls-label">Cartes suivies</span></div>
       </div>
     </div>
 
@@ -61,14 +67,14 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
         </div>
       </div>
       <div class="tile-copy">
-        <h2>Vise.<br />C'est coté.</h2>
-        <p>Le scanner lit le nom, les PV et le numéro de ta carte, compare l'illustration et te donne sa cote en quelques secondes.</p>
-        <span class="tile-link">Ouvrir le scanner</span>
+        <h2>Dix secondes.<br />Une cote.</h2>
+        <p>Pose ta carte devant l'objectif : nom, PV, numéro et illustration sont reconnus, et sa cote du jour s'affiche. Ta photo ne quitte jamais ton téléphone.</p>
+        <span class="tile-link">Scanner une carte</span>
       </div>
     </a>
 
     <a class="tile t-market" href={`${base}/marche/`}>
-      <h2>La bourse<br />des cartes.</h2>
+      <h2>Le marché,<br />en direct.</h2>
       <div class="mini-index">
         <span class="mi-value" id="mi-value">—</span>
         <span class="mi-chg" id="mi-chg"></span>
@@ -78,39 +84,48 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
     </a>
 
     <a class="tile t-alert" href={`${base}/favoris/`}>
-      <h2>Ne rate<br />aucune hausse.</h2>
+      <h2>Ta cible.<br />Ton moment.</h2>
       <div class="alert-demo" aria-hidden="true">
         <span class="ad-bell"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4" /></svg></span>
         <span class="ad-text"><strong id="ad-name">Noctali VMAX</strong><span id="ad-chg" class="up">a passé ton seuil</span></span>
       </div>
-      <p>Mets une étoile, fixe un prix cible : HoloCote te prévient.</p>
+      <p>Fixe le prix que tu es prêt à mettre : HoloCote te prévient quand la carte y arrive.</p>
     </a>
 
     <a class="tile t-coll" href={`${base}/collection/`}>
       <div>
-        <h2>Ton classeur,<br />ta fierté.</h2>
-        <p id="coll-line">Range tes cartes scannées, vois leur valeur totale et ta pépite.</p>
+        <h2>Toutes tes cartes.<br />Une seule valeur.</h2>
+        <p id="coll-line">Chaque carte scannée rejoint ton classeur : valeur totale, pépite, raretés, tout est là.</p>
       </div>
       <div class="stack" aria-hidden="true"><span></span><span></span><span></span></div>
     </a>
   </section>
 
+  <section class="how">
+    <h2 class="big">Comment ça marche</h2>
+    <ol class="how-steps">
+      <li><span class="hs-n">1</span><h3>Vise</h3><p>Ouvre le scanner et place ta carte dans le cadre, bien à plat.</p></li>
+      <li><span class="hs-n">2</span><h3>Découvre</h3><p>HoloCote reconnaît la carte et affiche sa rareté et sa cote du jour.</p></li>
+      <li><span class="hs-n">3</span><h3>Range ou chasse</h3><p>Ajoute-la à ton classeur, ou mets une étoile sur celles qui te manquent.</p></li>
+    </ol>
+  </section>
+
   <section class="risers" id="risers" hidden>
     <div class="section-head">
-      <h2 class="big">Ça monte.</h2>
+      <h2 class="big">Ça grimpe.</h2>
       <a class="btn btn-ghost" href={`${base}/marche/`}>Tout le marché</a>
     </div>
     <div class="riser-grid" id="riser-grid"></div>
   </section>
 
   <section class="manifesto">
-    <p><span>Pas de compte.</span><span>Pas de pub.</span><span class="foil">Juste tes cartes.</span></p>
-    <p class="m-sub">Ta collection et tes favoris restent dans ton téléphone. Tes photos ne quittent jamais ton appareil.</p>
+    <p><span>Zéro compte.</span><span>Zéro pub.</span><span class="foil">100 % cartes.</span></p>
+    <p class="m-sub">Ton classeur, ta chasse et tes scans restent dans ton téléphone. Personne d'autre ne les voit.</p>
   </section>
 
   <section class="final">
-    <h2>Et si ta prochaine carte était une pépite ?</h2>
-    <a class="btn btn-primary btn-xl" href={`${base}/scanner/`}>Scanner maintenant</a>
+    <h2>Prêt ? Sors ta plus belle carte.</h2>
+    <a class="btn btn-primary btn-xl" href={`${base}/scanner/`}>Lancer le scanner</a>
   </section>
 
   <script>
@@ -146,6 +161,16 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
       };
       tag('tag1', top[0]);
       tag('tag2', top[1]);
+
+      const topUp = [...qs].filter((q) => q.change7 !== undefined).sort((a, b) => b.change7! - a.change7!)[0];
+      document.getElementById('ls-n')!.textContent = String(qs.length);
+      if (m.index) document.getElementById('ls-index')!.textContent = m.index.value.toFixed(1).replace('.', ',');
+      if (topUp) {
+        document.getElementById('ls-top')!.textContent = formatChange(topUp.change7);
+        document.getElementById('ls-top')!.className = `ls-value ${changeClass(topUp.change7)}`;
+        document.getElementById('ls-top-name')!.textContent = topUp.name;
+      }
+      document.getElementById('live-strip')!.hidden = false;
 
       if (m.index) {
         document.getElementById('mi-value')!.textContent = m.index.value.toFixed(1).replace('.', ',');
@@ -184,6 +209,24 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
   </script>
 
   <style>
+
+    .live-strip { display: flex; gap: 0; margin-top: 26px; max-width: 560px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: rgba(14, 12, 26, 0.6); }
+    .ls-item { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; min-width: 0; }
+    .ls-item + .ls-item { border-left: 1px solid var(--line); }
+    .ls-value { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.2rem, 3vw, 1.6rem); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .ls-label { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .how { margin-bottom: 80px; }
+    .how .big { margin-bottom: 24px; }
+    .how-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: 1fr; counter-reset: none; }
+    @media (min-width: 860px) { .how-steps { grid-template-columns: repeat(3, 1fr); } }
+    .how-steps li { position: relative; padding: 28px 24px 24px; border-radius: 26px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
+    .how-steps h3 { font-size: 1.5rem; letter-spacing: -0.02em; margin: 14px 0 6px; }
+    .how-steps p { margin: 0; color: var(--muted); }
+    .hs-n { position: absolute; right: 14px; top: -18px; font-family: var(--font-display); font-weight: 800; font-size: 7rem; line-height: 1; color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.12); }
+    .how-steps li:nth-child(1) { border-top: 3px solid var(--cyan); }
+    .how-steps li:nth-child(2) { border-top: 3px solid var(--magenta); }
+    .how-steps li:nth-child(3) { border-top: 3px solid var(--gold); }
     .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
     .aurora span { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); opacity: 0.2; animation: drift 26s ease-in-out infinite alternate; }
     .aurora span:nth-child(1) { background: #3ef0ff; top: -30vmax; left: -20vmax; }
@@ -193,8 +236,9 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
 
     /* ---------- Hero ---------- */
     .hero { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: center; padding: clamp(24px, 5vw, 56px) 0 44px; min-height: min(86vh, 820px); }
-    @media (min-width: 980px) { .hero { grid-template-columns: 1.15fr 0.85fr; } }
-    .mega { display: flex; flex-direction: column; font-size: clamp(3.1rem, 10vw, 7.4rem); line-height: 0.9; letter-spacing: -0.045em; font-weight: 800; margin: 0 0 24px; }
+    @media (min-width: 980px) { .hero { grid-template-columns: 1.35fr 0.65fr; } .mega { font-size: clamp(3.4rem, 5.6vw, 4.9rem); } }
+    .hero-text { min-width: 0; }
+    .mega { display: flex; flex-direction: column; font-size: clamp(2.3rem, 10.5vw, 4.9rem); line-height: 0.9; letter-spacing: -0.045em; font-weight: 800; margin: 0 0 24px; }
     .mega span { display: block; }
     .foil {
       background: linear-gradient(100deg, #3ef0ff 0%, #8a7bff 25%, #ff4fd8 50%, #ffd25a 75%, #3ef0ff 100%);
@@ -230,7 +274,7 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
     @keyframes spin { to { transform: rotate(360deg); } }
     .fan { position: absolute; inset: 0; display: grid; place-items: center; }
     .fan-card {
-      position: absolute; width: clamp(160px, 25vw, 270px); aspect-ratio: 245 / 342; border-radius: 4.5% / 3.2%;
+      position: absolute; width: clamp(160px, 16vw, 210px); aspect-ratio: 245 / 342; border-radius: 4.5% / 3.2%;
       overflow: hidden; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55);
       animation: float 7s ease-in-out infinite;
       background: var(--holo); background-size: 200% 200%;
@@ -247,9 +291,9 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
     .fan-card img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.6s; }
     .fan-card.loaded img { opacity: 1; }
     .fan-card .ph { position: absolute; inset: 6%; border-radius: 6px; background: rgba(7, 6, 13, 0.55); }
-    .fan-card.c1 { --base: translateX(-44%) rotate(-13deg); z-index: 1; animation-delay: -2s; }
+    .fan-card.c1 { --base: translateX(-40%) rotate(-13deg); z-index: 1; animation-delay: -2s; }
     .fan-card.c2 { z-index: 3; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 70px rgba(255, 79, 216, 0.35); }
-    .fan-card.c3 { --base: translateX(44%) rotate(13deg); z-index: 2; animation-delay: -4s; }
+    .fan-card.c3 { --base: translateX(40%) rotate(13deg); z-index: 2; animation-delay: -4s; }
     @keyframes float { 50% { translate: 0 -16px; } }
     .float-tag {
       position: absolute; z-index: 4; display: grid; grid-template-columns: auto auto; gap: 0 10px; align-items: baseline;
@@ -262,7 +306,7 @@ const words = ['Scanne', 'Cote', 'Chasse', 'Collectionne'];
     .ft-name { grid-column: 1 / -1; font-weight: 700; font-size: 0.9rem; }
     .ft-price { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; }
     .ft-chg { font-weight: 700; font-size: 0.85rem; }
-    @media (max-width: 979px) { .showcase { order: -1; height: 320px; } .float-tag { display: none !important; } }
+    @media (max-width: 979px) { .showcase { order: -1; height: 320px; } .fan-card { width: clamp(150px, 34vw, 230px); } .float-tag { display: none !important; } }
 
     .ticker-slot { margin: 0 -16px; min-height: 42px; }
 
