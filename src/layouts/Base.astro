@@ -5,10 +5,23 @@ import Logo from '../components/Logo.astro';
 interface Props {
   title: string;
   description?: string;
-  active?: 'home' | 'search' | 'market' | 'scanner' | 'favorites' | 'ranking' | 'collection' | 'legal';
+  active?: 'home' | 'search' | 'market' | 'scanner' | 'favorites' | 'ranking' | 'collection' | 'mystery' | 'showcase' | 'legal';
 }
 const { title, description = 'Cote et rareté de tes cartes à collectionner, scanner gratuit et collection privée.', active } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+// Onglets. « extra » : rangés dans le menu « Plus » de la barre du bas sur téléphone.
+const NAV = [
+  { key: 'home', href: '/', label: 'Accueil', icon: '<path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" />' },
+  { key: 'search', href: '/recherche/', label: 'Recherche', icon: '<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />' },
+  { key: 'market', href: '/marche/', label: 'Marché', icon: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />' },
+  { key: 'scanner', href: '/scanner/', label: 'Scanner', icon: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" />' },
+  { key: 'collection', href: '/collection/', label: 'Collection', icon: '<rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" />', badge: 'nav-count' },
+  { key: 'favorites', href: '/favoris/', label: 'Favoris', icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />', badge: 'fav-count', extra: true },
+  { key: 'ranking', href: '/classement/', label: 'Classement', icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />', extra: true },
+  { key: 'mystery', href: '/mystere/', label: 'Mystère', icon: '<rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6v.4M12 16.8v.01" />', extra: true },
+  { key: 'showcase', href: '/vitrine/', label: 'Vitrine', icon: '<rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 16l3-4 2.5 3 2-2.5L17 16" /><circle cx="8.5" cy="8.5" r="1.3" />', extra: true },
+] as const;
+const extraActive = NAV.some((n) => 'extra' in n && n.extra && n.key === active);
 const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : `${title} · HoloCote`;
 ---
 <!doctype html>
@@ -30,31 +43,31 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
           <Logo />
         </a>
         <nav aria-label="Navigation principale">
-          <a href={`${base}/`} aria-current={active === 'home' ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" /></svg><span class="lbl">Accueil</span>
-          </a>
-          <a href={`${base}/recherche/`} aria-current={active === 'search' ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg><span class="lbl">Recherche</span>
-          </a>
-          <a href={`${base}/marche/`} aria-current={active === 'market' ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6" /></svg><span class="lbl">Marché</span>
-          </a>
-          <a href={`${base}/scanner/`} aria-current={active === 'scanner' ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" /></svg><span class="lbl">Scanner</span>
-          </a>
-          <a href={`${base}/favoris/`} aria-current={active === 'favorites' ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg><span class="lbl">Favoris</span>
-            <span class="count fav-count" id="fav-count" hidden></span>
-            <span class="alert-dot" id="alert-dot" hidden title="Alerte de prix"></span>
-          </a>
-          <a href={`${base}/classement/`} aria-current={active === 'ranking' ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /></svg><span class="lbl">Classement</span>
-          </a>
-          <a href={`${base}/collection/`} aria-current={active === 'collection' ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" /></svg><span class="lbl">Collection</span>
-            <span class="count" id="nav-count" hidden></span>
-          </a>
+          {NAV.map((n) => (
+            <a href={`${base}${n.href}`} class={'extra' in n && n.extra ? 'x' : undefined} aria-current={active === n.key ? 'page' : undefined}>
+              <svg viewBox="0 0 24 24" aria-hidden="true" set:html={n.icon} /><span class="lbl">{n.label}</span>
+              {'badge' in n && n.badge && <span class={`count ${n.badge}`} hidden></span>}
+              {n.key === 'favorites' && <span class="alert-dot" hidden title="Alerte de prix"></span>}
+            </a>
+          ))}
+          <button type="button" class="more-btn" id="more-btn" aria-expanded="false" aria-controls="more-sheet" aria-current={extraActive ? 'page' : undefined}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg><span class="lbl">Plus</span>
+            <span class="alert-dot" hidden></span>
+          </button>
         </nav>
+        <div class="more-sheet" id="more-sheet" hidden>
+          <p class="ms-title">Plus d'onglets</p>
+          <div class="ms-grid">
+            {NAV.filter((n) => 'extra' in n && n.extra).map((n) => (
+              <a href={`${base}${n.href}`} aria-current={active === n.key ? 'page' : undefined}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" set:html={n.icon} /><span>{n.label}</span>
+                {'badge' in n && n.badge && <span class={`count ${n.badge}`} hidden></span>}
+                {n.key === 'favorites' && <span class="alert-dot" hidden></span>}
+              </a>
+            ))}
+          </div>
+        </div>
+        <div class="more-backdrop" id="more-backdrop" hidden></div>
       </div>
     </header>
 
@@ -87,21 +100,28 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
       import { countCards } from '../lib/collection';
       import { countFavorites, onFavoritesChange } from '../lib/favorites';
       import { checkAlerts, currentAlerts, onAlertsChange, alertText } from '../lib/alerts';
-      const favBadge = document.getElementById('fav-count');
-      const refreshFav = () => {
-        const n = countFavorites();
-        if (favBadge) { favBadge.hidden = n === 0; favBadge.textContent = String(n); }
-      };
+      const setBadges = (cls: string, n: number) => document.querySelectorAll<HTMLElement>(`.${cls}`).forEach((b) => { b.hidden = n === 0; b.textContent = String(n); });
+      const refreshFav = () => setBadges('fav-count', countFavorites());
+
+      // Menu « Plus » (téléphone)
+      const moreBtn = document.getElementById('more-btn')!;
+      const sheet = document.getElementById('more-sheet')!;
+      const backdrop = document.getElementById('more-backdrop')!;
+      const setMore = (open: boolean) => { sheet.hidden = !open; backdrop.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); };
+      moreBtn.addEventListener('click', () => setMore(sheet.hidden));
+      backdrop.addEventListener('click', () => setMore(false));
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMore(false); });
+      window.matchMedia('(min-width: 721px)').addEventListener('change', () => setMore(false));
       refreshFav();
       onFavoritesChange(refreshFav);
 
       // Alertes de prix des favoris (vérifiées au plus toutes les 3 h, sur le site uniquement).
       const banner = document.getElementById('alert-banner')!;
-      const dot = document.getElementById('alert-dot')!;
+      const dots = document.querySelectorAll<HTMLElement>('.alert-dot');
       const onFavPage = location.pathname.replace(/\/$/, '').endsWith('/favoris');
       const showAlerts = () => {
         const alerts = currentAlerts();
-        dot.hidden = alerts.length === 0;
+        dots.forEach((d) => { d.hidden = alerts.length === 0; });
         let dismissed = false;
         try { dismissed = sessionStorage.getItem('holocote.alerts.dismissed') === '1'; } catch { /* rien */ }
         if (!alerts.length || onFavPage || dismissed) { banner.hidden = true; return; }
@@ -121,14 +141,7 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
       showAlerts();
       const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1500));
       if (countFavorites()) idle(() => { checkAlerts().catch(() => {}); });
-      const badge = document.getElementById('nav-count');
-      const refresh = () => {
-        const n = countCards();
-        if (badge) {
-          badge.hidden = n === 0;
-          badge.textContent = String(n);
-        }
-      };
+      const refresh = () => setBadges('nav-count', countCards());
       refresh();
       window.addEventListener('holocote:collection', refresh);
       window.addEventListener('storage', refresh);
@@ -155,14 +168,16 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         animation: shimmer 6s linear infinite; transform: rotate(-8deg);
         box-shadow: 0 0 16px rgba(255, 79, 216, 0.5);
       }
-      nav { display: flex; gap: 2px; }
+      nav { display: flex; gap: 2px; flex-wrap: wrap; }
+      .more-btn, .more-sheet, .more-backdrop { display: none; }
       nav a {
         position: relative;
         color: var(--muted); text-decoration: none; padding: 8px 11px; border-radius: 10px; font-weight: 600; font-size: 0.92rem;
         display: inline-flex; align-items: center; gap: 6px;
       }
       nav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 18px; }
-      @media (min-width: 721px) and (max-width: 1240px) { nav svg { display: none; } nav a { padding: 8px 8px; font-size: 0.88rem; } }
+      @media (min-width: 1241px) { nav a { padding: 8px 8px; gap: 5px; font-size: 0.86rem; } nav svg { width: 16px; height: 16px; flex-basis: 16px; } }
+      @media (min-width: 721px) and (max-width: 1240px) { nav svg { display: none; } nav a { padding: 8px 7px; font-size: 0.86rem; } .bar { justify-content: center; } }
       nav a:hover { color: var(--text); background: var(--surface); }
       nav a[aria-current='page'] { color: var(--text); background: var(--surface-2); }
       .count {
@@ -205,15 +220,34 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         .bar { justify-content: center; padding: 8px; }
         nav {
           position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-          display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+          display: grid; grid-template-columns: repeat(6, 1fr); gap: 0;
           padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
           background: rgba(10, 9, 18, 0.94); border-top: 1px solid var(--line);
           backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
         }
-        nav a { flex-direction: column; gap: 3px; padding: 6px 1px; font-size: 0.6rem; border-radius: 10px; min-width: 0; }
+        nav a.x { display: none; }
+        nav a, .more-btn { flex-direction: column; gap: 3px; padding: 6px 1px; font-size: 0.66rem; border-radius: 10px; min-width: 0; }
+        .more-btn { display: inline-flex; align-items: center; position: relative; border: 0; background: none; color: var(--muted); font-weight: 600; cursor: pointer; }
+        .more-btn[aria-current='page'], .more-btn[aria-expanded='true'] { color: var(--cyan); }
+        .more-sheet:not([hidden]) { display: block; position: fixed; left: 10px; right: 10px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 31;
+          padding: 14px; border-radius: 22px; background: rgba(16, 13, 30, 0.98); border: 1px solid var(--line); box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.6);
+          animation: sheet 0.22s ease-out; }
+        @keyframes sheet { from { transform: translateY(14px); opacity: 0; } }
+        .more-backdrop:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 29; background: rgba(0, 0, 0, 0.5); }
+        .ms-title { margin: 0 4px 10px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
+        .ms-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .ms-grid a { position: relative; display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 16px; text-decoration: none; color: var(--text);
+          font-weight: 700; background: var(--surface); border: 1px solid var(--line); }
+        .ms-grid a[aria-current='page'] { border-color: rgba(62, 240, 255, 0.6); color: var(--cyan); }
+        .ms-grid svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 24px; }
+        .ms-grid .count { margin-left: auto; }
+        .ms-grid .alert-dot { position: absolute; top: 10px; left: 30px; }
         nav .lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         nav svg { width: 22px; height: 22px; }
         nav a[aria-current='page'] { color: var(--cyan); background: transparent; }
+        .more-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
+        .more-btn svg circle { fill: currentColor; stroke: none; }
+        .more-btn .alert-dot { position: absolute; top: 4px; right: calc(50% - 16px); }
         nav .count { position: absolute; top: 0; left: calc(50% + 6px); min-width: 16px; height: 16px; font-size: 0.62rem; padding: 0 4px; }
         nav .alert-dot { position: absolute; top: 4px; right: calc(50% + 8px); }
         :global(body) { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }

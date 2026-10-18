@@ -104,17 +104,24 @@ import Base from '../layouts/Base.astro';
 
   <section class="board" id="board" hidden>
     <div class="board-bar">
-      <div class="chips" role="group" aria-label="Filtrer">
-        <button type="button" data-group="all" aria-pressed="true">Toutes</button>
-        <button type="button" data-group="legend" aria-pressed="false">Légendaires</button>
-        <button type="button" data-group="new" aria-pressed="false">Nouveautés</button>
+      <div class="chips" role="group" aria-label="Filtrer par époque">
+        <button type="button" data-group="all" aria-pressed="true">Toutes <b class="chip-n" data-n="all"></b></button>
+        <button type="button" data-group="classic" aria-pressed="false">Classiques <b class="chip-n" data-n="classic"></b></button>
+        <button type="button" data-group="swsh" aria-pressed="false">Épée et Bouclier <b class="chip-n" data-n="swsh"></b></button>
+        <button type="button" data-group="sv" aria-pressed="false">Écarlate et Violet <b class="chip-n" data-n="sv"></b></button>
+        <button type="button" data-group="mega" aria-pressed="false">Méga-Évolution <b class="chip-n" data-n="mega"></b></button>
+        <button type="button" data-group="new" aria-pressed="false">Nouveautés <b class="chip-n" data-n="new"></b></button>
       </div>
+      <div class="board-tools">
+      <label class="sr-only" for="board-q">Filtrer par nom</label>
+      <input id="board-q" type="search" placeholder="Filtrer : Dracaufeu, Mew…" autocomplete="off" />
       <label class="sr-only" for="sort">Trier</label>
       <select id="sort">
         <option value="change7">Variation 7 j</option>
         <option value="price">Cours</option>
         <option value="name">Nom</option>
       </select>
+      </div>
     </div>
     <div class="table" role="table" aria-label="Cours des cartes">
       <div class="tr th" role="row">
@@ -125,7 +132,9 @@ import Base from '../layouts/Base.astro';
         <span role="columnheader" class="chart-col">Tendance</span>
       </div>
       <div id="rows"></div>
+      <p class="rows-empty muted" id="rows-empty" hidden>Aucune carte ne correspond à ce filtre.</p>
     </div>
+    <button type="button" class="btn more-rows" id="more-rows" hidden></button>
   </section>
 
   <p class="notice">
@@ -136,7 +145,8 @@ import Base from '../layouts/Base.astro';
   </p>
 
   <script>
-    import { loadMarket, sparkline, bigChart, ticker, formatChange, changeClass, toQuote, type Quote } from '../lib/market';
+    import { loadMarket, sparkline, bigChart, ticker, formatChange, changeClass, toQuote, eraOf, type Quote, type Era } from '../lib/market';
+    import { normalize } from '../lib/cardindex';
     import { formatPrice, formatDate, getCard, type Card } from '../lib/tcgdex';
     import { getItems } from '../lib/collection';
     import { conditionFactor } from '../lib/condition';
@@ -153,7 +163,10 @@ import Base from '../layouts/Base.astro';
     const chg = (v?: number) => el('span', { class: `chg ${changeClass(v)}` }, [formatChange(v)]);
 
     let quotes: Quote[] = [];
-    let group: 'all' | 'legend' | 'new' = 'all';
+    let group: 'all' | 'new' | Era = 'all';
+    const PAGE = 20;
+    let shown = PAGE;
+    const inGroup = (q: Quote, g: typeof group) => g === 'all' || (g === 'new' ? q.group === 'new' : eraOf(q.id) === g);
 
     function moverList(target: HTMLElement, list: Quote[], value: (q: Quote) => Node) {
       target.replaceChildren(...list.map((q) =>
@@ -163,12 +176,19 @@ import Base from '../layouts/Base.astro';
 
     function renderBoard() {
       const sort = ($('sort') as HTMLSelectElement).value;
-      const list = quotes
-        .filter((q) => group === 'all' || q.group === group)
+      const nq = normalize(($('board-q') as HTMLInputElement).value);
+      document.querySelectorAll<HTMLElement>('[data-n]').forEach((b) => { b.textContent = String(quotes.filter((q) => inGroup(q, b.dataset.n as typeof group)).length); });
+      const all = quotes
+        .filter((q) => inGroup(q, group) && (!nq || normalize(q.name).includes(nq) || normalize(q.setName ?? '').includes(nq)))
         .sort((a, b) =>
           sort === 'name' ? a.name.localeCompare(b.name, 'fr')
           : sort === 'price' ? b.price - a.price
           : ((b.change7 ?? -1e9) - (a.change7 ?? -1e9)));
+      const list = all.slice(0, shown);
+      const more = $('more-rows') as HTMLButtonElement;
+      more.hidden = all.length <= shown;
+      more.textContent = `Voir ${Math.min(PAGE, all.length - shown)} cartes de plus (${all.length - shown} restantes)`;
+      $('rows-empty').hidden = all.length > 0;
       $('rows').replaceChildren(...list.map((q, i) => el('div', { class: 'row-wrap' }, [
         el('a', { class: 'tr', role: 'row', href: href(q) }, [
           el('span', { class: 'card-cell', role: 'cell' }, [
@@ -264,7 +284,7 @@ import Base from '../layouts/Base.astro';
       $('stats').hidden = false;
     }
     function renderHeat() {
-      const list = [...quotes].sort((a, b) => b.price - a.price);
+      const list = [...quotes].sort((a, b) => b.price - a.price).slice(0, 30);
       $('heat-grid').replaceChildren(...list.map((q, i) => {
         const c = q.change7 ?? 0;
         const k = Math.min(1, Math.abs(c) / 25);
@@ -376,10 +396,13 @@ import Base from '../layouts/Base.astro';
       b.addEventListener('click', () => {
         group = b.dataset.group as typeof group;
         document.querySelectorAll('[data-group]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        shown = PAGE;
         renderBoard();
       }),
     );
-    $('sort').addEventListener('change', renderBoard);
+    $('sort').addEventListener('change', () => { shown = PAGE; renderBoard(); });
+    $('board-q').addEventListener('input', () => { shown = PAGE; renderBoard(); });
+    $('more-rows').addEventListener('click', () => { shown += PAGE; renderBoard(); });
     main();
   </script>
 
@@ -523,6 +546,13 @@ import Base from '../layouts/Base.astro';
 
     .board-bar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .board-bar select { width: auto; }
+    .board-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .board-tools input { width: 220px; max-width: 100%; }
+    .chip-n { font-weight: 700; font-size: 0.72rem; opacity: 0.7; margin-left: 2px; }
+    .chips button[aria-pressed='true'] .chip-n { opacity: 0.85; }
+    .rows-empty { padding: 22px 16px; margin: 0; text-align: center; }
+    .more-rows { display: flex; margin: -6px auto 26px; min-width: 260px; justify-content: center; }
+    @media (max-width: 720px) { .board-tools, .board-tools input { width: 100%; } .board-tools input { flex: 1; } .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; width: calc(100% + 32px); } .chips button { flex: 0 0 auto; } }
     .chips { display: flex; gap: 6px; flex-wrap: wrap; }
     .chips button {
       border: 1px solid var(--line); background: var(--surface); color: var(--muted);

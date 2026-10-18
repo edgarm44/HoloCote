@@ -87,7 +87,7 @@ export function setPseudo(p: string) {
   try { localStorage.setItem(PSEUDO_KEY, p.trim().slice(0, 20)); } catch { /* rien */ }
 }
 
-async function priced(list: { id: string; lang: Lang; cond: Condition; qty: number; finish?: 'normal' | 'reverse' }[]): Promise<EntryCard[]> {
+export async function priced(list: { id: string; lang: Lang; cond: Condition; qty: number; finish?: 'normal' | 'reverse' }[]): Promise<EntryCard[]> {
   const out: EntryCard[] = new Array(list.length);
   let i = 0;
   await Promise.all(Array.from({ length: 6 }, async () => {

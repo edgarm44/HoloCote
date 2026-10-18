@@ -55,7 +55,55 @@ export const WATCHLIST: string[] = [
   'me05-120',       // Méga-Darkrai-ex (Mega Hyper Rare) — Nuit Noire
   '30th-150',       // Pikachu-ex — 30ᵉ Anniversaire
   '30th-152',       // Mew-ex — 30ᵉ Anniversaire
+  // Ajouts du 18 octobre 2026 (identifiants vérifiés dans la base TCGdex du 3 octobre 2026)
+  'base1-58',       // Pikachu — Set de base
+  'base1-16',       // Électhor — Set de base
+  'base1-1',        // Alakazam — Set de base
+  'swsh7-218',      // Rayquaza VMAX (alternative) — Évolution Céleste
+  'swsh7-212',      // Nymphali VMAX (alternative) — Évolution Céleste
+  'swsh8-269',      // Mew VMAX (alternative) — Poing de Fusion
+  'swsh8-271',      // Ectoplasma VMAX (alternative) — Poing de Fusion
+  'swsh9-174',      // Dracaufeu VSTAR (secrète) — Stars Étincelantes
+  'swsh11-186',     // Giratina V (alternative) — Origine Perdue
+  'swsh12-186',     // Lugia V (alternative) — Tempête Argentée
+  'sv01-245',       // Gardevoir-ex (illustration spéciale) — Écarlate et Violet
+  'sv01-254',       // Koraidon-ex (hyper rare) — Écarlate et Violet
+  'sv02-256',       // Miascarade-ex (illustration spéciale) — Évolutions à Paldea
+  'sv04.5-232',     // Mew-ex (illustration spéciale) — Destinées de Paldea
+  'sv04.5-233',     // Gardevoir-ex (illustration spéciale) — Destinées de Paldea
+  'sv06-214',       // Amphinobi-ex (illustration spéciale) — Mascarade Crépusculaire
+  'sv06-216',       // Ursaking Lune Vermeille-ex (illustration spéciale) — Mascarade Crépusculaire
+  'sv06.5-093',     // Pêchaminus-ex (illustration spéciale) — Fable Nébuleuse
+  'sv08.5-167',     // Évoli-ex (illustration spéciale) — Évolutions Prismatiques
+  'sv08.5-156',     // Nymphali-ex (illustration spéciale) — Évolutions Prismatiques
+  'sv08.5-155',     // Mentali-ex (illustration spéciale) — Évolutions Prismatiques
+  'sv08.5-179',     // Pikachu-ex (hyper rare) — Évolutions Prismatiques
+  'me01-179',       // Méga-Lucario-ex (illustration spéciale) — Méga-Évolution
+  'me01-177',       // Méga-Florizarre-ex (illustration spéciale) — Méga-Évolution
+  'me02.5-294',     // Méga-Dracaufeu Y-ex (Mega Hyper Rare) — Héros Transcendants
+  'me02.5-284',     // Méga-Ectoplasma-ex (illustration spéciale) — Héros Transcendants
+  'me03-121',       // Miaouss-ex (illustration spéciale) — Équilibre Parfait
+  'me04-116',       // Méga-Amphinobi-ex (illustration spéciale) — Chaos Ascendant
+  'me05-116',       // Méga-Darkrai-ex (illustration spéciale) — Nuit Noire
+  '30th-158',       // Mew-ex — 30ᵉ Anniversaire
+  '30th-157',       // Mewtwo-ex — 30ᵉ Anniversaire
+  '30th-154',       // Ectoplasma-ex — 30ᵉ Anniversaire
 ];
+
+/** Époque d'une carte, d'après le préfixe de son identifiant (filtres du Marché). */
+export type Era = 'classic' | 'swsh' | 'sv' | 'mega';
+export const ERAS: { key: Era; label: string }[] = [
+  { key: 'classic', label: 'Classiques' },
+  { key: 'swsh', label: 'Épée et Bouclier' },
+  { key: 'sv', label: 'Écarlate et Violet' },
+  { key: 'mega', label: 'Méga-Évolution' },
+];
+export function eraOf(id: string): Era {
+  if (/^(me\d|30th)/.test(id)) return 'mega';
+  if (/^sv/.test(id)) return 'sv';
+  if (/^swsh/.test(id)) return 'swsh';
+  return 'classic';
+}
 
 const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
@@ -138,7 +186,7 @@ export interface Market {
   loadedAt: number;
 }
 
-const CACHE_KEY = 'holocote.market.v2';
+const CACHE_KEY = 'holocote.market.v3';
 const TTL = 30 * 60 * 1000;
 
 function readCache(): Market | null {
