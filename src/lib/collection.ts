@@ -132,7 +132,8 @@ export function importJson(text: string, mode: 'merge' | 'replace'): number {
   const store = load();
   for (const it of incoming.items) {
     const ex = store.items.find((i) => sameLine(i, it));
-    if (ex) ex.quantity = clampQty(ex.quantity + it.quantity);
+    // Même ligne issue de la même sauvegarde (même date d'ajout) : on ne double pas, on garde la plus grande quantité.
+    if (ex) ex.quantity = clampQty(ex.addedAt === it.addedAt ? Math.max(ex.quantity, it.quantity) : ex.quantity + it.quantity);
     else store.items.push(it);
   }
   save(store);

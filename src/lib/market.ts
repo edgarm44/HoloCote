@@ -16,6 +16,7 @@ export interface Quote {
   price: number;          // cours HoloCote (même calcul que la fiche carte)
   avg30?: number;
   avg7?: number;
+  low?: number;           // plus bas prix proposé à la vente (Cardmarket)
   change7?: number;       // variation : moyenne 7 j comparée à la moyenne 30 j (en %)
   points: number[];       // repères pour le mini-graphique, du plus ancien au plus récent
   updated?: string;
@@ -127,6 +128,7 @@ export function toQuote(card: Card, lang: Lang, group: Quote['group']): Quote | 
     rarity: card.rarity,
     price: p.value,
     avg30, avg7,
+    low: k('low'),
     change7: pct(avg7, avg30),
     points: points.length >= 2 ? points : [p.value, p.value],
     updated: p.updated,
@@ -186,7 +188,7 @@ export interface Market {
   loadedAt: number;
 }
 
-const CACHE_KEY = 'holocote.market.v3';
+const CACHE_KEY = 'holocote.market.v4';
 const TTL = 30 * 60 * 1000;
 
 function readCache(): Market | null {

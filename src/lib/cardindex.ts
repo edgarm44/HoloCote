@@ -13,7 +13,7 @@ export function normalize(s: string): string {
 /** Nom sans les suffixes de mécanique de jeu (ex, V, VMAX…). */
 export function coreName(s: string): string {
   return normalize(
-    s.replace(/\b(ex|EX|GX|V|VMAX|VSTAR|V-UNION|BREAK|LV\.?X|Prime|Star|δ|◇|☆)\b/g, ' '),
+    s.replace(/\b(ex|GX|V|VMAX|VSTAR|V-UNION|BREAK|LV\.?X|Prime|Star)\b/gi, ' ').replace(/[δ◇☆]/g, ' '),
   );
 }
 

@@ -71,6 +71,7 @@ export async function enableNotifications(): Promise<boolean> {
   if (typeof Notification === 'undefined') return false;
   const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
   const ok = perm === 'granted';
+  if (ok) await swRegistration();
   write(SETTINGS_KEY, { ...getSettings(), notify: ok });
   window.dispatchEvent(new CustomEvent(EVENT));
   return ok;
@@ -111,6 +112,28 @@ function evaluate(f: Favorite, price: number, unit: 'EUR' | 'USD', s: AlertSetti
   return out;
 }
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+/** Service worker minimal (sans cache) : Android n'affiche les notifications que par ce biais. */
+async function swRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    return (await navigator.serviceWorker.getRegistration(`${BASE}/`))
+      ?? (await navigator.serviceWorker.register(`${BASE}/sw.js`, { scope: `${BASE}/` }));
+  } catch { return null; }
+}
+
+async function showNotification(title: string, opts: NotificationOptions) {
+  const reg = await swRegistration();
+  if (reg) {
+    try {
+      const ready = await Promise.race([navigator.serviceWorker.ready, new Promise<null>((r) => setTimeout(() => r(null), 4000))]);
+      if (ready) { await ready.showNotification(title, opts); return; }
+    } catch { /* repli ci-dessous */ }
+  }
+  try { new Notification(title, opts); } catch { /* notifications indisponibles dans ce contexte */ }
+}
+
 let running: Promise<PriceAlert[]> | null = null;
 
 /** Vérifie les cours des favoris (au plus toutes les 30 min, sauf `force`). */
@@ -138,13 +161,11 @@ export function checkAlerts(force = false): Promise<PriceAlert[]> {
     const fresh = alerts.filter((a) => !st.notified.includes(a.key));
     if (s.notify && fresh.length && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       const fmt = (v: number, u: 'EUR' | 'USD') => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: u }).format(v);
-      try {
-        new Notification(fresh.length === 1 ? 'Alerte HoloCote' : `${fresh.length} alertes HoloCote`, {
-          body: fresh.slice(0, 3).map((a) => alertText(a, fmt)).join('\n'),
-          icon: new URL(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/favicon.svg`, location.href).href,
-          tag: 'holocote-alerts',
-        });
-      } catch { /* notifications indisponibles dans ce contexte */ }
+      await showNotification(fresh.length === 1 ? 'Alerte HoloCote' : `${fresh.length} alertes HoloCote`, {
+        body: fresh.slice(0, 3).map((a) => alertText(a, fmt)).join('\n'),
+        icon: new URL(`${BASE}/favicon.svg`, location.href).href,
+        tag: 'holocote-alerts',
+      });
     }
     write(STATE_KEY, { checkedAt: Date.now(), alerts, notified: [...new Set([...st.notified, ...alerts.map((a) => a.key)])].slice(-300) });
     window.dispatchEvent(new CustomEvent(EVENT));

@@ -5,7 +5,7 @@ import Logo from '../components/Logo.astro';
 interface Props {
   title: string;
   description?: string;
-  active?: 'home' | 'search' | 'market' | 'scanner' | 'favorites' | 'ranking' | 'collection' | 'mystery' | 'showcase' | 'legal';
+  active?: 'home' | 'search' | 'market' | 'scanner' | 'favorites' | 'ranking' | 'collection' | 'mystery' | 'showcase' | 'deals' | 'legal';
 }
 const { title, description = 'Cote et rareté de tes cartes à collectionner, scanner gratuit et collection privée.', active } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -14,6 +14,7 @@ const NAV = [
   { key: 'home', href: '/', label: 'Accueil', icon: '<path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" />' },
   { key: 'search', href: '/recherche/', label: 'Recherche', icon: '<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />' },
   { key: 'market', href: '/marche/', label: 'Marché', icon: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />' },
+  { key: 'deals', href: '/opportunites/', label: 'Opportunités', icon: '<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" />', extra: true },
   { key: 'scanner', href: '/scanner/', label: 'Scanner', icon: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" />' },
   { key: 'collection', href: '/collection/', label: 'Collection', icon: '<rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" />', badge: 'nav-count' },
   { key: 'favorites', href: '/favoris/', label: 'Favoris', icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />', badge: 'fav-count', extra: true },
@@ -100,6 +101,14 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
       import { countCards } from '../lib/collection';
       import { countFavorites, onFavoritesChange } from '../lib/favorites';
       import { checkAlerts, currentAlerts, onAlertsChange, alertText } from '../lib/alerts';
+      // Onglet actif visible quand la barre défile (tablette)
+      const navEl = document.querySelector<HTMLElement>('header nav');
+      const cur = navEl?.querySelector<HTMLElement>('a[aria-current="page"]');
+      if (navEl && cur && navEl.scrollWidth > navEl.clientWidth) navEl.scrollLeft = cur.offsetLeft - navEl.clientWidth / 2 + cur.offsetWidth / 2;
+      const markOverflow = () => navEl?.classList.toggle('overflow', innerWidth > 720 && navEl.scrollWidth > navEl.clientWidth + 2);
+      markOverflow();
+      window.addEventListener('resize', markOverflow);
+      document.fonts?.ready.then(markOverflow);
       const setBadges = (cls: string, n: number) => document.querySelectorAll<HTMLElement>(`.${cls}`).forEach((b) => { b.hidden = n === 0; b.textContent = String(n); });
       const refreshFav = () => setBadges('fav-count', countFavorites());
 
@@ -118,7 +127,7 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
       // Alertes de prix des favoris (vérifiées au plus toutes les 3 h, sur le site uniquement).
       const banner = document.getElementById('alert-banner')!;
       const dots = document.querySelectorAll<HTMLElement>('.alert-dot');
-      const onFavPage = location.pathname.replace(/\/$/, '').endsWith('/favoris');
+      const onFavPage = /\/(favoris|opportunites)$/.test(location.pathname.replace(/\/$/, ''));
       const showAlerts = () => {
         const alerts = currentAlerts();
         dots.forEach((d) => { d.hidden = alerts.length === 0; });
@@ -176,8 +185,21 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         display: inline-flex; align-items: center; gap: 6px;
       }
       nav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 18px; }
-      @media (min-width: 1241px) { nav a { padding: 8px 8px; gap: 5px; font-size: 0.86rem; } nav svg { width: 16px; height: 16px; flex-basis: 16px; } }
-      @media (min-width: 721px) and (max-width: 1240px) { nav svg { display: none; } nav a { padding: 8px 7px; font-size: 0.86rem; } .bar { justify-content: center; } }
+      @media (min-width: 1241px) { nav a { padding: 8px 6px; gap: 5px; font-size: 0.85rem; } nav svg { width: 15px; height: 15px; flex-basis: 15px; } }
+      @media (min-width: 721px) and (max-width: 1240px) {
+        nav svg { display: none; }
+        nav a { padding: 8px 6px; font-size: 0.86rem; }
+      }
+      @media (min-width: 721px) {
+        nav { gap: 0; }
+        nav a { flex: 0 0 auto; }
+        .bar { flex-wrap: nowrap; }
+        .logo { flex: 0 0 auto; }
+        /* Une seule ligne d'onglets, qui défile si la fenêtre est étroite */
+        nav { flex-wrap: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+        nav.overflow { -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent); mask-image: linear-gradient(90deg, #000 90%, transparent); }
+        nav::-webkit-scrollbar { display: none; }
+      }
       nav a:hover { color: var(--text); background: var(--surface); }
       nav a[aria-current='page'] { color: var(--text); background: var(--surface-2); }
       .count {

@@ -1,0 +1,485 @@
+---
+import Base from '../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Opportunités" active="deals" description="Quelles cartes sont sous leur prix habituel, lesquelles sont en surchauffe : l'analyse HoloCote des cotes du jour.">
+  <section class="op-hero">
+    <h1>Opportu<wbr />nités<span class="holo-text">.</span></h1>
+    <p class="op-slogan">Le bon prix, <span class="holo-text">au bon moment.</span></p>
+    <p class="muted op-lead">Chaque carte est comparée à ses propres repères : sa moyenne du mois, sa moyenne de la semaine et le prix le plus bas proposé. HoloCote repère celles qui se vendent sous leur prix habituel, celles qui repartent et celles qui flambent.</p>
+  </section>
+
+  <aside class="disclaimer" role="note">
+    <span class="dc-ic" aria-hidden="true">!</span>
+    <p><strong>Des repères, pas des conseils.</strong> Ces signaux décrivent l'évolution récente des cotes Cardmarket ; ils ne prédisent pas l'avenir et ne sont pas un conseil d'achat ou d'investissement. Une carte peut continuer de baisser. Avant d'acheter, compare plusieurs vendeurs et vérifie l'état de la carte. Si tu es mineur, parles-en à un adulte avant tout achat.</p>
+  </aside>
+
+  <div id="op-state" aria-live="polite">
+    <div class="status" role="status"><div class="spinner"></div>Analyse des cotes en cours…</div>
+  </div>
+
+  <div id="op-main" hidden>
+    <section class="climate">
+      <div class="gauge-box">
+        <svg class="gauge" viewBox="0 0 220 128" aria-hidden="true">
+          <defs>
+            <linearGradient id="gz" x1="0" x2="1">
+              <stop offset="0" stop-color="#ff5a7a" /><stop offset="0.5" stop-color="#ffd25a" /><stop offset="1" stop-color="#3dffa8" />
+            </linearGradient>
+          </defs>
+          <path d="M20 112 A90 90 0 0 1 200 112" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="18" stroke-linecap="round" />
+          <path d="M20 112 A90 90 0 0 1 200 112" fill="none" stroke="url(#gz)" stroke-width="18" stroke-linecap="round" />
+          <g id="needle" style="transform-origin: 110px 112px; transform: rotate(-90deg)">
+            <line x1="110" y1="112" x2="110" y2="34" stroke="#f1effa" stroke-width="4" stroke-linecap="round" />
+          </g>
+          <circle cx="110" cy="112" r="9" fill="#f1effa" />
+        </svg>
+        <div class="gauge-legend"><span>Vendeur</span><span>Acheteur</span></div>
+      </div>
+      <div class="climate-txt">
+        <p class="eyebrow">Climat du marché</p>
+        <h2 id="cl-label">—</h2>
+        <p class="muted" id="cl-text"></p>
+        <div class="cl-stats">
+          <div><b id="cl-below">0</b><span>sous leur moyenne</span></div>
+          <div><b id="cl-above">0</b><span>au-dessus</span></div>
+          <div><b id="cl-total">0</b><span>cartes analysées</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="filters">
+      <div class="chips" role="group" aria-label="Budget">
+        <span class="f-l">Budget</span>
+        <button type="button" data-budget="0" aria-pressed="true">Tous</button>
+        <button type="button" data-budget="20" aria-pressed="false">− de 20 €</button>
+        <button type="button" data-budget="100" aria-pressed="false">− de 100 €</button>
+        <button type="button" data-budget="500" aria-pressed="false">− de 500 €</button>
+      </div>
+      <div class="chips" role="group" aria-label="Signal">
+        <span class="f-l">Signal</span>
+        <button type="button" data-sig="all" aria-pressed="true">Tous</button>
+        <button type="button" data-sig="window" aria-pressed="false">Sous sa moyenne</button>
+        <button type="button" data-sig="rebound" aria-pressed="false">Rebond</button>
+        <button type="button" data-sig="falling" aria-pressed="false">En chute</button>
+        <button type="button" data-sig="hot" aria-pressed="false">Surchauffe</button>
+      </div>
+    </div>
+
+    <section class="block">
+      <div class="b-head">
+        <h2>Le top des opportunités</h2>
+        <p class="muted small">Les cartes les plus bas par rapport à leurs propres repères, en ce moment.</p>
+      </div>
+      <div class="top-grid" id="top"></div>
+      <p class="muted empty" id="top-empty" hidden>Aucune carte ne correspond à ces filtres pour l'instant.</p>
+    </section>
+
+    <section class="block">
+      <div class="b-head">
+        <h2>Tes favoris : c'est le moment ?</h2>
+        <p class="muted small">Pour chaque carte suivie : son signal du jour et un prix cible suggéré. Un toucher crée l'alerte, tu seras prévenu sur le site quand le cours l'atteint.</p>
+      </div>
+      <div class="fav-list" id="favs"></div>
+      <div class="empty-box" id="favs-empty" hidden>
+        <p>Tu ne suis encore aucune carte.</p>
+        <a class="btn btn-primary" href={`${base}/marche/`}>Choisir des cartes dans le Marché</a>
+      </div>
+    </section>
+
+    <section class="block two">
+      <div class="panel-b">
+        <div class="b-head row">
+          <h2>Alertes déclenchées</h2>
+          <button type="button" class="btn small-btn" id="check">Vérifier maintenant</button>
+        </div>
+        <ul class="alerts" id="alerts"></ul>
+        <p class="muted small" id="alerts-empty">Aucune alerte en ce moment. Fixe un prix cible sur tes favoris ci-dessus.</p>
+        <a class="link" href={`${base}/favoris/#alertes`}>Régler mes alertes</a>
+      </div>
+      <div class="panel-b">
+        <div class="b-head"><h2>Tes cartes au plus haut</h2></div>
+        <p class="muted small">Cartes de ton classeur nettement au-dessus de leur moyenne du mois. Bon à savoir si tu pensais t'en séparer… ou juste pour frimer.</p>
+        <ul class="highs" id="highs"></ul>
+        <p class="muted small" id="highs-empty">Aucune carte de ton classeur n'est en surchauffe aujourd'hui.</p>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="b-head row">
+        <h2>Toutes les cartes analysées</h2>
+        <label class="sr-only" for="sort">Trier</label>
+        <select id="sort">
+          <option value="score">Meilleure opportunité</option>
+          <option value="month">Plus forte baisse vs mois</option>
+          <option value="hot">Plus forte hausse vs mois</option>
+          <option value="price">Cours décroissant</option>
+        </select>
+      </div>
+      <div class="all" id="all"></div>
+      <button type="button" class="btn more" id="more" hidden></button>
+    </section>
+
+    <section class="method">
+      <h2>Comment on lit les signaux</h2>
+      <div class="m-grid">
+        <div class="m-card"><span class="sig up">Sous sa moyenne</span><p>Le cours est au moins 5 % sous la moyenne des 30 derniers jours et il a arrêté de baisser cette semaine. C'est le signal « fenêtre intéressante ».</p></div>
+        <div class="m-card"><span class="sig cyan">Rebond</span><p>La tendance du mois était à la baisse, mais le cours repasse au-dessus de sa moyenne de la semaine : la carte repart.</p></div>
+        <div class="m-card"><span class="sig down">En chute</span><p>Le cours est sous sa moyenne du mois et continue de baisser cette semaine. Personne ne sait où s'arrêtera la baisse : patience.</p></div>
+        <div class="m-card"><span class="sig gold">Surchauffe</span><p>Le cours dépasse sa moyenne du mois de 15 % ou plus. Les hausses brutales retombent souvent : attendre peut coûter moins cher.</p></div>
+      </div>
+      <p class="muted small">Score d'opportunité (0 à 100) : 50 quand la carte est à sa moyenne du mois ; il monte quand le cours est sous cette moyenne, baisse quand il est au-dessus, avec un bonus pour un rebond et un malus pour une chute en cours. Prix cible suggéré : 7 % sous le plus bas de ses trois repères (cours, moyenne 7 jours, moyenne 30 jours). Données : cotes Cardmarket de la version normale via TCGdex, toutes langues et tous états confondus ; TCGdex ne publie pas d'historique jour par jour.</p>
+    </section>
+  </div>
+
+  <script>
+    import { loadMarket, toQuote, sparkline, type Quote } from '../lib/market';
+    import { analyse, climate, VERDICTS, type Analysis, type Verdict } from '../lib/opportunity';
+    import { getCard, formatPrice, type Lang } from '../lib/tcgdex';
+    import { getFavorites, addFavorite, setTargets, isFavorite, favButton, onFavoritesChange } from '../lib/favorites';
+    import { currentAlerts, checkAlerts, alertText, recheckSoon, onAlertsChange } from '../lib/alerts';
+    import { getItems } from '../lib/collection';
+    import { el, url, holoCard, toast } from '../lib/ui';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const eur = (v: number) => formatPrice(v, 'EUR');
+    const sgn = (v?: number) => (v === undefined ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(Math.abs(v) < 10 ? 1 : 0).replace('.', ',')} %`);
+    const href = (q: Quote) => url(`/carte/?id=${encodeURIComponent(q.id)}&lang=${q.lang}`);
+    const key = (id: string, lang: Lang) => `${lang}:${id}`;
+
+    let all: Analysis[] = [];
+    let budget = 0;
+    let sig: 'all' | Verdict = 'all';
+    let shown = 20;
+
+    const badge = (v: Verdict, long = false) => el('span', { class: `sig ${VERDICTS[v].tone}` }, [long ? VERDICTS[v].label : VERDICTS[v].short]);
+    const thumb = (q: Quote, w = 44) => {
+      const b = el('span', { class: 'th' });
+      b.style.width = `${w}px`;
+      if (q.image) b.append(el('img', { src: `${q.image}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
+      return b;
+    };
+    const ring = (score: number) => {
+      const r = el('span', { class: 'ring', title: `Score d'opportunité : ${score} sur 100` }, [el('b', {}, [String(score)])]);
+      r.style.setProperty('--s', String(score));
+      r.dataset.lvl = score >= 65 ? 'hi' : score >= 45 ? 'mid' : 'lo';
+      return r;
+    };
+    const filtered = () => all.filter((a) => (!budget || a.q.price <= budget) && (sig === 'all' || a.verdict === sig));
+
+    /** Crée (ou met à jour) l'alerte « prix cible » d'une carte, en l'ajoutant aux favoris si besoin. */
+    function setAlert(a: Analysis) {
+      const { q } = a;
+      if (!isFavorite(q.id, q.lang)) addFavorite(q.id, q.lang, { name: q.name, image: q.image, setName: q.setName, rarity: q.rarity, priceAtAdd: q.price, unit: 'EUR' });
+      const f = getFavorites().find((x) => x.cardId === q.id && x.lang === q.lang);
+      setTargets(q.id, q.lang, { below: a.target, above: f?.targetAbove });
+      recheckSoon();
+      toast(`Alerte créée : tu seras prévenu si ${q.name} passe sous ${eur(a.target)}.`);
+      renderFavs();
+      renderTop();
+    }
+    function alertBtn(a: Analysis, cls = 'btn') {
+      const f = getFavorites().find((x) => x.cardId === a.q.id && x.lang === a.q.lang);
+      const has = f?.targetBelow;
+      const b = el('button', { type: 'button', class: `${cls} alert-btn ${has ? 'set' : ''}` }, [
+        has ? `Alerte à ${eur(f!.targetBelow!)}` : `Me prévenir sous ${eur(a.target)}`,
+      ]);
+      b.addEventListener('click', () => setAlert(a));
+      if (has) b.title = `Remplacer par ${eur(a.target)}`;
+      return b;
+    }
+
+    function renderClimate() {
+      const c = climate(all);
+      $('cl-label').textContent = c.label;
+      $('cl-text').textContent = c.text;
+      $('cl-below').textContent = String(c.below);
+      $('cl-above').textContent = String(c.above);
+      $('cl-total').textContent = String(c.total);
+      requestAnimationFrame(() => { ($('needle') as unknown as SVGGElement).style.transform = `rotate(${-90 + c.share * 180}deg)`; });
+    }
+
+    function renderTop() {
+      const list = filtered().filter((a) => a.q.price >= 1).sort((x, y) => y.score - x.score).slice(0, 6);
+      $('top-empty').hidden = list.length > 0;
+      $('top').replaceChildren(...list.map((a, i) => {
+        const { q } = a;
+        return el('article', { class: `opp ${i === 0 ? 'first' : ''}` }, [
+          el('a', { class: 'opp-vis', href: href(q), 'aria-label': q.name }, [holoCard(q.image, q.name)]),
+          el('div', { class: 'opp-body' }, [
+            el('div', { class: 'opp-top' }, [badge(a.verdict, true), ring(a.score)]),
+            el('a', { class: 'opp-name', href: href(q) }, [q.name]),
+            el('p', { class: 'opp-set muted small' }, [q.setName ?? '']),
+            el('div', { class: 'opp-price' }, [
+              el('strong', {}, [eur(q.price)]),
+              q.avg30 ? el('span', { class: 'muted small' }, [`moyenne du mois ${eur(q.avg30)}`]) : null,
+            ]),
+            el('div', { class: 'opp-chart' }, [sparkline(q.points, 220, 46), el('span', { class: 'chart-l muted' }, ['30 j', '7 j', 'auj.'].map((t) => el('i', {}, [t])))]),
+            el('ul', { class: 'reasons' }, a.reasons.slice(0, 3).map((r) => el('li', {}, [r]))),
+            el('div', { class: 'opp-actions' }, [alertBtn(a, 'btn btn-primary'), favButton(q.id, q.lang, () => ({ name: q.name, image: q.image, setName: q.setName, rarity: q.rarity, priceAtAdd: q.price, unit: 'EUR' }))]),
+          ]),
+        ]);
+      }));
+    }
+
+    function renderFavs() {
+      const favs = getFavorites();
+      const byKey = new Map(all.map((a) => [key(a.q.id, a.q.lang), a]));
+      const owned = new Set(getItems().map((i) => key(i.cardId, i.lang)));
+      const rows = favs.map((f) => ({ f, a: byKey.get(key(f.cardId, f.lang)) })).filter((x) => x.a) as { f: ReturnType<typeof getFavorites>[number]; a: Analysis }[];
+      rows.sort((x, y) => y.a.score - x.a.score);
+      $('favs-empty').hidden = favs.length > 0;
+      $('favs').replaceChildren(...rows.map(({ f, a }) => {
+        const { q } = a;
+        const tgt = f.targetBelow;
+        const gap = tgt ? ((q.price - tgt) / tgt) * 100 : undefined;
+        const prog = tgt ? Math.max(0, Math.min(100, (tgt / q.price) * 100)) : 0;
+        return el('div', { class: 'fav-row' }, [
+          el('a', { class: 'fr-card', href: href(q) }, [thumb(q, 48), el('span', { class: 'fr-name' }, [q.name, el('small', { class: 'muted' }, [[q.setName, owned.has(key(f.cardId, f.lang)) ? 'déjà dans ton classeur' : ''].filter(Boolean).join(' · ')])])]),
+          el('div', { class: 'fr-sig' }, [badge(a.verdict), el('span', { class: 'muted small' }, [`${sgn(a.vsMonth)} vs mois`])]),
+          el('div', { class: 'fr-price' }, [el('strong', {}, [eur(q.price)]),
+            tgt
+              ? el('div', { class: 'fr-gauge', title: `Cible ${eur(tgt)}` }, [el('span', { style: `width:${prog}%` }), el('small', { class: 'muted' }, [gap! <= 0 ? 'cible atteinte' : `encore ${sgn(-gap! / (1 + gap! / 100))} pour ta cible`])])
+              : el('small', { class: 'muted' }, ['pas encore de cible'])]),
+          alertBtn(a, 'btn fr-btn'),
+        ]);
+      }));
+    }
+
+    function renderAlerts() {
+      const list = currentAlerts();
+      const fmt = (v: number, u: 'EUR' | 'USD') => formatPrice(v, u);
+      $('alerts-empty').hidden = list.length > 0;
+      $('alerts').replaceChildren(...list.slice(0, 6).map((a) => el('li', { class: `al ${a.kind === 'below' ? 'up' : a.kind === 'above' ? 'gold' : a.pct > 0 ? 'up' : 'down'}` }, [
+        el('span', { class: 'al-k' }, [a.kind === 'below' ? 'Prix cible' : a.kind === 'above' ? 'Plafond' : 'Variation']),
+        el('span', {}, [alertText(a, fmt)]),
+      ])));
+    }
+
+    function renderHighs() {
+      const byKey = new Map(all.map((a) => [key(a.q.id, a.q.lang), a]));
+      const seen = new Set<string>();
+      const highs = getItems().map((i) => byKey.get(key(i.cardId, i.lang))).filter((a): a is Analysis => !!a && a.verdict === 'hot')
+        .filter((a) => { const k = key(a.q.id, a.q.lang); if (seen.has(k)) return false; seen.add(k); return true; });
+      $('highs-empty').hidden = highs.length > 0;
+      $('highs').replaceChildren(...highs.slice(0, 6).map((a) => el('li', {}, [
+        el('a', { href: href(a.q) }, [thumb(a.q, 36), el('span', { class: 'fr-name' }, [a.q.name, el('small', { class: 'muted' }, [`${eur(a.q.price)} · moyenne ${a.q.avg30 ? eur(a.q.avg30) : '—'}`])]), el('b', { class: 'gold-t' }, [sgn(a.vsMonth)])]),
+      ])));
+    }
+
+    function renderAll() {
+      const s = ($('sort') as HTMLSelectElement).value;
+      const list = filtered().sort((x, y) =>
+        s === 'month' ? (x.vsMonth ?? 0) - (y.vsMonth ?? 0)
+        : s === 'hot' ? (y.vsMonth ?? 0) - (x.vsMonth ?? 0)
+        : s === 'price' ? y.q.price - x.q.price
+        : y.score - x.score);
+      const more = $('more') as HTMLButtonElement;
+      more.hidden = list.length <= shown;
+      more.textContent = `Voir plus (${list.length - shown} restantes)`;
+      $('all').replaceChildren(...list.slice(0, shown).map((a) => el('a', { class: 'all-row', href: href(a.q) }, [
+        thumb(a.q, 34),
+        el('span', { class: 'fr-name' }, [a.q.name, el('small', { class: 'muted' }, [a.q.setName ?? ''])]),
+        el('span', { class: 'num' }, [eur(a.q.price)]),
+        el('span', { class: `num ${(a.vsMonth ?? 0) < 0 ? 'up-t' : (a.vsMonth ?? 0) > 0 ? 'down-t' : ''}` }, [sgn(a.vsMonth)]),
+        badge(a.verdict),
+        ring(a.score),
+      ])));
+    }
+
+    function renderAllSections() {
+      renderTop(); renderFavs(); renderAlerts(); renderHighs(); renderAll();
+    }
+
+    function pressed(attr: string, b: HTMLElement) {
+      document.querySelectorAll(`[${attr}]`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    }
+    document.querySelectorAll<HTMLButtonElement>('[data-budget]').forEach((b) => b.addEventListener('click', () => {
+      budget = Number(b.dataset.budget); pressed('data-budget', b); shown = 20; renderTop(); renderAll();
+    }));
+    document.querySelectorAll<HTMLButtonElement>('[data-sig]').forEach((b) => b.addEventListener('click', () => {
+      sig = b.dataset.sig as typeof sig; pressed('data-sig', b); shown = 20; renderTop(); renderAll();
+    }));
+    $('sort').addEventListener('change', () => { shown = 20; renderAll(); });
+    $('more').addEventListener('click', () => { shown += 20; renderAll(); });
+    $('check').addEventListener('click', async () => {
+      const b = $('check') as HTMLButtonElement;
+      b.disabled = true; b.textContent = 'Vérification…';
+      await checkAlerts(true).catch(() => {});
+      b.disabled = false; b.textContent = 'Vérifier maintenant';
+      renderAlerts();
+      toast('Cours de tes favoris vérifiés.');
+    });
+    onAlertsChange(renderAlerts);
+
+    async function main() {
+      try {
+        const m = await loadMarket();
+        const quotes = new Map(m.quotes.map((q) => [key(q.id, q.lang), q]));
+        // Favoris et cartes du classeur absents du Marché : on charge leur cote.
+        const extra = [...getFavorites().map((f) => ({ id: f.cardId, lang: f.lang })), ...getItems().map((i) => ({ id: i.cardId, lang: i.lang }))]
+          .filter((x, i, arr) => !quotes.has(key(x.id, x.lang)) && arr.findIndex((y) => y.id === x.id && y.lang === x.lang) === i)
+          .slice(0, 80);
+        let k = 0;
+        await Promise.all(Array.from({ length: 6 }, async () => {
+          while (k < extra.length) {
+            const x = extra[k++];
+            const c = await getCard(x.id, x.lang).catch(() => null);
+            const q = c && toQuote(c, x.lang, 'legend');
+            if (q) quotes.set(key(x.id, x.lang), q);
+          }
+        }));
+        all = [...quotes.values()].map(analyse);
+        if (!all.length) throw new Error('vide');
+      } catch {
+        const retry = el('button', { type: 'button', class: 'btn' }, ['Réessayer']);
+        retry.addEventListener('click', () => { $('op-state').replaceChildren(el('div', { class: 'status', role: 'status' }, [el('div', { class: 'spinner' }), 'Analyse des cotes en cours…'])); main(); });
+        $('op-state').replaceChildren(el('div', { class: 'status' }, ['Les cotes sont indisponibles pour le moment. ', retry]));
+        return;
+      }
+      $('op-state').replaceChildren();
+      $('op-main').hidden = false;
+      renderClimate();
+      renderAllSections();
+      onFavoritesChange(() => { renderFavs(); });
+      checkAlerts().then(renderAlerts).catch(() => {});
+    }
+    main();
+  </script>
+
+  <style>
+    .op-hero { padding: clamp(24px, 5vw, 56px) 0 20px; }
+    .op-hero h1 { font-size: clamp(2.3rem, 11vw, 7.2rem); line-height: 0.88; letter-spacing: -0.05em; font-weight: 800; margin: 0 0 14px; }
+    .op-slogan { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.2rem, 3vw, 1.9rem); letter-spacing: -0.02em; margin: 0 0 12px; }
+    .op-lead { max-width: 720px; margin: 0; }
+    .disclaimer { display: flex; gap: 14px; align-items: flex-start; padding: 14px 18px; border-radius: 16px; margin: 8px 0 28px;
+      background: rgba(255, 210, 90, 0.07); border: 1px solid rgba(255, 210, 90, 0.4); }
+    .disclaimer p { margin: 0; font-size: 0.9rem; }
+    .dc-ic { flex: 0 0 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--gold); color: #0a0812; font-weight: 800; font-family: var(--font-display); }
+
+    .climate { display: grid; grid-template-columns: 280px 1fr; gap: clamp(18px, 4vw, 40px); align-items: center; padding: clamp(18px, 3vw, 28px); border-radius: 24px; margin-bottom: 22px;
+      border: 1px solid transparent; background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, linear-gradient(135deg, rgba(62, 240, 255, 0.55), rgba(138, 123, 255, 0.3), rgba(255, 79, 216, 0.55)) border-box; }
+    .gauge { width: 100%; display: block; }
+    .gauge :global(#needle), .gauge #needle { transition: transform 1.2s cubic-bezier(0.2, 0.9, 0.2, 1.15); }
+    .gauge-legend { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 6px; }
+    .eyebrow { margin: 0 0 4px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
+    .climate h2 { font-size: clamp(1.6rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 6px; }
+    .cl-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .cl-stats div { padding: 10px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); display: flex; flex-direction: column; min-width: 110px; }
+    .cl-stats b { font-family: var(--font-display); font-size: 1.5rem; }
+    .cl-stats span { font-size: 0.78rem; color: var(--muted); }
+
+    .filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+    .chips { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .f-l { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; min-width: 58px; }
+    .chips button { border: 1px solid var(--line); background: var(--surface); color: var(--muted); padding: 7px 13px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+    .chips button[aria-pressed='true'] { color: #0a0812; background: var(--holo); border-color: transparent; }
+
+    .block { margin-bottom: 36px; }
+    .b-head { margin-bottom: 14px; }
+    .b-head h2 { margin: 0 0 4px; font-size: clamp(1.35rem, 3vw, 1.9rem); font-weight: 800; letter-spacing: -0.02em; }
+    .b-head p { margin: 0; }
+    .b-head.row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .b-head.row select { width: auto; }
+
+    .top-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+    .top-grid :global(.opp) { display: grid; grid-template-columns: 120px 1fr; gap: 16px; padding: 16px; border-radius: 22px; background: var(--surface); border: 1px solid var(--line); transition: transform 0.2s, border-color 0.2s; min-width: 0; }
+    .top-grid :global(.opp:hover) { transform: translateY(-3px); border-color: rgba(255, 255, 255, 0.22); }
+    .top-grid :global(.opp.first) { border: 1px solid transparent; background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, var(--holo) border-box; box-shadow: 0 0 40px rgba(61, 255, 168, 0.12); }
+    .top-grid :global(.opp-vis) { display: block; align-self: start; }
+    .top-grid :global(.opp-body) { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .top-grid :global(.opp-top) { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .top-grid :global(.opp-name) { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none; line-height: 1.2; }
+    .top-grid :global(.opp-set) { margin: 0; }
+    .top-grid :global(.opp-price) { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .top-grid :global(.opp-price strong) { font-family: var(--font-display); font-size: 1.5rem; color: var(--gold); }
+    .top-grid :global(.opp-chart) { position: relative; }
+    .top-grid :global(.opp-chart svg) { width: 100%; height: 46px; }
+    .top-grid :global(.chart-l) { display: flex; justify-content: space-between; font-size: 0.65rem; font-style: normal; }
+    .top-grid :global(.chart-l i) { font-style: normal; }
+    .top-grid :global(.reasons) { margin: 4px 0 6px; padding-left: 18px; font-size: 0.83rem; color: var(--muted); display: grid; gap: 3px; }
+    .top-grid :global(.opp-actions) { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: auto; }
+    :global(.alert-btn) { min-height: 40px; padding: 0 14px; font-size: 0.85rem; }
+    :global(.alert-btn.set) { color: var(--up) !important; background: rgba(61, 255, 168, 0.08) !important; border: 1px solid rgba(61, 255, 168, 0.5) !important; }
+
+    :global(.sig) { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 800; white-space: nowrap; border: 1px solid; }
+    :global(.sig::before) { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    :global(.sig.up) { color: var(--up); border-color: rgba(61, 255, 168, 0.45); background: rgba(61, 255, 168, 0.08); }
+    :global(.sig.down) { color: var(--down); border-color: rgba(255, 90, 122, 0.45); background: rgba(255, 90, 122, 0.08); }
+    :global(.sig.gold) { color: var(--gold); border-color: rgba(255, 210, 90, 0.45); background: rgba(255, 210, 90, 0.08); }
+    :global(.sig.cyan) { color: var(--cyan); border-color: rgba(62, 240, 255, 0.45); background: rgba(62, 240, 255, 0.08); }
+    :global(.sig.muted) { color: var(--muted); border-color: var(--line); background: var(--surface); }
+    :global(.ring) { --c: var(--muted); flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+      background: radial-gradient(closest-side, var(--bg-2) 76%, transparent 78%), conic-gradient(var(--c) calc(var(--s) * 1%), rgba(255, 255, 255, 0.08) 0); }
+    :global(.ring b) { font-family: var(--font-display); font-size: 0.82rem; }
+    :global(.ring[data-lvl='hi']) { --c: var(--up); }
+    :global(.ring[data-lvl='mid']) { --c: var(--gold); }
+    :global(.ring[data-lvl='lo']) { --c: var(--down); }
+    :global(.th) { flex: 0 0 auto; aspect-ratio: 245 / 342; border-radius: 5px; overflow: hidden; background: var(--surface-2); display: block; }
+    :global(.th img) { width: 100%; height: 100%; object-fit: cover; }
+    :global(.fr-name) { display: flex; flex-direction: column; min-width: 0; font-weight: 700; line-height: 1.25; }
+    :global(.fr-name small) { font-weight: 500; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .fav-list { display: grid; gap: 8px; }
+    .fav-list :global(.fav-row) { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+    .fav-list :global(.fr-card) { display: flex; gap: 12px; align-items: center; text-decoration: none; color: var(--text); min-width: 0; }
+    .fav-list :global(.fr-sig) { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+    .fav-list :global(.fr-price) { display: flex; flex-direction: column; gap: 4px; }
+    .fav-list :global(.fr-price strong) { font-family: var(--font-display); }
+    .fav-list :global(.fr-gauge) { display: flex; flex-direction: column; gap: 3px; }
+    .fav-list :global(.fr-gauge span) { display: block; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--up)); max-width: 100%; }
+    .empty-box { padding: 22px; border-radius: 18px; border: 1px dashed rgba(255, 255, 255, 0.18); text-align: center; }
+    .empty-box p { margin: 0 0 12px; }
+    .empty { padding: 18px 0; }
+
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .panel-b { padding: 18px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+    .small-btn { min-height: 38px; padding: 0 14px; font-size: 0.85rem; }
+    .alerts, .highs { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; }
+    .alerts :global(.al) { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--bg-2); border-left: 3px solid var(--muted); font-size: 0.88rem; }
+    .alerts :global(.al.up) { border-left-color: var(--up); }
+    .alerts :global(.al.down) { border-left-color: var(--down); }
+    .alerts :global(.al.gold) { border-left-color: var(--gold); }
+    .alerts :global(.al-k) { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; color: var(--muted); }
+    .highs :global(li a) { display: flex; gap: 10px; align-items: center; text-decoration: none; color: var(--text); padding: 8px; border-radius: 12px; background: var(--bg-2); }
+    .highs :global(.fr-name) { flex: 1; }
+    :global(.gold-t) { color: var(--gold); font-family: var(--font-display); }
+    .link { font-size: 0.88rem; }
+
+    .all { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2); }
+    .all :global(.all-row) { display: grid; grid-template-columns: 34px minmax(0, 1fr) 90px 80px 130px 42px; gap: 12px; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); text-decoration: none; color: var(--text); }
+    .all :global(.all-row:first-child) { border-top: 0; }
+    .all :global(.all-row:hover) { background: var(--surface); }
+    .all :global(.num) { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+    :global(.up-t) { color: var(--up); }
+    :global(.down-t) { color: var(--down); }
+    .more { display: flex; margin: 14px auto 0; }
+
+    .method { padding: clamp(18px, 3vw, 28px); border-radius: 24px; border: 1px solid var(--line); background: var(--surface); margin-bottom: 28px; }
+    .method h2 { margin: 0 0 14px; }
+    .m-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+    .m-card { padding: 14px; border-radius: 16px; background: var(--bg-2); border: 1px solid var(--line); }
+    .m-card p { margin: 10px 0 0; font-size: 0.86rem; color: var(--muted); }
+    .method > p { margin: 0; }
+
+    @media (max-width: 900px) {
+      .climate { grid-template-columns: 1fr; }
+      .gauge-box { max-width: 300px; margin: 0 auto; width: 100%; }
+      .two { grid-template-columns: 1fr; }
+      .m-grid { grid-template-columns: 1fr 1fr; }
+      .fav-list :global(.fav-row) { grid-template-columns: minmax(0, 1fr) auto; }
+      .fav-list :global(.fr-sig) { grid-column: 2; grid-row: 1; align-items: flex-end; }
+      .fav-list :global(.fr-price) { grid-column: 1; }
+      .fav-list :global(.fr-btn) { grid-column: 2; }
+      .all :global(.all-row) { grid-template-columns: 34px minmax(0, 1fr) auto 42px; }
+      .all :global(.all-row > .num:nth-of-type(2)), .all :global(.all-row > .sig) { display: none; }
+    }
+    @media (max-width: 720px) {
+      .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+      .chips button { flex: 0 0 auto; }
+      .top-grid { grid-template-columns: 1fr; }
+      .top-grid :global(.opp) { grid-template-columns: 96px 1fr; gap: 12px; padding: 12px; }
+      .m-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</Base>

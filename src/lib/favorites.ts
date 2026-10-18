@@ -70,9 +70,11 @@ export function setTargets(cardId: string, lang: Lang, t: { below?: number; abov
 }
 
 /** Prévient quand les favoris changent (dans cet onglet ou un autre). */
-export function onFavoritesChange(cb: () => void) {
+export function onFavoritesChange(cb: () => void): () => void {
+  const onStorage = (e: StorageEvent) => { if (e.key === KEY) cb(); };
   window.addEventListener(EVENT, cb);
-  window.addEventListener('storage', (e) => { if (e.key === KEY) cb(); });
+  window.addEventListener('storage', onStorage);
+  return () => { window.removeEventListener(EVENT, cb); window.removeEventListener('storage', onStorage); };
 }
 
 const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
@@ -118,7 +120,13 @@ export function favButton(
     }
     paint();
   });
-  onFavoritesChange(paint);
+  // Les listes (Marché, recherche…) recréent leurs boutons : un bouton retiré de la page se désabonne.
+  let seen = false;
+  const off = onFavoritesChange(() => {
+    if (!b.isConnected) { if (seen) off(); return; }
+    seen = true;
+    paint();
+  });
   return b;
 }
 

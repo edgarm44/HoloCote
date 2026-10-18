@@ -75,14 +75,14 @@ const similarity = lev;
 function score(q: string, qp: string, key: string, phon: string): number {
   if (key === q) return 1;
   if (key.startsWith(q)) return 0.96 - Math.min(0.1, (key.length - q.length) * 0.004);
-  if (phon === qp) return 0.94;
+  if (qp.length >= 3 && phon === qp) return 0.94;
   if (q.length >= 3 && key.includes(q)) return 0.86;
-  let s = Math.max(similarity(q, key), similarity(qp, phon) - 0.02);
+  let s = Math.max(similarity(q, key), qp.length >= 3 ? similarity(qp, phon) - 0.02 : 0);
   // La saisie contient un nom plus court (« dracofeu » contient « draco ») : bonus modéré seulement.
   if (key.length >= 4 && q.includes(key)) s = Math.max(s, 0.2 + 0.7 * (key.length / q.length));
   // Saisie en cours : on compare aussi au début du nom.
   if (q.length >= 3 && key.length > q.length) {
-    s = Math.max(s, similarity(q, key.slice(0, q.length)) - 0.06, similarity(qp, phon.slice(0, qp.length)) - 0.08);
+    s = Math.max(s, similarity(q, key.slice(0, q.length)) - 0.06, qp.length >= 3 ? similarity(qp, phon.slice(0, qp.length)) - 0.08 : 0);
   }
   return s;
 }
@@ -119,10 +119,14 @@ export async function smartSearch(query: string, lang: Lang, max = 72): Promise<
     const chosen = names.filter((n) => n.score >= Math.max(0.62, top - (top >= 0.9 ? 0.04 : 0.12))).slice(0, 4);
     const q = coreName(query) || normalize(query);
     const exactish = chosen.some((n) => n.key === q || n.key.startsWith(q));
+    // « noctali vmax » : les cartes qui portent la mécanique tapée (VMAX, ex, V…) passent devant.
+    const mech = query.toLowerCase().match(/\b(vmax|vstar|gx|ex|v)\b/)?.[1];
+    const hasMech = (n: string) => !!mech && new RegExp(`(^|[\\s-])${mech}(\\b|$)`, 'i').test(n);
     const cards = chosen
       .flatMap((n) => n.cards)
       .slice()
       .reverse() // l'index va du plus ancien au plus récent : on montre les plus récentes d'abord
+      .sort((a, b) => Number(hasMech(b.name)) - Number(hasMech(a.name)))
       .slice(0, max);
     return { cards, names, didYouMean: exactish ? undefined : chosen[0].label, fallback: false };
   } catch {

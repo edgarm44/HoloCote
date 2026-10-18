@@ -1,6 +1,5 @@
 ---
 import Base from '../layouts/Base.astro';
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <Base title="Classement" active="ranking" description="Ton classeur face aux rivaux HoloCote : qui a les cartes qui valent le plus ?">
   <section class="rk-hero">
@@ -79,7 +78,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       a.style.width = a.style.height = `${size}px`;
       return a;
     };
-    const leagueBadge = (e: Entry) => el('span', { class: `league-badge l-${e.league.key}` }, [e.league.name]);
     const tag = (e: Entry) => e.isMe ? el('span', { class: 'who me' }, ['Toi']) : el('span', { class: 'who' }, ['Fictif']);
 
     function openBinder(e: Entry) {
