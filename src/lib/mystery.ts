@@ -1,4 +1,4 @@
-// « Carte mystère du jour » : une carte par jour, la même pour tout le monde, à deviner en 6 essais.
+// « Défi du jour » : une carte par jour, la même pour tout le monde, à deviner en 6 essais.
 // Tout se passe dans le navigateur ; les parties sont gardées dans le stockage local.
 // Identifiants vérifiés dans la base TCGdex (copie du 3 octobre 2026). La réponse est le nom du Pokémon.
 
@@ -118,7 +118,7 @@ const TYPES_FR: Record<string, string> = {
 export const typeFr = (t: string) => TYPES_FR[t] ?? t;
 
 /* Parties enregistrées */
-export interface DayRecord { guesses: string[]; won: boolean; done: boolean }
+export interface DayRecord { guesses: string[]; won: boolean; done: boolean; claimed?: boolean }
 const KEY = 'holocote.mystery.v1';
 type Store = Record<string, DayRecord>;
 function read(): Store {
