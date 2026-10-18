@@ -4,6 +4,9 @@ const popular = [
   'Dracaufeu', 'Pikachu', 'Mew', 'Mewtwo', 'Évoli', 'Noctali', 'Mentali', 'Nymphali', 'Pyroli', 'Aquali', 'Voltali', 'Givrali', 'Phyllali',
   'Lucario', 'Rayquaza', 'Ectoplasma', 'Gardevoir', 'Ronflex', 'Léviator', 'Lugia', 'Giratina', 'Arceus', 'Darkrai', 'Tortank', 'Florizarre',
   'Salamèche', 'Carapuce', 'Bulbizarre', 'Dracolosse', 'Amphinobi', 'Zoroark', 'Miraidon', 'Koraidon', 'Terapagos', 'Pêchaminus', 'Miaouss',
+  'Rondoudou', 'Psykokwak', 'Ronflex', 'Lokhlass', 'Artikodin', 'Électhor', 'Sulfura', 'Kyogre', 'Groudon', 'Ho-Oh', 'Celebi', 'Jirachi',
+  'Deoxys', 'Dialga', 'Palkia', 'Reshiram', 'Zekrom', 'Kyurem', 'Xerneas', 'Yveltal', 'Zygarde', 'Solgaleo', 'Lunala', 'Zacian', 'Zamazenta',
+  'Éthernatos', 'Goupix', 'Feunard', 'Gallame', 'Tyranocif', 'Absol', 'Métalosse', 'Latias', 'Latios', 'Arcanin', 'Sablaireau', 'Évoli-ex',
 ];
 ---
 <Base title="Recherche" active="search" description="Cherche une carte par son nom, même avec une faute : rareté, cote et fiche détaillée.">
@@ -50,6 +53,16 @@ const popular = [
       <p class="muted small d-sub">Les cartes suivies dont la cote est la plus haute aujourd'hui.</p>
       <div class="grid" id="top"></div>
     </div>
+    <div class="d-block" id="new-block" hidden>
+      <h2>Nouveautés</h2>
+      <p class="muted small d-sub">Les cartes les plus recherchées des dernières extensions.</p>
+      <div class="grid" id="newest"></div>
+    </div>
+    <div class="d-block" id="classic-block" hidden>
+      <h2>Les classiques</h2>
+      <p class="muted small d-sub">Les cartes cultes des premières séries.</p>
+      <div class="grid" id="classic"></div>
+    </div>
     <div class="d-block" id="cheap-block" hidden>
       <h2>Petits prix, belles cartes</h2>
       <p class="muted small d-sub">Des cartes rares à moins de 20 € en ce moment.</p>
@@ -70,7 +83,7 @@ const popular = [
 
   <script>
     import { smartSearch, suggestNames, preloadSearch, recentSearches, rememberSearch, clearRecent } from '../lib/smartsearch';
-    import { loadMarket } from '../lib/market';
+    import { loadMarket, eraOf } from '../lib/market';
     import { formatPrice, type Lang } from '../lib/tcgdex';
     import { cardTile, status, getLang, rememberLang, el } from '../lib/ui';
     import { mascotSvg } from '../lib/mascot';
@@ -121,8 +134,14 @@ const popular = [
       const top = [...qs].filter((q) => !used.has(q.id)).sort((a, b) => b.price - a.price).slice(0, 12);
       top.forEach((q) => used.add(q.id));
       const cheap = [...qs].filter((q) => !used.has(q.id) && q.price >= 1 && q.price < 20).sort((a, b) => b.price - a.price).slice(0, 12);
+      cheap.forEach((q) => used.add(q.id));
+      const newest = qs.filter((q) => q.group === 'new' && !used.has(q.id)).sort((a, b) => b.price - a.price).slice(0, 12);
+      newest.forEach((q) => used.add(q.id));
+      const classic = qs.filter((q) => eraOf(q.id) === 'classic' && !used.has(q.id)).sort((a, b) => b.price - a.price).slice(0, 12);
       fill('hot', 'hot-block', hot);
       fill('top', 'top-block', top);
+      fill('newest', 'new-block', newest);
+      fill('classic', 'classic-block', classic);
       fill('cheap', 'cheap-block', cheap);
     }).catch(() => {});
 

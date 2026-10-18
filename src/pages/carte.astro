@@ -87,7 +87,7 @@ import Base from '../layouts/Base.astro';
           reverse ? `Version reverse holo : ${formatPrice(reverse.value, reverse.unit)}` : '',
         ].filter(Boolean).join(' · ');
         const date = formatDate(price.updated);
-        slot('price-note').textContent = `Cote indicative${date ? ` du ${date}` : ''}, source ${price.source}${price.unit === 'USD' ? ' (marché américain, en dollars)' : ''}. Cardmarket regroupe toutes les langues et tous les états : une carte française ou abîmée se vend souvent moins cher.`;
+        slot('price-note').textContent = `${price.unsure ? 'Cote incertaine : les ventes récentes de cette carte varient beaucoup, compare plusieurs annonces. ' : ''}Cote indicative${date ? ` du ${date}` : ''}, source ${price.source}${price.unit === 'USD' ? ' (marché américain, en dollars)' : ''}. Cardmarket regroupe toutes les langues et tous les états : une carte française ou abîmée se vend souvent moins cher.`;
       } else {
         slot('price').textContent = '—';
         slot('price-note').textContent = "Pas de cote disponible pour cette carte. Essaie la version dans l'autre langue.";

@@ -17,6 +17,7 @@ export interface Quote {
   avg30?: number;
   avg7?: number;
   low?: number;           // plus bas prix proposé à la vente (Cardmarket)
+  unsure?: boolean;       // cote peu fiable (repères trop dispersés)
   change7?: number;       // variation : moyenne 7 j comparée à la moyenne 30 j (en %)
   points: number[];       // repères pour le mini-graphique, du plus ancien au plus récent
   updated?: string;
@@ -173,6 +174,149 @@ export const WATCHLIST: string[] = [
   '30th-155',                  // Jirachi-ex
   '30th-156',                  // Drattak-ex
   '30th-148',                  // Amphinobi-ex
+  // Ajouts du 18 octobre 2026, soir : cartes rares de chaque extension (identifiants vérifiés, base TCGdex du 3 octobre 2026)
+  'sv01-248',       // Roue-de-Fer-ex (Special illustration rare)
+  'sv01-246',       // Fort-Ivoire-ex (Special illustration rare)
+  'sv01-243',       // Filentrappe-ex (Special illustration rare)
+  'sv01-222',       // Rongourmand (Illustration rare)
+  'sv02-275',       // Dinglu-ex (Hyper rare)
+  'sv02-274',       // Baojian-ex (Hyper rare)
+  'sv02-273',       // Palmaval-ex (Hyper rare)
+  'sv02-272',       // Flâmigator-ex (Hyper rare)
+  'sv03-225',       // Roucarnage-ex (Special illustration rare)
+  'sv03-224',       // Vrombotor-ex (Special illustration rare)
+  'sv03-222',       // Bekaglaçon-ex (Special illustration rare)
+  'sv03-209',       // Gourmelet (Illustration rare)
+  'sv03.5-202',     // Électhor-ex (Special illustration rare)
+  'sv03.5-201',     // Alakazam-ex (Special illustration rare)
+  'sv03.5-181',     // Draco (Illustration rare)
+  'sv03.5-180',     // Amonita (Illustration rare)
+  'sv04-262',       // Rugit-Lune-ex (Hyper rare)
+  'sv04-261',       // Garde-de-Fer-ex (Hyper rare)
+  'sv04-260',       // Carchacrok-ex (Hyper rare)
+  'sv04-253',       // Altaria-ex (Special illustration rare)
+  'sv04.5-245',     // Koraidon-ex (Hyper rare)
+  'sv04.5-244',     // Dinglu-ex (Hyper rare)
+  'sv04.5-243',     // Miraidon-ex (Hyper rare)
+  'sv04.5-242',     // Baojian-ex (Hyper rare)
+  'sv05-218',       // Ire-Foudre-ex (Hyper rare)
+  'sv05-217',       // Roc-de-Fer-ex (Hyper rare)
+  'sv05-216',       // Chef-de-Fer-ex (Hyper rare)
+  'sv05-215',       // Serpente-Eau-ex (Hyper rare)
+  'sv06-222',       // Ursaking Lune Vermeille-ex (Hyper rare)
+  'sv06-215',       // Ogerpon Masque de la Pierre-ex (Special illustration rare)
+  'sv06-213',       // Ogerpon Masque du Puits-ex (Special illustration rare)
+  'sv06-212',       // Ogerpon Masque du Fourneau-ex (Special illustration rare)
+  'sv06.5-092',     // Favianos-ex (Special illustration rare)
+  'sv06.5-091',     // Fortusimia-ex (Special illustration rare)
+  'sv06.5-090',     // Félicanis-ex (Special illustration rare)
+  'sv06.5-079',     // Chelours (Illustration rare)
+  'sv07-168',       // Mygavolt-ex (Special illustration rare)
+  'sv07-167',       // Pomdorochi-ex (Special illustration rare)
+  'sv07-155',       // Pondralugon (Illustration rare)
+  'sv07-154',       // Gloupti (Illustration rare)
+  'sv08-248',       // Noadkoko d'Alola-ex (Hyper rare)
+  'sv08-247',       // Pikachu-ex (Hyper rare)
+  'sv08-241',       // Pondralugon-ex (Special illustration rare)
+  'sv08-240',       // Trioxhydre-ex (Special illustration rare)
+  'sv08.5-178',     // Serpente-Eau-ex (Hyper rare)
+  'sv08.5-177',     // Ogerpon Masque Turquoise-ex (Hyper rare)
+  'sv08.5-176',     // Vert-de-Fer-ex (Hyper rare)
+  'sv08.5-169',     // Terapagos-ex (Special illustration rare)
+  'sv09-188',       // Ampibidou-ex de Mashynn (Hyper rare)
+  'sv09-187',       // Drattak-ex (Special illustration rare)
+  'sv09-184',       // Mélofée-ex de Lilie (Special illustration rare)
+  'sv09-182',       // Volcanion-ex (Special illustration rare)
+  'sv10-242',       // Nostenfer-ex de la Team Rocket (Hyper rare)
+  'sv10-241',       // Carchacrok-ex de Cynthia (Hyper rare)
+  'sv10-240',       // Mewtwo-ex de la Team Rocket (Hyper rare)
+  'sv10-239',       // Ho-Oh-ex de Luth (Hyper rare)
+  'sv10.5b-169',    // Genesect-ex (Special illustration rare)
+  'sv10.5b-168',    // Minotaupe-ex (Special illustration rare)
+  'sv10.5b-167',    // Meloetta-ex (Special illustration rare)
+  'sv10.5b-165',    // Kyurem-ex (Special illustration rare)
+  'sv10.5w-170',    // Frison-ex (Special illustration rare)
+  'sv10.5w-169',    // Trioxhydre-ex (Special illustration rare)
+  'sv10.5w-168',    // Moyade-ex (Special illustration rare)
+  'sv10.5w-167',    // Keldeo-ex (Special illustration rare)
+  'me01-178',       // Méga-Gardevoir-ex (Special illustration rare)
+  'me01-154',       // Nounourson (Illustration rare)
+  'me01-153',       // Argouste (Illustration rare)
+  'me01-152',       // Cadoizo (Illustration rare)
+  'me02-107',       // Capidextre (Illustration rare)
+  'me02-106',       // Miaouss (Illustration rare)
+  'me02-105',       // Grodoudou (Illustration rare)
+  'me02-104',       // Togedemaru (Illustration rare)
+  'me02.5-289',     // Métalosse-ex de Pierre (Special illustration rare)
+  'me02.5-288',     // Favianos-ex (Special illustration rare)
+  'me02.5-287',     // Angoliath-ex de Rosemary (Special illustration rare)
+  'me02.5-285',     // Méga-Baggaïd-ex (Special illustration rare)
+  'me03-118',       // Méga-Staross-ex (Special illustration rare)
+  'me03-099',       // Rattatac (Illustration rare)
+  'me03-098',       // Dimoclès (Illustration rare)
+  'me03-097',       // Drascore (Illustration rare)
+  'me04-119',       // Pashmilla-ex (Special illustration rare)
+  'me04-097',       // Miradar (Illustration rare)
+  'me04-096',       // Tauros (Illustration rare)
+  'me04-095',       // Colimucus (Illustration rare)
+  'me05-095',       // Silvallié (Illustration rare)
+  'me05-094',       // Bazoucan (Illustration rare)
+  'me05-093',       // Bastiodon (Illustration rare)
+  'me05-092',       // Roublenard (Illustration rare)
+  '30th-147',       // Chochodile-ex (Special illustration rare)
+  '30th-146',       // Famignol (Illustration rare)
+  '30th-145',       // Zorua de Hisui (Illustration rare)
+  '30th-144',       // Miaouss (Illustration rare)
+  'swsh1-212',      // Zamazenta V (Secret Rare)
+  'swsh1-211',      // Zacian V (Secret Rare)
+  'swsh1-206',      // Ronflex VMAX (Secret Rare)
+  'swsh1-205',      // Dolman VMAX (Secret Rare)
+  'swsh2-205',      // Berserkatt de Galar (Secret Rare)
+  'swsh2-204',      // Beldeneige (Secret Rare)
+  'swsh2-199',      // Pachyradjah VMAX (Secret Rare)
+  'swsh2-198',      // Sepiatroce VMAX (Secret Rare)
+  'swsh3-198',      // Monthracite (Secret Rare)
+  'swsh3-197',      // Gorythmic (Secret Rare)
+  'swsh3-194',      // Drattak VMAX (Secret Rare)
+  'swsh3-193',      // Cizayox VMAX (Secret Rare)
+  'swsh4-199',      // Gouroutan (Secret Rare)
+  'swsh4-198',      // Ixon de Galar (Secret Rare)
+  'swsh4-191',      // Togekiss VMAX (Secret Rare)
+  'swsh4-190',      // Exagide VMAX (Secret Rare)
+  'swsh5-179',      // Démolosse (Secret Rare)
+  'swsh5-178',      // Octillery (Secret Rare)
+  'swsh5-171',      // Corvaillus VMAX (Secret Rare)
+  'swsh5-170',      // Shifours Mille Poings VMAX (Secret Rare)
+  'swsh6-224',      // Ronflex (Secret Rare)
+  'swsh6-223',      // Archéodong (Secret Rare)
+  'swsh6-222',      // Électrode (Secret Rare)
+  'swsh6-209',      // Boréas VMAX (Secret Rare)
+  'swsh7-228',      // Cresselia (Secret Rare)
+  'swsh7-227',      // Lézargus (Secret Rare)
+  'swsh7-226',      // Momartik (Secret Rare)
+  'swsh7-220',      // Duralugon VMAX (Secret Rare)
+  'swsh8-280',      // Lainergie (Secret Rare)
+  'swsh8-272',      // Rongrigou VMAX (Secret Rare)
+  'swsh8-267',      // Fulgudog VMAX (Secret Rare)
+  'swsh8-266',      // Lézargus VMAX (Secret Rare)
+  'swsh9-183',      // Sulfura de Galar V (Secret Rare)
+  'swsh9-182',      // Électhor de Galar V (Secret Rare)
+  'swsh9-181',      // Artikodin de Galar V (Secret Rare)
+  'swsh9-175',      // Farfaduvet VSTAR (Secret Rare)
+  'swsh10-210',     // Dialga Originel VSTAR (Secret Rare)
+  'swsh10-209',     // Clamiral de Hisui VSTAR (Secret Rare)
+  'swsh10-208',     // Palkia Originel VSTAR (Secret Rare)
+  'swsh10-196',     // Hachécateur VSTAR (Secret Rare)
+  'swsh11-213',     // Zoroark de Hisui VSTAR (Secret Rare)
+  'swsh11-202',     // Muplodocus de Hisui VSTAR (Secret Rare)
+  'swsh11-201',     // Giratina VSTAR (Secret Rare)
+  'swsh11-200',     // Drascore VSTAR (Secret Rare)
+  'swsh12-210',     // Majaspic VSTAR (Secret Rare)
+  'swsh12-201',     // Regidrago VSTAR (Secret Rare)
+  'swsh12-200',     // Mysdibule VSTAR (Secret Rare)
+  'swsh12-199',     // Zarbi VSTAR (Secret Rare)
+  'swsh12.5-160',   // Pikachu (Secret Rare)
+  'swsh12.5-102',   // Rayquaza VMAX (Ultra Rare)
 ];
 
 /** Époque d'une carte, d'après le préfixe de son identifiant (filtres du Marché). */
@@ -213,6 +357,7 @@ export function toQuote(card: Card, lang: Lang, group: Quote['group']): Quote | 
     price: p.value,
     avg30, avg7,
     low: k('low'),
+    unsure: p.unsure,
     change7: pct(avg7, avg30),
     points: points.length >= 2 ? points : [p.value, p.value],
     updated: p.updated,
@@ -272,7 +417,7 @@ export interface Market {
   loadedAt: number;
 }
 
-const CACHE_KEY = 'holocote.market.v5';
+const CACHE_KEY = 'holocote.market.v6';
 const TTL = 30 * 60 * 1000;
 
 function readCache(): Market | null {
@@ -309,7 +454,7 @@ export function loadMarket(force = false): Promise<Market> {
   if (cached) return Promise.resolve(cached);
   if (inflight) return inflight;
   inflight = (async () => {
-    const legends = await pool(WATCHLIST, 8, async (id) => {
+    const legends = await pool(WATCHLIST, 10, async (id) => {
       const r = await cardAnyLang(id);
       return r ? toQuote(r.card, r.lang, 'legend') : null;
     });

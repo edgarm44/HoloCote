@@ -55,11 +55,19 @@ import { CONDITIONS } from '../lib/condition';
         <input id="snap" type="file" accept="image/*" capture="environment" class="sr-only" />
         <input id="photo" type="file" accept="image/*" class="sr-only" />
       </div>
+      <div class="cam-pick" id="cam-pick" hidden>
+        <label for="cam-select">Caméra</label>
+        <select id="cam-select"></select>
+      </div>
       <label class="auto" id="auto-wrap" hidden>
         <input type="checkbox" id="auto-scan" checked />
         <span>Scan automatique quand l'image est nette et stable</span>
       </label>
       <p class="muted small">L'image est analysée sur ton appareil : elle n'est jamais envoyée ni enregistrée. Touche l'image pour faire la mise au point.</p>
+      <details class="cam-diag" id="cam-diag">
+        <summary>La caméra ne marche pas ? Infos à me transmettre</summary>
+        <pre id="cam-diag-text">Ouvre la caméra pour voir les infos.</pre>
+      </details>
       <div id="progress" hidden>
         <div class="bar"><span id="progress-fill"></span></div>
         <p id="progress-label" class="muted small"></p>
@@ -471,15 +479,52 @@ import { CONDITIONS } from '../lib/condition';
     function showCamError(e: unknown) {
       $('cam-error-text').textContent = cameraMessage(e);
       camError.hidden = false;
+      lastErr = `${(e as { name?: string })?.name ?? ''} ${(e as { message?: string })?.message ?? ''}`.trim() || 'inconnue';
+      updateDiag();
     }
 
-    /** Caméras arrière, la principale d'abord (on évite ultra grand-angle, téléobjectif et caméras de profondeur). */
+    /** Caméras disponibles. Sur téléphone, les arrière d'abord, la principale en tête (pas d'ultra grand-angle ni de téléobjectif). */
+    let camList: { id: string; label: string }[] = [];
+    let hasBack = false;
+    let lastErr = '';
+    const CAM_PREF = 'holocote.camera.v1';
+    const VIRTUAL = /virtual|obs|camo|snap camera|manycam|xsplit|nvidia broadcast|droidcam|epoccam|ndi/i;
     async function backCameras(): Promise<string[]> {
       const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput' && d.deviceId);
+      camList = devs.map((d, i) => ({ id: d.deviceId, label: d.label || `Caméra ${i + 1}` }));
       const back = devs.filter((d) => /back|rear|arri|environment|trás|posterior|world/i.test(d.label));
+      hasBack = back.length > 0;
       const list = back.length ? back : devs;
-      const score = (l: string) => (/triple|dual(?! wide)/i.test(l) ? -1 : /ultra|wide|0[.,]5|tele|zoom|macro|depth|profondeur|infrared|ir\b/i.test(l) ? 1 : 0);
+      const score = (l: string) => (VIRTUAL.test(l) ? 5 : /triple|dual(?! wide)/i.test(l) ? -1 : /ultra|wide|0[.,]5|tele|zoom|macro|depth|profondeur|infrared|ir\b/i.test(l) ? 1 : 0);
       return list.sort((a, b) => score(a.label) - score(b.label)).map((d) => d.deviceId);
+    }
+
+    /** Liste déroulante des caméras (utile sur ordinateur : webcam intégrée, webcam USB…). */
+    function fillCamSelect() {
+      const sel = $<HTMLSelectElement>('cam-select');
+      const cur = track()?.getSettings().deviceId;
+      sel.replaceChildren(...camList.map((c) => el('option', { value: c.id }, [c.label])));
+      if (cur) sel.value = cur;
+      $('cam-pick').hidden = camList.length < 2;
+    }
+
+    /** Infos techniques affichées sur demande, pour diagnostiquer un problème à distance. */
+    function updateDiag() {
+      const t = track();
+      const st = (t?.getSettings?.() ?? {}) as MediaTrackSettings;
+      const ua = navigator.userAgent;
+      const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Autre';
+      const os = /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) && !/Mobile/.test(ua) ? 'macOS' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Linux/.test(ua) ? 'Linux' : 'Autre';
+      $('cam-diag-text').textContent = [
+        `Navigateur : ${browser} · ${os}`,
+        `Adresse sécurisée : ${window.isSecureContext ? 'oui' : 'non'}`,
+        `Accès caméra possible : ${navigator.mediaDevices?.getUserMedia ? 'oui' : 'non'}`,
+        `Caméras trouvées : ${camList.length ? camList.map((c) => c.label).join(' / ') : 'aucune (ou accès pas encore donné)'}`,
+        `Caméra utilisée : ${t ? t.label || 'sans nom' : 'aucune'}`,
+        `Image : ${video.videoWidth || 0} × ${video.videoHeight || 0}${st.frameRate ? ` à ${Math.round(st.frameRate)} i/s` : ''}`,
+        `Lecture : ${video.paused ? 'en pause' : 'en cours'}`,
+        `Dernière erreur : ${lastErr || 'aucune'}`,
+      ].join('\n');
     }
 
     /** Demande un flux vidéo en assouplissant les exigences à chaque échec. */
@@ -569,15 +614,27 @@ import { CONDITIONS } from '../lib/condition';
       camBtn.disabled = true;
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
-        await start();
-        // Les noms des caméras ne sont lisibles qu'après autorisation : on bascule alors sur la principale.
+        // Caméra choisie la dernière fois (ordinateur avec plusieurs webcams), sinon caméra par défaut.
+        let pref = '';
+        try { pref = localStorage.getItem(CAM_PREF) || ''; } catch { /* rien */ }
+        if (pref) await start(pref).catch(() => start());
+        else await start();
+        // Les noms des caméras ne sont lisibles qu'après autorisation.
         deviceIds = await backCameras().catch(() => []);
         const cur = track()?.getSettings().deviceId;
-        const facing = track()?.getSettings().facingMode;
-        if (deviceIds.length > 1 && cur && deviceIds[0] !== cur && facing !== 'user') {
+        const curLabel = track()?.label ?? '';
+        // Téléphone : on bascule sur la caméra arrière principale. Ordinateur : on garde la caméra par défaut,
+        // sauf si c'est une caméra virtuelle (OBS…) qui donne souvent une image noire.
+        const wantSwitch = !pref && deviceIds.length > 1 && cur && deviceIds[0] !== cur && (hasBack || VIRTUAL.test(curLabel));
+        if (wantSwitch) {
           const ok = await start(deviceIds[0]).then(() => true).catch(() => false);
           if (!ok) await start();
         }
+        fillCamSelect();
+        // Webcam tournée vers soi : aperçu en miroir pour viser plus facilement (l'analyse utilise l'image normale).
+        const facing = track()?.getSettings().facingMode;
+        video.classList.toggle('mirror', facing === 'user' || (!hasBack && !/Android|iPhone|iPad/i.test(navigator.userAgent)));
+        updateDiag();
         deviceIdx = Math.max(0, deviceIds.indexOf(track()?.getSettings().deviceId ?? ''));
         switchBtn.hidden = deviceIds.length < 2;
         camTools.hidden = torchBtn.hidden && zoomBtn.hidden && switchBtn.hidden;
@@ -639,6 +696,18 @@ import { CONDITIONS } from '../lib/condition';
       camLoading.hidden = true;
       sharpMax = 0;
     });
+
+    $<HTMLSelectElement>('cam-select').addEventListener('change', async (e) => {
+      const id = (e.target as HTMLSelectElement).value;
+      try { localStorage.setItem(CAM_PREF, id); } catch { /* rien */ }
+      camLoading.hidden = false;
+      await start(id).catch(async (err) => { lastErr = String((err as Error)?.name ?? err); await start().catch(() => {}); });
+      camLoading.hidden = true;
+      fillCamSelect();
+      updateDiag();
+      sharpMax = 0;
+    });
+    $('cam-diag').addEventListener('toggle', updateDiag);
 
     /** Mise au point au toucher (Chrome Android) ; ailleurs, relance l'autofocus. */
     viewer.addEventListener('pointerdown', async (e) => {
@@ -743,7 +812,8 @@ import { CONDITIONS } from '../lib/condition';
         if (lastSig) { moved = 0; for (let i = 0; i < 64; i++) moved += Math.abs(m.sig[i] - lastSig[i]); moved /= 64; }
         lastSig = m.sig;
         const stable = moved < 7;
-        const sharpOk = m.sharp > 22 && m.sharp >= sharpMax * 0.55;
+        // Webcams d'ordinateur moins nettes que les téléphones : seuil bas, et on compare surtout à la meilleure image récente.
+        const sharpOk = m.sharp > 8 && m.sharp >= sharpMax * 0.55;
         const reset = () => { stableSince = 0; };
         if (m.light < 38) { setHint(torchBtn.hidden ? "Trop sombre : rapproche-toi d'une lampe ou d'une fenêtre" : 'Trop sombre : allume la lampe (en haut à droite)', 'warn'); return reset(); }
         if (m.glare > 0.04 || m.light > 228) { setHint('Reflet sur la carte : incline-la un peu', 'warn'); return reset(); }
@@ -752,6 +822,8 @@ import { CONDITIONS } from '../lib/condition';
         if (!sharpOk) {
           if (!blurSince) blurSince = performance.now();
           const long = performance.now() - blurSince > 2500;
+          // Image stable depuis longtemps mais jamais très nette (webcam à mise au point fixe) : on tente quand même.
+          if (autoScan.checked && performance.now() - blurSince > 3500 && performance.now() - lastShot > 4000) { blurSince = 0; shoot(); return; }
           setHint(long && !zoomBtn.hidden && zoomBtn.textContent === '×1' ? 'Toujours flou : recule le téléphone et touche ×2' : long ? "Toujours flou : recule un peu et touche l'image pour la mise au point" : 'Mise au point…', 'warn');
           return reset();
         }
@@ -898,6 +970,12 @@ import { CONDITIONS } from '../lib/condition';
     @keyframes flash { 0% { opacity: 0.85; } 100% { opacity: 0; } }
     .tap-play { position: absolute; inset: 0; z-index: 6; border: 0; background: rgba(7, 6, 13, 0.7); color: var(--text); font-weight: 700; font-size: 1rem; cursor: pointer; }
     .cam-loading { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); font-size: 0.9rem; }
+    .viewer video.mirror { transform: scaleX(-1); }
+    .cam-pick { display: flex; gap: 10px; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 0.85rem; color: var(--muted); }
+    .cam-pick select { width: auto; max-width: 260px; min-height: 38px; font-size: 0.85rem; }
+    .cam-diag { margin-top: 8px; font-size: 0.8rem; color: var(--muted); }
+    .cam-diag summary { cursor: pointer; }
+    .cam-diag pre { white-space: pre-wrap; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 8px 0 0; font-size: 0.75rem; }
     .cam-error { margin: 0 0 14px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(255, 90, 122, 0.5); background: rgba(255, 90, 122, 0.08); }
     .cam-error p { margin: 0 0 8px; }
     .ce-title { font-weight: 700; color: var(--down); }

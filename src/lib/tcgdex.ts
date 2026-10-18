@@ -117,6 +117,7 @@ export interface PriceInfo {
   unit: 'EUR' | 'USD';
   source: 'Cardmarket' | 'TCGplayer';
   updated?: string;
+  unsure?: boolean;   // repères trop dispersés ou trop peu nombreux : cote à prendre avec prudence
 }
 
 const num = (v: unknown): number | undefined =>
@@ -138,8 +139,11 @@ export function cardmarket(card: Card, holo: boolean): PriceInfo | null {
   // La moyenne de la veille (avg1) est exclue : une seule vente peut la fausser.
   // Vérifié sur données réelles : la tendance seule peut être aberrante (Dracaufeu set de base :
   // tendance 78 € pour des ventes moyennes de 420 à 770 €).
-  const value = median([k('trend'), k('avg'), k('avg7'), k('avg30')]) ?? k('avg1');
-  return value ? { value, low: k('low'), unit: 'EUR', source: 'Cardmarket', updated: cm.updated } : null;
+  const refs = [k('trend'), k('avg'), k('avg7'), k('avg30')].filter((x): x is number => x !== undefined);
+  const value = median(refs) ?? k('avg1');
+  // Contrôle de cohérence : moins de deux repères, ou un écart de plus de 3 fois entre eux.
+  const unsure = refs.length < 2 || Math.max(...refs) / Math.min(...refs) > 3;
+  return value ? { value, low: k('low'), unit: 'EUR', source: 'Cardmarket', updated: cm.updated, unsure } : null;
 }
 
 function tcgplayer(card: Card, keys: string[]): PriceInfo | null {

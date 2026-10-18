@@ -165,7 +165,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       r.dataset.lvl = score >= 65 ? 'hi' : score >= 45 ? 'mid' : 'lo';
       return r;
     };
-    const filtered = () => all.filter((a) => (!budget || a.q.price <= budget) && (sig === 'all' || a.verdict === sig));
+    const filtered = () => all.filter((a) => !a.q.unsure && (!budget || a.q.price <= budget) && (sig === 'all' || a.verdict === sig));
 
     /** Crée (ou met à jour) l'alerte « prix cible » d'une carte, en l'ajoutant aux favoris si besoin. */
     function setAlert(a: Analysis) {

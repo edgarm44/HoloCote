@@ -141,7 +141,7 @@ import Base from '../layouts/Base.astro';
     Cours = cote HoloCote, identique à la fiche carte : médiane de la tendance, du prix moyen de vente et des moyennes 7 et 30 jours de Cardmarket
     (en euros, version normale, toutes langues et tous états confondus). Variation 7 j = moyenne des 7 derniers jours comparée à celle des 30 jours.
     Les mini-graphiques relient ces repères (moyenne 30 j, moyenne 7 j, cours) : ce n'est pas un historique jour par jour.
-    Ce n'est pas un conseil d'investissement.
+    Un « ? » signale une cote incertaine (repères Cardmarket très écartés) : ces cartes sont exclues du Duel et des Opportunités. Ce n'est pas un conseil d'investissement.
   </p>
 
   <script>
@@ -196,7 +196,7 @@ import Base from '../layouts/Base.astro';
             thumb(q),
             el('span', { class: 'mv-name' }, [q.name, el('small', {}, [[q.setName, q.group === 'new' ? 'Nouveauté' : ''].filter(Boolean).join(' · ')])]),
           ]),
-          el('span', { class: 'num price', role: 'cell' }, [eur(q.price)]),
+          el('span', { class: 'num price', role: 'cell', title: q.unsure ? 'Cote incertaine : ventes récentes très variables' : '' }, [eur(q.price), q.unsure ? el('sup', { class: 'unsure' }, ['?']) : null]),
           el('span', { class: 'num muted', role: 'cell' }, [q.avg30 ? eur(q.avg30) : '—']),
           el('span', { class: 'num', role: 'cell' }, [chg(q.change7)]),
           el('span', { class: 'chart-col', role: 'cell' }, [sparkline(q.points, 110, 34)]),
@@ -546,6 +546,7 @@ import Base from '../layouts/Base.astro';
 
     .board-bar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
     .board-bar select { width: auto; }
+    .table :global(.unsure) { color: var(--gold); font-weight: 800; margin-left: 2px; }
     .board-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .board-tools input { width: 220px; max-width: 100%; }
     .chip-n { font-weight: 700; font-size: 0.72rem; opacity: 0.7; margin-left: 2px; }

@@ -790,7 +790,8 @@ import { mascotSvg } from '../lib/mascot';
     let answered = false;
     try { best = JSON.parse(localStorage.getItem(DKEY) || '{}').best || 0; } catch { /* rien */ }
     const saveBest = () => { try { localStorage.setItem(DKEY, JSON.stringify({ best })); } catch { /* rien */ } };
-    const fair = (a: Quote, b: Quote) => { const r = Math.max(a.price, b.price) / Math.min(a.price, b.price); return a.id !== b.id && r >= 1.2 && r <= 5; };
+    // Paire jouable : deux cartes de noms différents, cotes fiables, et un écart net (1,2 à 5 fois) pour qu'il y ait une vraie bonne réponse.
+    const fair = (a: Quote, b: Quote) => { const r = Math.max(a.price, b.price) / Math.min(a.price, b.price); return a.id !== b.id && a.name !== b.name && r >= 1.2 && r <= 5; };
 
     function duelCard(q: Quote, side: 'a' | 'b') {
       const b = $(`du-${side}`) as HTMLButtonElement;
@@ -929,7 +930,8 @@ import { mascotSvg } from '../lib/mascot';
       $('du-state').replaceChildren(status('On prépare les cartes…'));
       try {
         const m = await loadMarket();
-        pool = m.quotes.filter((q) => q.image && q.price >= 0.5);
+        // Seules les cotes fiables entrent dans le duel (repères cohérents, moyenne du mois connue).
+        pool = m.quotes.filter((q) => q.image && q.price >= 0.5 && !q.unsure && q.avg30);
       } catch { pool = []; }
       if (pool.length < 4) {
         $('du-state').replaceChildren(el('p', { class: 'muted' }, ['Les cotes sont indisponibles pour le moment. Réessaie dans un instant.']));

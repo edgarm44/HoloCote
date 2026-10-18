@@ -206,7 +206,7 @@ const TOOLS = [
       $('live').hidden = false;
 
       // Meilleure opportunité du jour
-      const best = qs.map(analyse).filter((a) => a.q.price >= 1 && (a.verdict === 'window' || a.verdict === 'rebound')).sort((a, b) => b.score - a.score)[0];
+      const best = qs.map(analyse).filter((a) => a.q.price >= 1 && !a.q.unsure && (a.verdict === 'window' || a.verdict === 'rebound')).sort((a, b) => b.score - a.score)[0];
       if (best) {
         const th = $('opp-thumb');
         if (best.q.image) th.replaceChildren(el('img', { src: `${best.q.image}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
