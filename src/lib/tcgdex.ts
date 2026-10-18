@@ -59,13 +59,20 @@ export interface SetBrief {
 }
 
 const cache = new Map<string, Promise<unknown>>();
+let fresh = false;
+
+/** Oublie les réponses déjà chargées et redemande les cotes au serveur (bouton « Actualiser »). */
+export function clearApiCache() {
+  cache.clear();
+  fresh = true;
+}
 
 async function get<T>(path: string): Promise<T> {
   const url = `${API}${path}`;
   if (!cache.has(url)) {
     cache.set(
       url,
-      fetch(url).then(async (r) => {
+      fetch(url, fresh ? { cache: 'no-cache' } : undefined).then(async (r) => {
         if (r.status === 404) return null;
         if (!r.ok) throw new Error(`TCGdex ${r.status}`);
         return r.json();

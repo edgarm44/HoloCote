@@ -4,7 +4,7 @@
 // La moyenne de la veille n'est pas utilisée : sur données réelles elle varie du simple
 // au triple d'un jour à l'autre (une seule vente suffit).
 
-import { getCard, listSets, priceFor, type Card, type CardBrief, type Lang } from './tcgdex';
+import { getCard, listSets, priceFor, clearApiCache, type Card, type CardBrief, type Lang } from './tcgdex';
 
 export interface Quote {
   id: string;
@@ -24,20 +24,37 @@ export interface Quote {
 
 /** Cartes « légendaires » suivies en permanence (identifiants TCGdex). Les absentes sont ignorées. */
 export const WATCHLIST: string[] = [
-  'base1-4',      // Dracaufeu — Set de base
-  'base1-2',      // Tortank — Set de base
-  'base1-15',     // Florizarre — Set de base
-  'base1-10',     // Mewtwo — Set de base
-  'swsh7-215',    // Noctali VMAX — Évolution Céleste
-  'swsh4-188',    // Pikachu VMAX — Voltage Éclatant
-  'sv03-223',     // Dracaufeu ex — Flammes Obsidiennes
-  'sv03.5-199',   // Dracaufeu ex — 151
-  'sv03.5-200',   // Tortank ex — 151
-  'sv03.5-198',   // Florizarre ex — 151
-  'sv03.5-205',   // Mew ex — 151
-  'sv04.5-234',   // Dracaufeu ex — Destinées de Paldea
-  'sv08.5-161',   // Noctali ex — Évolutions Prismatiques
-  'sv08-238',     // Pikachu ex — Étincelles Déferlantes
+  // Classiques (identifiants vérifiés dans la base TCGdex du 3 octobre 2026)
+  'base1-4',        // Dracaufeu — Set de base
+  'base1-2',        // Tortank — Set de base
+  'base1-15',       // Florizarre — Set de base
+  'base1-10',       // Mewtwo — Set de base
+  'swsh7-215',      // Noctali VMAX — Évolution Céleste
+  'swsh4-188',      // Pikachu VMAX — Voltage Éclatant
+  // Écarlate et Violet
+  'sv03-223',       // Dracaufeu-ex — Flammes Obsidiennes
+  'sv03.5-199',     // Dracaufeu-ex — 151
+  'sv03.5-200',     // Tortank-ex — 151
+  'sv03.5-198',     // Florizarre-ex — 151
+  'sv03.5-205',     // Mew-ex — 151
+  'sv04.5-234',     // Dracaufeu-ex — Destinées de Paldea
+  'sv08-238',       // Pikachu-ex — Étincelles Déferlantes
+  'sv08.5-161',     // Noctali-ex — Évolutions Prismatiques
+  'sv09-185',       // Zoroark-ex de N — Aventures Ensemble
+  'sv10-231',       // Mewtwo-ex de la Team Rocket — Rivalités Destinées
+  'sv10.5b-166',    // Zekrom-ex — Foudre Noire
+  'sv10.5w-166',    // Reshiram-ex — Flamme Blanche
+  // Méga-Évolution (2025-2026)
+  'me01-188',       // Méga-Lucario-ex (Mega Hyper Rare) — Méga-Évolution
+  'me01-187',       // Méga-Gardevoir-ex (Mega Hyper Rare) — Méga-Évolution
+  'me02-130',       // Méga-Dracaufeu X-ex (Mega Hyper Rare) — Flammes Fantasmagoriques
+  'me02-125',       // Méga-Dracaufeu X-ex — Flammes Fantasmagoriques
+  'me02.5-277',     // Pikachu-ex — Héros Transcendants
+  'me03-124',       // Méga-Zygarde-ex (Mega Hyper Rare) — Équilibre Parfait
+  'me04-122',       // Méga-Amphinobi-ex (Mega Hyper Rare) — Chaos Ascendant
+  'me05-120',       // Méga-Darkrai-ex (Mega Hyper Rare) — Nuit Noire
+  '30th-150',       // Pikachu-ex — 30ᵉ Anniversaire
+  '30th-152',       // Mew-ex — 30ᵉ Anniversaire
 ];
 
 const num = (v: unknown): number | undefined =>
@@ -94,18 +111,26 @@ interface SetDetail { id: string; name: string; cardCount?: { official?: number 
 /** Cartes « chasse » (numéro au-delà du total officiel) des deux dernières extensions. */
 async function newestChase(max = 16): Promise<string[]> {
   const sets = await listSets('fr').catch(() => []);
-  // Les deux extensions les plus récentes qui ont des cartes « secrètes » (total > officiel).
-  const recent = sets.filter((s) => (s.cardCount?.total ?? 0) > (s.cardCount?.official ?? 0)).slice(-2).reverse();
+  // Les deux extensions les plus récentes qui ont des cartes « chasse » (total > officiel).
+  // On écarte les promos et les petites collections (moins de 50 cartes officielles).
+  const recent = sets
+    .filter((s) => (s.cardCount?.official ?? 0) >= 50 && (s.cardCount?.total ?? 0) > (s.cardCount?.official ?? 0))
+    .slice(-2)
+    .reverse();
   const ids: string[] = [];
   for (const s of recent) {
     const d: SetDetail | null = await fetch(`https://api.tcgdex.net/v2/fr/sets/${encodeURIComponent(s.id)}`)
       .then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const official = d?.cardCount?.official ?? s.cardCount?.official ?? 0;
     const chase = (d?.cards ?? []).filter((c) => /^\d+$/.test(c.localId) && Number(c.localId) > official);
-    ids.push(...chase.slice(-Math.ceil(max / 2)).map((c) => c.id));
+    // Les cartes les plus rares sont en fin de liste : on en garde les 14 dernières.
+    ids.push(...chase.slice(-14).map((c) => c.id));
   }
-  return ids.slice(0, max);
+  return ids.slice(0, max * 2);
 }
+
+/** Raretés « chasse » : illustrations spéciales, hyper rares, méga hyper rares, secrètes, dorées. */
+const CHASE_RARITY = /illustration sp|special illustration|hyper|secr|gold|dor|ultra rare|double rare/i;
 
 export interface Market {
   quotes: Quote[];
@@ -141,8 +166,12 @@ function computeIndex(quotes: Quote[]): Market['index'] {
 
 let inflight: Promise<Market> | null = null;
 
-export function loadMarket(): Promise<Market> {
-  const cached = readCache();
+export function loadMarket(force = false): Promise<Market> {
+  if (force) {
+    try { sessionStorage.removeItem(CACHE_KEY); } catch { /* rien */ }
+    clearApiCache();
+  }
+  const cached = force ? null : readCache();
   if (cached) return Promise.resolve(cached);
   if (inflight) return inflight;
   inflight = (async () => {
@@ -151,10 +180,12 @@ export function loadMarket(): Promise<Market> {
       return r ? toQuote(r.card, r.lang, 'legend') : null;
     });
     const newIds = (await newestChase()).filter((id) => !WATCHLIST.includes(id));
-    const fresh = await pool(newIds, 6, async (id) => {
+    const fresh = (await pool(newIds, 6, async (id) => {
       const card = await getCard(id, 'fr').catch(() => null);
-      return card ? toQuote(card, 'fr', 'new') : null;
-    });
+      // On garde les Pokémon aux raretés les plus recherchées (pas les cartes Dresseur ou Énergie).
+      if (!card || !/pok[eé]mon/i.test(card.category ?? 'Pokemon') || !CHASE_RARITY.test(card.rarity ?? '')) return null;
+      return toQuote(card, 'fr', 'new');
+    })).filter(Boolean).slice(0, 16);
     const quotes = [...legends, ...fresh].filter((q): q is Quote => !!q);
     const market: Market = { quotes, index: computeIndex(quotes), loadedAt: Date.now() };
     if (quotes.length) {

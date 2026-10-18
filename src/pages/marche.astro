@@ -11,7 +11,7 @@ import Base from '../layouts/Base.astro';
     <div class="panel index-card" id="index-card">
       <div class="index-top">
         <span class="index-label">Indice HoloCote</span>
-        <span class="live"><span class="pulse"></span>Cotes Cardmarket</span>
+        <span class="live"><span class="pulse"></span><span id="live-text">Cotes Cardmarket</span></span>
       </div>
       <div class="index-row">
         <span class="index-value" id="index-value">—</span>
@@ -22,6 +22,7 @@ import Base from '../layouts/Base.astro';
       </div>
       <div id="index-chart" class="index-chart"></div>
       <p class="muted small">Base 100 = valeur moyenne des cartes suivies sur 30 jours.</p>
+      <button type="button" class="btn refresh" id="refresh">Actualiser les cours</button>
     </div>
   </section>
 
@@ -293,10 +294,17 @@ import Base from '../layouts/Base.astro';
       $('portfolio').hidden = false;
     }
 
-    async function main() {
+    $('refresh').addEventListener('click', async () => {
+      const b = $('refresh') as HTMLButtonElement;
+      b.disabled = true; b.textContent = 'Actualisation…';
+      await main(true);
+      b.disabled = false; b.textContent = 'Actualiser les cours';
+    });
+
+    async function main(force = false) {
       let market;
       try {
-        market = await loadMarket();
+        market = await loadMarket(force);
       } catch {
         market = null;
       }
@@ -318,7 +326,7 @@ import Base from '../layouts/Base.astro';
         $('index-chart').replaceChildren(sparkline(pts, 320, 70));
       }
       const updated = quotes.map((q) => q.updated).filter(Boolean).sort().pop();
-      if (updated) $('index-card').querySelector('.live')!.lastChild!.textContent = `Cotes du ${formatDate(updated)}`;
+      if (updated) $('live-text').textContent = `Cotes du ${formatDate(updated)}`;
 
       $('ticker-slot').replaceChildren(ticker(quotes.filter((q) => q.change7 !== undefined), href, eur));
 
@@ -398,6 +406,7 @@ import Base from '../layouts/Base.astro';
       border-color: rgba(138, 123, 255, 0.35);
     }
     .index-card p { margin: 6px 0 0; }
+    .refresh { margin-top: 12px; min-height: 40px; font-size: 0.9rem; }
     .index-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .index-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
     .live { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); }
