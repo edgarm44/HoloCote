@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { CONDITIONS } from '../lib/condition';
+import { mascotSvg } from '../lib/mascot';
 ---
 <Base title="Ma collection" active="collection" description="Ta collection de cartes, stockée dans ton navigateur.">
   <section class="hero">
@@ -64,9 +65,9 @@ import { CONDITIONS } from '../lib/condition';
   <p id="no-match" class="muted" hidden>Aucune carte ne correspond à ce filtre.</p>
 
   <div id="empty" class="empty" hidden>
-    <div class="empty-cards" aria-hidden="true"><span></span><span></span><span></span></div>
+    <div class="empty-coti" set:html={mascotSvg('think', 110)} />
     <h2>Ton classeur est vide</h2>
-    <p class="muted">Scanne ta première carte : le scanner la reconnaît et te propose de l'ajouter ici.</p>
+    <p class="muted">Scanne ta première carte : le scanner la reconnaît et te propose de l'ajouter ici. Tu peux aussi en gagner une chaque jour dans le Défi.</p>
     <a class="btn btn-primary" id="go-scan" href="#">Scanner une carte</a>
   </div>
 
@@ -380,6 +381,7 @@ import { CONDITIONS } from '../lib/condition';
     .remove { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
     .remove:hover { color: var(--danger); border-color: rgba(255, 90, 122, 0.5); }
 
+    .empty-coti { display: flex; justify-content: center; margin-bottom: 14px; }
     .empty { text-align: center; padding: 48px 20px; border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 22px; margin-bottom: 24px; }
     .empty-cards { position: relative; height: 120px; margin-bottom: 18px; }
     .empty-cards span {

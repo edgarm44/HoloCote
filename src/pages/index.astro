@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { mascotSvg } from '../lib/mascot';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // Index des onglets : chaque ligne dit ce qu'on y fait, en une phrase.
@@ -128,6 +129,7 @@ const TOOLS = [
   </section>
 
   <section class="final">
+    <div class="final-coti" set:html={mascotSvg('happy', 120, 'Coti, la mascotte de HoloCote, te salue')} />
     <h2>Zéro compte. Zéro pub.<br />Tes cartes restent chez toi.</h2>
     <p>Ton classeur, tes favoris et tes scans sont gardés dans ton téléphone. Personne d'autre ne les voit.</p>
     <a class="btn btn-primary btn-xl" href={`${base}/scanner/`}>Scanner ma première carte</a>
@@ -391,6 +393,8 @@ const TOOLS = [
     .final { text-align: center; padding: clamp(40px, 8vw, 80px) 20px; border-radius: 32px; margin-bottom: 30px;
       background: radial-gradient(circle at 50% 0%, rgba(255, 79, 216, 0.22), transparent 60%), radial-gradient(circle at 50% 100%, rgba(62, 240, 255, 0.18), transparent 60%), var(--bg-2);
       border: 1px solid var(--line); }
+    .final-coti { display: flex; justify-content: center; margin-bottom: 14px; animation: bob 4s ease-in-out infinite; }
+    @keyframes bob { 50% { transform: translateY(-8px); } }
     .final h2 { font-size: clamp(1.9rem, 5.5vw, 3.6rem); line-height: 1; letter-spacing: -0.04em; font-weight: 800; max-width: 18ch; margin: 0 auto 16px; text-wrap: balance; }
     .final p { color: var(--muted); max-width: 34em; margin: 0 auto 26px; }
 

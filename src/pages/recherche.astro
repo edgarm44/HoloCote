@@ -73,6 +73,7 @@ const popular = [
     import { loadMarket } from '../lib/market';
     import { formatPrice, type Lang } from '../lib/tcgdex';
     import { cardTile, status, getLang, rememberLang, el } from '../lib/ui';
+    import { mascotSvg } from '../lib/mascot';
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     const form = $<HTMLFormElement>('search-form');
@@ -187,7 +188,10 @@ const popular = [
       state.replaceChildren();
       if (!r.cards.length) {
         $('summary').textContent = `Aucune carte pour « ${q} »`;
+        const coti = el('div', { class: 'empty-coti' });
+        coti.innerHTML = mascotSvg('sad', 90);
         state.replaceChildren(el('div', { class: 'panel empty' }, [
+          coti,
           el('p', {}, [lang === 'fr' ? 'Essaie en anglais (Dracaufeu = Charizard) ou choisis une carte populaire ci-dessous.' : 'Essaie en français, ou choisis une carte populaire.']),
           el('button', { type: 'button', class: 'btn', id: 'back-discover' }, ['Voir les suggestions']),
         ]));
@@ -268,6 +272,7 @@ const popular = [
     .link-btn { border: 0; background: none; color: var(--muted); cursor: pointer; text-decoration: underline; font: inherit; }
     .chips { display: flex; gap: 8px; flex-wrap: wrap; }
     .d-sub { margin: -6px 0 14px; }
+    :global(.empty-coti) { display: flex; justify-content: center; margin-bottom: 8px; }
     .more-results { display: flex; margin: 22px auto 0; min-width: 260px; justify-content: center; }
     .discover :global(.chip), .r-head :global(.chip) {
       border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer;
