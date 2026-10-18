@@ -1,20 +1,32 @@
 ---
 import Base from '../layouts/Base.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const words = ['Scanne', 'Suis', 'Chasse', 'Range'];
+
+// Index des onglets : chaque ligne dit ce qu'on y fait, en une phrase.
+const TOOLS = [
+  { href: '/scanner/', name: 'Scanner', text: 'Photographie ta carte, elle est reconnue et rangée dans ton classeur.', icon: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" />' },
+  { href: '/recherche/', name: 'Recherche', text: 'Trouve n\'importe quelle carte, même avec une faute d\'orthographe.', icon: '<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />' },
+  { href: '/marche/', name: 'Marché', text: 'Les cours du jour, les plus fortes hausses et les plus fortes baisses.', icon: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />' },
+  { href: '/opportunites/', name: 'Opportunités', text: 'Les cartes qui se vendent sous leur prix habituel en ce moment.', icon: '<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" />' },
+  { href: '/favoris/', name: 'Favoris', text: 'Suis les cartes qui te manquent et reçois une alerte au bon prix.', icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />' },
+  { href: '/collection/', name: 'Collection', text: 'Ton classeur : chaque carte, son état et la valeur de l\'ensemble.', icon: '<rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" />' },
+  { href: '/classement/', name: 'Classement', text: 'Ton classeur face à quatorze rivaux, de la ligue Bronze à Légende.', icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />' },
+  { href: '/defi/', name: 'Défi du jour', text: 'Une carte cachée, six essais. Trouve-la et elle rejoint ton classeur.', icon: '<rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6v.4M12 16.8v.01" />' },
+  { href: '/vitrine/', name: 'Vitrine', text: 'Une affiche de tes plus belles cartes, prête à partager.', icon: '<rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 16l3-4 2.5 3 2-2.5L17 16" /><circle cx="8.5" cy="8.5" r="1.3" />' },
+];
 ---
 <Base title="HoloCote" active="home">
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 
   <section class="hero">
     <div class="hero-text">
-      <h1 class="mega"><span>Sors tes cartes.</span><span>On s'occupe</span><span class="foil">de la cote.</span></h1>
-      <p class="lead">Un scan et tu sais ce que vaut ta carte. Suis le marché comme à la bourse, traque celles qui te manquent et range les autres dans ton classeur.</p>
+      <h1 class="mega">Sors tes cartes.<br />On s'occupe de&nbsp;la&nbsp;cote.</h1>
+      <p class="lead">Scanne une carte Pokémon et découvre sa rareté et sa cote du jour. Suis le marché, guette le bon prix et range tout dans ton classeur.</p>
 
       <form class="hero-search" action={`${base}/recherche/`} method="get" role="search">
         <label class="sr-only" for="hq">Nom de la carte</label>
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-        <input id="hq" name="q" type="search" placeholder="Cherche une carte…" minlength="2" required autocomplete="off" />
+        <input id="hq" name="q" type="search" placeholder="Dracaufeu, Pikachu, Noctali…" minlength="2" required autocomplete="off" />
         <input type="hidden" name="lang" value="fr" />
         <button class="go" type="submit" aria-label="Chercher">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
@@ -29,11 +41,11 @@ const words = ['Scanne', 'Suis', 'Chasse', 'Range'];
         <a class="btn btn-ghost btn-xl" href={`${base}/marche/`}>Voir le marché</a>
       </div>
 
-      <div class="live-strip" id="live-strip" hidden>
-        <div class="ls-item"><span class="ls-value" id="ls-index">—</span><span class="ls-label">Indice</span></div>
-        <div class="ls-item"><span class="ls-value up" id="ls-top">—</span><span class="ls-label" id="ls-top-name">Plus forte hausse</span></div>
-        <div class="ls-item"><span class="ls-value" id="ls-n">—</span><span class="ls-label">Cartes suivies</span></div>
-      </div>
+      <dl class="live" id="live" hidden>
+        <div><dt>Indice HoloCote</dt><dd id="ls-index">—</dd></div>
+        <div><dt id="ls-top-name">Plus forte hausse</dt><dd id="ls-top">—</dd></div>
+        <div><dt>Cartes suivies</dt><dd id="ls-n">—</dd></div>
+      </dl>
     </div>
 
     <div class="showcase" aria-hidden="true">
@@ -50,102 +62,121 @@ const words = ['Scanne', 'Suis', 'Chasse', 'Range'];
 
   <div class="ticker-slot" id="ticker-slot"></div>
 
-  <div class="marquee" aria-hidden="true">
-    <div class="marquee-track">
-      {[0, 1].map(() => words.map((w) => <span>{w}<i>✦</i></span>))}
-    </div>
-  </div>
-
-  <section class="bento">
-    <a class="tile t-scan" href={`${base}/scanner/`}>
-      <div class="scan-visual" aria-hidden="true">
-        <div class="sv-card">
-          <div class="sv-line"></div>
-          <span class="sv-chip c-a">Dracaufeu ex</span>
-          <span class="sv-chip c-b">330 PV</span>
-          <span class="sv-chip c-c">125/197</span>
+  <section class="today" aria-labelledby="today-h">
+    <h2 id="today-h" class="sec-title">Aujourd'hui</h2>
+    <div class="today-grid">
+      <a class="day day-defi" href={`${base}/defi/`}>
+        <span class="mini-card" aria-hidden="true"><span>?</span></span>
+        <div class="day-body">
+          <h3>Défi du jour <span class="muted" id="defi-n"></span></h3>
+          <p id="defi-text">Une carte cachée t'attend. Six essais pour la trouver et la gagner.</p>
+          <span class="day-cta" id="defi-cta">Jouer</span>
         </div>
-      </div>
-      <div class="tile-copy">
-        <h2>Dix secondes.<br />Une cote.</h2>
-        <p>Pose ta carte devant l'objectif : nom, PV, numéro et illustration sont reconnus, et sa cote du jour s'affiche. Ta photo ne quitte jamais ton téléphone.</p>
-        <span class="tile-link">Scanner une carte</span>
-      </div>
-    </a>
-
-    <a class="tile t-market" href={`${base}/marche/`}>
-      <h2>Le marché,<br />en direct.</h2>
-      <div class="mini-index">
-        <span class="mi-value" id="mi-value">—</span>
-        <span class="mi-chg" id="mi-chg"></span>
-      </div>
-      <div class="mi-chart" id="mi-chart"></div>
-      <span class="tile-link">Indice HoloCote</span>
-    </a>
-
-    <a class="tile t-alert" href={`${base}/favoris/`}>
-      <h2>Ta cible.<br />Ton moment.</h2>
-      <div class="alert-demo" aria-hidden="true">
-        <span class="ad-bell"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4" /></svg></span>
-        <span class="ad-text"><strong id="ad-name">Noctali VMAX</strong><span id="ad-chg" class="up">a passé ton seuil</span></span>
-      </div>
-      <p>Fixe le prix que tu es prêt à mettre : HoloCote te prévient quand la carte y arrive.</p>
-    </a>
-
-    <a class="tile t-coll" href={`${base}/collection/`}>
-      <div>
-        <h2>Toutes tes cartes.<br />Une seule valeur.</h2>
-        <p id="coll-line">Chaque carte scannée rejoint ton classeur : valeur totale, pépite, raretés, tout est là.</p>
-      </div>
-      <div class="stack" aria-hidden="true"><span></span><span></span><span></span></div>
-    </a>
+      </a>
+      <a class="day day-opp" href={`${base}/opportunites/`}>
+        <div class="day-body">
+          <h3>Sous son prix habituel</h3>
+          <p id="opp-text">Les cartes qui se vendent moins cher que d'habitude, repérées chaque jour.</p>
+          <div class="opp-line" id="opp-line" hidden>
+            <span class="opp-thumb" id="opp-thumb"></span>
+            <span class="opp-info"><strong id="opp-name"></strong><span id="opp-price"></span></span>
+            <span class="opp-gap" id="opp-gap"></span>
+          </div>
+          <span class="day-cta">Toutes les opportunités</span>
+        </div>
+      </a>
+      <a class="day day-rank" href={`${base}/classement/`}>
+        <div class="day-body">
+          <h3>Ton classement</h3>
+          <p class="rank-big" id="rank-big">?</p>
+          <p id="rank-text">Ton classeur affronte quatorze rivaux. Où te places-tu ?</p>
+          <span class="day-cta">Voir le classement</span>
+        </div>
+      </a>
+    </div>
   </section>
 
-  <section class="how">
-    <h2 class="big">Comment ça marche</h2>
-    <ol class="how-steps">
-      <li><span class="hs-n">1</span><h3>Vise</h3><p>Ouvre le scanner et place ta carte dans le cadre, bien à plat.</p></li>
-      <li><span class="hs-n">2</span><h3>Découvre</h3><p>HoloCote reconnaît la carte et affiche sa rareté et sa cote du jour.</p></li>
-      <li><span class="hs-n">3</span><h3>Range ou chasse</h3><p>Ajoute-la à ton classeur, ou mets une étoile sur celles qui te manquent.</p></li>
-    </ol>
-  </section>
-
-  <section class="risers" id="risers" hidden>
-    <div class="section-head">
-      <h2 class="big">Ça grimpe.</h2>
-      <a class="btn btn-ghost" href={`${base}/marche/`}>Tout le marché</a>
+  <section class="risers" id="risers" hidden aria-labelledby="risers-h">
+    <div class="sec-head">
+      <h2 id="risers-h" class="sec-title">Ça grimpe cette semaine</h2>
+      <a class="text-link" href={`${base}/marche/`}>Tout le marché</a>
     </div>
     <div class="riser-grid" id="riser-grid"></div>
   </section>
 
-  <section class="manifesto">
-    <p><span>Zéro compte.</span><span>Zéro pub.</span><span class="foil">100 % cartes.</span></p>
-    <p class="m-sub">Ton classeur, ta chasse et tes scans restent dans ton téléphone. Personne d'autre ne les voit.</p>
+  <section class="tools" aria-labelledby="tools-h">
+    <h2 id="tools-h" class="sec-title">Tout HoloCote</h2>
+    <ul class="tool-list">
+      {TOOLS.map((t) => (
+        <li>
+          <a href={`${base}${t.href}`}>
+            <span class="tool-ic"><svg viewBox="0 0 24 24" aria-hidden="true" set:html={t.icon} /></span>
+            <span class="tool-name">{t.name}</span>
+            <span class="tool-text">{t.text}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="how" aria-labelledby="how-h">
+    <h2 id="how-h" class="sec-title">Ta première carte en trois gestes</h2>
+    <ol class="how-steps">
+      <li><h3>Vise</h3><p>Ouvre le scanner et pose ta carte bien à plat dans le cadre.</p></li>
+      <li><h3>Découvre</h3><p>HoloCote reconnaît la carte et affiche sa rareté et sa cote du jour.</p></li>
+      <li><h3>Range</h3><p>Ajoute-la à ton classeur, ou mets une étoile sur celles qui te manquent.</p></li>
+    </ol>
   </section>
 
   <section class="final">
-    <h2>Prêt ? Sors ta plus belle carte.</h2>
-    <a class="btn btn-primary btn-xl" href={`${base}/scanner/`}>Lancer le scanner</a>
+    <h2>Zéro compte. Zéro pub.<br />Tes cartes restent chez toi.</h2>
+    <p>Ton classeur, tes favoris et tes scans sont gardés dans ton téléphone. Personne d'autre ne les voit.</p>
+    <a class="btn btn-primary btn-xl" href={`${base}/scanner/`}>Scanner ma première carte</a>
   </section>
 
   <script>
-    import { loadMarket, ticker, formatChange, changeClass, sparkline, type Quote } from '../lib/market';
+    import { loadMarket, ticker, formatChange, changeClass, type Quote } from '../lib/market';
+    import { analyse } from '../lib/opportunity';
     import { formatPrice } from '../lib/tcgdex';
-    import { getItems, countCards } from '../lib/collection';
+    import { countCards } from '../lib/collection';
+    import { todayNumber, getDay } from '../lib/mystery';
     import { holoCard, attachTilt, el, url } from '../lib/ui';
 
+    const $ = (id: string) => document.getElementById(id)!;
     const href = (q: Quote) => url(`/carte/?id=${encodeURIComponent(q.id)}&lang=${q.lang}`);
     const eur = (v: number) => formatPrice(v, 'EUR');
     document.querySelectorAll<HTMLElement>('.fan-card').forEach(attachTilt);
 
-    const n = countCards();
-    if (n) document.getElementById('coll-line')!.textContent = `${n} carte${n > 1 ? 's' : ''} dans ton classeur (${getItems().length} différente${getItems().length > 1 ? 's' : ''}). Viens voir ce qu'elles valent.`;
+    /* Défi du jour : état de la partie, sans rien dévoiler de la carte. */
+    const n = todayNumber();
+    const day = getDay(n);
+    $('defi-n').textContent = `n° ${n}`;
+    if (day.done) {
+      $('defi-text').textContent = day.won
+        ? `Trouvée en ${day.guesses.length} essai${day.guesses.length > 1 ? 's' : ''}. ${day.claimed ? 'Elle est dans ton classeur.' : 'Pense à l\'ajouter à ton classeur.'}`
+        : 'Raté pour aujourd\'hui. Nouvelle carte à minuit.';
+      $('defi-cta').textContent = day.won && !day.claimed ? 'Récupérer ma carte' : 'Voir le résultat';
+    } else if (day.guesses.length) {
+      $('defi-text').textContent = `Partie en cours : ${6 - day.guesses.length} essai${6 - day.guesses.length > 1 ? 's' : ''} restant${6 - day.guesses.length > 1 ? 's' : ''}.`;
+      $('defi-cta').textContent = 'Continuer';
+    }
+
+    /* Classement : dernier rang connu (calculé sur la page Classement). */
+    let rank = 0;
+    try { rank = Number(localStorage.getItem('holocote.rank.v1')) || 0; } catch { /* rien */ }
+    if (rank) {
+      $('rank-big').textContent = `${rank}${rank === 1 ? 'er' : 'e'}`;
+      $('rank-text').textContent = `sur 15 à ta dernière visite. ${countCards() ? 'Chaque carte scannée peut te faire grimper.' : 'Scanne tes cartes pour grimper.'}`;
+    } else if (!countCards()) {
+      $('rank-text').textContent = 'Scanne tes premières cartes et découvre ta place face aux quatorze rivaux.';
+    }
 
     loadMarket().then((m) => {
       const qs = m.quotes;
       if (!qs.length) return;
-      document.getElementById('ticker-slot')!.replaceChildren(ticker(qs.filter((q) => q.change7 !== undefined), href, eur));
+      $('ticker-slot').replaceChildren(ticker(qs.filter((q) => q.change7 !== undefined), href, eur));
 
+      // Les trois cartes flottantes : les plus chères du marché.
       const top = [...qs].filter((q) => q.image).sort((a, b) => b.price - a.price).slice(0, 3);
       const slots = [...document.querySelectorAll<HTMLElement>('.fan-card')];
       top.forEach((q, i) => {
@@ -154,121 +185,95 @@ const words = ['Scanne', 'Suis', 'Chasse', 'Range'];
         slots[i].replaceChildren(img);
       });
       const tag = (id: string, q?: Quote) => {
-        const t = document.getElementById(id)!;
         if (!q) return;
+        const t = $(id);
         t.replaceChildren(el('span', { class: 'ft-name' }, [q.name]), el('span', { class: 'ft-price' }, [eur(q.price)]), el('span', { class: `ft-chg ${changeClass(q.change7)}` }, [formatChange(q.change7)]));
         t.hidden = false;
       };
       tag('tag1', top[0]);
       tag('tag2', top[1]);
 
+      // Chiffres du jour
       const topUp = [...qs].filter((q) => q.change7 !== undefined).sort((a, b) => b.change7! - a.change7!)[0];
-      document.getElementById('ls-n')!.textContent = String(qs.length);
-      if (m.index) document.getElementById('ls-index')!.textContent = m.index.value.toFixed(1).replace('.', ',');
+      $('ls-n').textContent = String(qs.length);
+      if (m.index) $('ls-index').textContent = m.index.value.toFixed(1).replace('.', ',');
       if (topUp) {
-        document.getElementById('ls-top')!.textContent = formatChange(topUp.change7);
-        document.getElementById('ls-top')!.className = `ls-value ${changeClass(topUp.change7)}`;
-        document.getElementById('ls-top-name')!.textContent = topUp.name;
+        $('ls-top').textContent = formatChange(topUp.change7);
+        $('ls-top').className = changeClass(topUp.change7);
+        $('ls-top-name').textContent = topUp.name;
       }
-      document.getElementById('live-strip')!.hidden = false;
+      $('live').hidden = false;
 
-      if (m.index) {
-        document.getElementById('mi-value')!.textContent = m.index.value.toFixed(1).replace('.', ',');
-        const c = document.getElementById('mi-chg')!;
-        c.textContent = `${formatChange(m.index.change7)} sur 7 jours`;
-        c.className = `mi-chg ${changeClass(m.index.change7)}`;
-        const withHist = qs.filter((q) => q.avg30);
-        const s = (f: (q: Quote) => number | undefined) => withHist.reduce((t, q) => t + (f(q) ?? q.price), 0);
-        const b = s((q) => q.avg30);
-        if (b) document.getElementById('mi-chart')!.replaceChildren(sparkline([b, s((q) => q.avg7), s((q) => q.price)].map((v) => (v / b) * 100), 260, 70));
-      }
-
-      const mover = [...qs].filter((q) => q.change7 !== undefined).sort((a, b) => Math.abs(b.change7!) - Math.abs(a.change7!))[0];
-      if (mover) {
-        document.getElementById('ad-name')!.textContent = mover.name;
-        const c = document.getElementById('ad-chg')!;
-        c.textContent = `${mover.change7! > 0 ? '▲' : '▼'} ${formatChange(mover.change7)} cette semaine`;
-        c.className = changeClass(mover.change7);
+      // Meilleure opportunité du jour
+      const best = qs.map(analyse).filter((a) => a.q.price >= 1 && (a.verdict === 'window' || a.verdict === 'rebound')).sort((a, b) => b.score - a.score)[0];
+      if (best) {
+        const th = $('opp-thumb');
+        if (best.q.image) th.replaceChildren(el('img', { src: `${best.q.image}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
+        $('opp-name').textContent = best.q.name;
+        $('opp-price').textContent = eur(best.q.price);
+        $('opp-gap').textContent = best.vsMonth !== undefined && best.vsMonth < 0 ? `${formatChange(best.vsMonth)} vs son mois` : 'repart';
+        $('opp-text').textContent = 'La meilleure du jour :';
+        $('opp-line').hidden = false;
       }
 
-      const up = qs.filter((q) => (q.change7 ?? 0) > 0 && q.image).sort((a, b) => b.change7! - a.change7!).slice(0, 4);
+      // Plus fortes hausses
+      const up = qs.filter((q) => (q.change7 ?? 0) > 0 && q.image).sort((a, b) => b.change7! - a.change7!).slice(0, 6);
       if (up.length) {
-        document.getElementById('riser-grid')!.replaceChildren(...up.map((q, i) =>
-          el('a', { class: `riser r${i}`, href: href(q) }, [
+        $('riser-grid').replaceChildren(...up.map((q) =>
+          el('a', { class: 'riser', href: href(q) }, [
             holoCard(q.image, q.name),
-            el('div', { class: 'riser-info' }, [
-              el('span', { class: 'riser-chg up' }, [`▲ ${formatChange(q.change7)}`]),
-              el('span', { class: 'riser-name' }, [q.name]),
-              el('span', { class: 'riser-price' }, [eur(q.price)]),
-            ]),
+            el('span', { class: 'riser-chg' }, [`▲ ${formatChange(q.change7)}`]),
+            el('span', { class: 'riser-name' }, [q.name]),
+            el('span', { class: 'riser-price' }, [eur(q.price)]),
           ]),
         ));
-        document.getElementById('risers')!.hidden = false;
+        $('risers').hidden = false;
       }
     }).catch(() => { /* la page reste utilisable sans les cours */ });
   </script>
 
   <style>
-
-    .live-strip { display: flex; gap: 0; margin-top: 26px; max-width: 560px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: rgba(14, 12, 26, 0.6); }
-    .ls-item { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; min-width: 0; }
-    .ls-item + .ls-item { border-left: 1px solid var(--line); }
-    .ls-value { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.2rem, 3vw, 1.6rem); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-    .ls-label { font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-    .how { margin-bottom: 80px; }
-    .how .big { margin-bottom: 24px; }
-    .how-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: 1fr; counter-reset: none; }
-    @media (min-width: 860px) { .how-steps { grid-template-columns: repeat(3, 1fr); } }
-    .how-steps li { position: relative; padding: 28px 24px 24px; border-radius: 26px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
-    .how-steps h3 { font-size: 1.5rem; letter-spacing: -0.02em; margin: 14px 0 6px; }
-    .how-steps p { margin: 0; color: var(--muted); }
-    .hs-n { position: absolute; right: 14px; top: -18px; font-family: var(--font-display); font-weight: 800; font-size: 7rem; line-height: 1; color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.12); }
-    .how-steps li:nth-child(1) { border-top: 3px solid var(--cyan); }
-    .how-steps li:nth-child(2) { border-top: 3px solid var(--magenta); }
-    .how-steps li:nth-child(3) { border-top: 3px solid var(--gold); }
     .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-    .aurora span { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); opacity: 0.2; animation: drift 26s ease-in-out infinite alternate; }
+    .aurora span { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); opacity: 0.18; animation: drift 26s ease-in-out infinite alternate; }
     .aurora span:nth-child(1) { background: #3ef0ff; top: -30vmax; left: -20vmax; }
     .aurora span:nth-child(2) { background: #ff4fd8; top: -10vmax; right: -30vmax; animation-delay: -9s; }
-    .aurora span:nth-child(3) { background: #8a7bff; bottom: -40vmax; left: 20vmax; animation-delay: -17s; opacity: 0.14; }
+    .aurora span:nth-child(3) { background: #8a7bff; bottom: -40vmax; left: 20vmax; animation-delay: -17s; opacity: 0.12; }
     @keyframes drift { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
 
     /* ---------- Hero ---------- */
-    .hero { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: center; padding: clamp(24px, 5vw, 56px) 0 44px; min-height: min(86vh, 820px); }
-    @media (min-width: 980px) { .hero { grid-template-columns: 1.35fr 0.65fr; } .mega { font-size: clamp(3.4rem, 5.6vw, 4.9rem); } }
+    .hero { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: center; padding: clamp(20px, 5vw, 56px) 0 clamp(28px, 5vw, 48px); min-height: min(80vh, 760px); }
+    @media (min-width: 980px) { .hero { grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr); } }
     .hero-text { min-width: 0; }
-    .mega { display: flex; flex-direction: column; font-size: clamp(2.3rem, 10.5vw, 4.9rem); line-height: 0.9; letter-spacing: -0.045em; font-weight: 800; margin: 0 0 24px; }
-    .mega span { display: block; }
-    .foil {
-      background: linear-gradient(100deg, #3ef0ff 0%, #8a7bff 25%, #ff4fd8 50%, #ffd25a 75%, #3ef0ff 100%);
-      background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
-      animation: foil 6s linear infinite;
-      filter: drop-shadow(0 0 30px rgba(255, 79, 216, 0.25));
-    }
-    @keyframes foil { to { background-position: 200% 0; } }
-    .lead { font-size: clamp(1.05rem, 2.2vw, 1.3rem); color: var(--muted); max-width: 540px; margin-bottom: 26px; }
+    .mega { font-size: clamp(2.3rem, 9.5vw, 4.6rem); line-height: 0.95; letter-spacing: -0.045em; font-weight: 800; margin: 0 0 22px; text-wrap: balance; }
+    .lead { font-size: clamp(1.05rem, 2.1vw, 1.25rem); color: var(--muted); max-width: 34em; margin-bottom: 26px; }
 
     .hero-search {
-      display: flex; align-items: center; gap: 10px; max-width: 560px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px; max-width: 540px; margin-bottom: 16px;
       padding: 7px 7px 7px 18px; border-radius: 999px;
       background: rgba(14, 12, 26, 0.88); border: 1px solid rgba(255, 255, 255, 0.14);
-      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.4);
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .hero-search:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(62, 240, 255, 0.15), 0 16px 50px rgba(0, 0, 0, 0.4); }
+    .hero-search:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(62, 240, 255, 0.15); }
     .hero-search > svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
-    .hero-search input[type='search'] { border: 0; background: transparent; box-shadow: none; padding: 10px 2px; min-height: 46px; font-size: 1.05rem; }
+    .hero-search input[type='search'] { border: 0; background: transparent; box-shadow: none; padding: 10px 2px; min-height: 46px; font-size: 1.05rem; min-width: 0; }
     .hero-search input:focus-visible { box-shadow: none; }
-    .go { width: 48px; height: 48px; flex: 0 0 48px; border: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center; background: var(--holo); background-size: 200% 100%; animation: shimmer 6s linear infinite; }
+    .go { width: 48px; height: 48px; flex: 0 0 48px; border: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center; background: var(--holo); background-size: 200% 100%; }
     .go svg { width: 22px; height: 22px; fill: none; stroke: #0a0812; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
     .go:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
     .cta { display: flex; gap: 12px; flex-wrap: wrap; }
-    .btn-xl { min-height: 58px; padding: 0 28px; font-size: 1.05rem; border-radius: 999px; }
+    .btn-xl { min-height: 56px; padding: 0 26px; font-size: 1.02rem; border-radius: 999px; }
     .btn-xl svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .btn-ghost { background: transparent; border: 1px solid rgba(255, 255, 255, 0.22); }
     .btn-ghost:hover { border-color: var(--text); }
 
+    .live { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 28px 0 0; }
+    .live div { display: flex; flex-direction: column-reverse; min-width: 0; }
+    .live dt { font-size: 0.8rem; color: var(--muted); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .live dd { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(1.3rem, 3vw, 1.7rem); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .live dd.up { color: var(--up); }
+    .live dd.down { color: var(--down); }
+
+    /* Les trois cartes flottantes (inchangées) */
     .showcase { position: relative; height: clamp(340px, 54vw, 580px); }
     .halo { position: absolute; inset: 12%; border-radius: 50%; background: conic-gradient(from 90deg, #3ef0ff, #8a7bff, #ff4fd8, #ffd25a, #3ef0ff); filter: blur(70px); opacity: 0.35; animation: spin 18s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -308,102 +313,90 @@ const words = ['Scanne', 'Suis', 'Chasse', 'Range'];
     .ft-chg { font-weight: 700; font-size: 0.85rem; }
     @media (max-width: 979px) { .showcase { order: -1; height: 320px; } .fan-card { width: clamp(150px, 34vw, 230px); } .float-tag { display: none !important; } }
 
-    .ticker-slot { margin: 0 -16px; min-height: 42px; }
+    /* Bandeau des cours : pleine largeur sans débordement */
+    .ticker-slot { margin: 0 0 clamp(48px, 8vw, 88px); min-height: 42px; border-block: 1px solid var(--line); }
 
-    /* ---------- Bandeau géant ---------- */
-    .marquee { overflow: hidden; margin: 18px -16px 56px; padding: 6px 0; }
-    .marquee-track { display: inline-flex; white-space: nowrap; animation: marquee 40s linear infinite; }
-    .marquee span {
-      font-family: var(--font-display); font-weight: 800; font-size: clamp(3.2rem, 11vw, 8.5rem); line-height: 1; letter-spacing: -0.04em;
-      color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.28); padding-right: 0.3em;
+    /* ---------- Titres de section ---------- */
+    .sec-title { font-size: clamp(1.7rem, 4.2vw, 2.8rem); line-height: 1; letter-spacing: -0.035em; font-weight: 800; margin: 0 0 22px; }
+    .sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+    .text-link { font-weight: 700; text-decoration: none; }
+    .text-link:hover { text-decoration: underline; }
+    section.today, section.risers, section.tools, section.how { margin-bottom: clamp(56px, 9vw, 96px); }
+
+    /* ---------- Aujourd'hui ---------- */
+    .today-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+    @media (min-width: 900px) { .today-grid { grid-template-columns: 1.25fr 1fr 0.8fr; } }
+    .day { display: flex; gap: 20px; align-items: stretch; padding: 22px; border-radius: 22px; text-decoration: none; color: var(--text); border: 1px solid var(--line); background: var(--bg-2); transition: border-color 0.2s; min-width: 0; }
+    .day:hover { border-color: rgba(255, 255, 255, 0.3); }
+    .day:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+    .day-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1; }
+    .day h3 { margin: 0; font-size: 1.2rem; }
+    .day h3 .muted { font-family: var(--font-body); font-weight: 600; font-size: 0.95rem; }
+    .day p { margin: 0; color: var(--muted); }
+    .day-cta { margin-top: auto; padding-top: 6px; font-weight: 700; color: var(--cyan); }
+    .day-defi { background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, var(--holo) border-box; border: 1px solid transparent; }
+    .mini-card { flex: 0 0 auto; width: 84px; aspect-ratio: 245 / 342; border-radius: 8px; display: grid; place-items: center; align-self: center;
+      background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 6px, transparent 6px 12px), linear-gradient(160deg, #241d4a, #120f26);
+      border: 2px solid rgba(255, 210, 90, 0.6); transform: rotate(-6deg); }
+    .mini-card span { font-family: var(--font-display); font-weight: 800; font-size: 2.2rem; color: var(--gold); }
+    .opp-line { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: rgba(61, 255, 168, 0.06); border: 1px solid rgba(61, 255, 168, 0.3); }
+    .opp-thumb { width: 40px; aspect-ratio: 245 / 342; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+    .opp-thumb :global(img) { width: 100%; height: 100%; object-fit: cover; }
+    .opp-info { display: flex; flex-direction: column; min-width: 0; }
+    .opp-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .opp-info span { color: var(--gold); font-weight: 700; font-size: 0.9rem; }
+    .opp-gap { color: var(--up); font-weight: 800; font-size: 0.85rem; white-space: nowrap; }
+    .rank-big { font-family: var(--font-display); font-weight: 800; font-size: 3.2rem !important; line-height: 1; color: var(--text) !important; letter-spacing: -0.04em; }
+
+    /* ---------- Ça grimpe ---------- */
+    .riser-grid { display: grid; gap: 18px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    /* Téléphone et tablette : une bande qui défile au doigt */
+    @media (max-width: 899px) {
+      .riser-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 6px; gap: 14px; }
+      .riser-grid::-webkit-scrollbar { display: none; }
+      .riser-grid :global(.riser) { flex: 0 0 140px; scroll-snap-align: start; }
     }
-    .marquee span:nth-child(4n + 2) { -webkit-text-stroke-color: rgba(62, 240, 255, 0.6); }
-    .marquee span:nth-child(4n + 3) { -webkit-text-stroke-color: rgba(255, 79, 216, 0.6); }
-    .marquee i { font-style: normal; color: var(--gold); -webkit-text-stroke: 0; font-size: 0.4em; vertical-align: middle; margin-left: 0.3em; }
-    @keyframes marquee { to { transform: translateX(-50%); } }
-
-    /* ---------- Bento ---------- */
-    .bento { display: grid; gap: 16px; grid-template-columns: 1fr; margin-bottom: 72px; }
-    @media (min-width: 900px) {
-      .bento { grid-template-columns: 1.3fr 1fr 1fr; grid-template-rows: auto auto; }
-      .t-scan { grid-row: span 2; }
-      .t-coll { grid-column: span 2; }
-    }
-    .tile {
-      position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
-      padding: clamp(22px, 3vw, 32px); border-radius: 28px; text-decoration: none; color: var(--text);
-      background: var(--surface); border: 1px solid var(--line); transition: border-color 0.3s, transform 0.3s;
-    }
-    .tile:hover { border-color: rgba(255, 255, 255, 0.28); transform: translateY(-3px); }
-    .tile:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-    .tile h2 { font-size: clamp(1.8rem, 3.6vw, 2.7rem); line-height: 0.98; letter-spacing: -0.035em; font-weight: 800; margin: 0; }
-    .tile p { color: var(--muted); margin: 0; max-width: 440px; }
-    .tile-link { font-weight: 700; color: var(--cyan); margin-top: auto; }
-
-    .t-scan { background: radial-gradient(circle at 50% 30%, rgba(62, 240, 255, 0.14), transparent 60%), var(--surface); min-height: 520px; }
-    .scan-visual { flex: 1; display: grid; place-items: center; min-height: 260px; }
-    .sv-card {
-      position: relative; width: min(190px, 46%); aspect-ratio: 245 / 342; border-radius: 12px;
-      background: linear-gradient(160deg, #1b1830, #0f0d1d); border: 2px solid rgba(62, 240, 255, 0.55);
-      box-shadow: 0 0 0 9999px rgba(7, 6, 13, 0), 0 0 40px rgba(62, 240, 255, 0.25);
-    }
-    .sv-card::before { content: ''; position: absolute; inset: 9% 8% 46%; border-radius: 6px; background: linear-gradient(135deg, rgba(255, 79, 216, 0.5), rgba(255, 210, 90, 0.4)); }
-    .sv-line { position: absolute; left: -8%; right: -8%; height: 3px; top: 0; background: var(--holo); box-shadow: 0 0 18px var(--magenta); animation: sweep 2.6s ease-in-out infinite alternate; }
-    @keyframes sweep { to { top: 100%; } }
-    .sv-chip {
-      position: absolute; white-space: nowrap; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem;
-      background: rgba(14, 12, 26, 0.92); border: 1px solid rgba(61, 255, 168, 0.5); color: var(--up);
-    }
-    .c-a { top: 2%; left: 70%; }
-    .c-b { top: 40%; right: 78%; }
-    .c-c { bottom: 4%; left: 72%; }
-
-    .t-market { background: radial-gradient(circle at 80% 0%, rgba(61, 255, 168, 0.12), transparent 60%), var(--surface); }
-    .mini-index { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-    .mi-value { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; letter-spacing: -0.03em; }
-    .mi-chg { font-weight: 700; }
-    .mi-chart :global(svg) { width: 100%; height: 70px; }
-
-    .t-alert { background: radial-gradient(circle at 0% 100%, rgba(255, 210, 90, 0.14), transparent 60%), var(--surface); }
-    .alert-demo { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 16px; background: rgba(7, 6, 13, 0.6); border: 1px solid rgba(255, 210, 90, 0.35); }
-    .ad-bell { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 12px; display: grid; place-items: center; background: var(--gold); animation: ring 3s ease-in-out infinite; }
-    .ad-bell svg { width: 20px; height: 20px; fill: none; stroke: #0a0812; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    @keyframes ring { 0%, 86%, 100% { transform: rotate(0); } 89% { transform: rotate(14deg); } 93% { transform: rotate(-12deg); } 96% { transform: rotate(6deg); } }
-    .ad-text { display: flex; flex-direction: column; font-size: 0.9rem; }
-
-    .t-coll { flex-direction: row; justify-content: space-between; align-items: center; gap: 24px; background: radial-gradient(circle at 100% 50%, rgba(255, 79, 216, 0.14), transparent 55%), var(--surface); }
-    .stack { position: relative; width: 150px; height: 150px; flex: 0 0 150px; }
-    .stack span { position: absolute; top: 10px; left: 40px; width: 74px; height: 104px; border-radius: 9px; background: var(--holo); background-size: 200% 200%; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
-    .stack span:nth-child(1) { transform: rotate(-16deg) translateX(-26px); opacity: 0.5; }
-    .stack span:nth-child(2) { transform: rotate(-4deg); opacity: 0.75; }
-    .stack span:nth-child(3) { transform: rotate(10deg) translateX(26px); }
-    @media (max-width: 560px) { .stack { display: none; } }
-
-    /* ---------- Ça monte ---------- */
-    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-    .big { font-size: clamp(3rem, 9vw, 6.5rem); line-height: 0.9; letter-spacing: -0.045em; font-weight: 800; margin: 0; }
-    .risers { margin-bottom: 80px; }
-    .riser-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, 1fr); }
-    @media (min-width: 900px) { .riser-grid { grid-template-columns: repeat(4, 1fr); } }
-    .riser-grid :global(.riser) { display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: var(--text); }
-    .riser-grid :global(.riser-info) { display: flex; flex-direction: column; gap: 2px; }
-    .riser-grid :global(.riser-chg) { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.3rem, 2.6vw, 1.8rem); letter-spacing: -0.02em; }
-    .riser-grid :global(.riser-name) { font-weight: 700; }
+    .riser-grid :global(.riser) { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--text); min-width: 0; }
+    .riser-grid :global(.riser .holo-card) { margin-bottom: 8px; }
+    .riser-grid :global(.riser-chg) { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.2rem, 2.4vw, 1.6rem); letter-spacing: -0.02em; color: var(--up); }
+    .riser-grid :global(.riser-name) { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .riser-grid :global(.riser-price) { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-    /* ---------- Manifeste ---------- */
-    .manifesto { padding: clamp(40px, 8vw, 90px) 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 72px; }
-    .manifesto p:first-child { display: flex; flex-direction: column; font-family: var(--font-display); font-weight: 800; font-size: clamp(2.4rem, 8vw, 6rem); line-height: 0.95; letter-spacing: -0.045em; margin: 0 0 22px; }
-    .m-sub { color: var(--muted); font-size: 1.1rem; max-width: 560px; margin: 0; }
+    /* ---------- Index des onglets ---------- */
+    .tool-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; border-top: 1px solid var(--line); }
+    @media (min-width: 860px) { .tool-list { grid-template-columns: 1fr 1fr; column-gap: 40px; } }
+    .tool-list li { border-bottom: 1px solid var(--line); }
+    .tool-list a { display: grid; grid-template-columns: 44px 9.5rem minmax(0, 1fr); gap: 14px; align-items: center; padding: 16px 4px; text-decoration: none; color: var(--text); }
+    .tool-list a:hover .tool-name { color: var(--cyan); }
+    .tool-list a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 8px; }
+    .tool-ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); }
+    .tool-ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tool-name { font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; transition: color 0.15s; }
+    .tool-text { color: var(--muted); font-size: 0.92rem; }
+    @media (max-width: 560px) { .tool-list a { grid-template-columns: 44px minmax(0, 1fr); row-gap: 2px; } .tool-ic { grid-row: span 2; } }
+
+    /* ---------- Étapes ---------- */
+    .how-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: 1fr; counter-reset: step; }
+    @media (min-width: 860px) { .how-steps { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 859px) {
+      .how-steps li { display: grid; grid-template-columns: 36px 1fr; column-gap: 14px; align-items: start; }
+      .how-steps li::before { grid-row: span 2; margin: 0; }
+    }
+    .how-steps li { counter-increment: step; padding: 20px 22px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); }
+    .how-steps li::before { content: counter(step); display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; margin-bottom: 14px;
+      font-family: var(--font-display); font-weight: 800; color: #0a0812; background: var(--holo); }
+    .how-steps h3 { font-size: 1.3rem; margin: 0 0 6px; }
+    .how-steps p { margin: 0; color: var(--muted); }
 
     /* ---------- Fin ---------- */
-    .final { text-align: center; padding: clamp(40px, 8vw, 80px) 16px; border-radius: 36px; margin-bottom: 30px; position: relative; overflow: hidden;
-      background: radial-gradient(circle at 50% 0%, rgba(255, 79, 216, 0.25), transparent 60%), radial-gradient(circle at 50% 100%, rgba(62, 240, 255, 0.2), transparent 60%), var(--bg-2);
+    .final { text-align: center; padding: clamp(40px, 8vw, 80px) 20px; border-radius: 32px; margin-bottom: 30px;
+      background: radial-gradient(circle at 50% 0%, rgba(255, 79, 216, 0.22), transparent 60%), radial-gradient(circle at 50% 100%, rgba(62, 240, 255, 0.18), transparent 60%), var(--bg-2);
       border: 1px solid var(--line); }
-    .final h2 { font-size: clamp(2rem, 6vw, 4.2rem); line-height: 0.98; letter-spacing: -0.04em; font-weight: 800; max-width: 900px; margin: 0 auto 28px; }
+    .final h2 { font-size: clamp(1.9rem, 5.5vw, 3.6rem); line-height: 1; letter-spacing: -0.04em; font-weight: 800; max-width: 18ch; margin: 0 auto 16px; text-wrap: balance; }
+    .final p { color: var(--muted); max-width: 34em; margin: 0 auto 26px; }
 
     @media (prefers-reduced-motion: reduce) {
-      .marquee-track, .halo, .foil, .sv-line, .ad-bell { animation: none !important; }
+      .halo, .aurora span { animation: none !important; }
     }
   </style>
 </Base>
