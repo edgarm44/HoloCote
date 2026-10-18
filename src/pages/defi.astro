@@ -146,6 +146,7 @@ import { mascotSvg } from '../lib/mascot';
             <p class="muted small" id="bx-claim-note">La dixième carte du booster rejoint ta collection (état Near Mint), une fois par jour.</p>
           </div>
         </div>
+        <p class="bx-rates muted small">Chances pour la dixième carte : 1 % carte exceptionnelle (hyper rare, dorée…), 6 % carte « chasse » (numéro au-delà de la série), 23 % rare de la série, 70 % carte ordinaire. Simulation : ce ne sont pas les taux officiels.</p>
         <div class="bx-sum" id="bx-sum" hidden>
           <div><span class="muted small">Valeur du booster</span><strong id="bx-total">—</strong></div>
           <div><span class="muted small">Meilleure carte</span><strong id="bx-best">—</strong></div>
@@ -160,9 +161,13 @@ import { mascotSvg } from '../lib/mascot';
       <div class="duel-head">
         <div>
           <h2>Duel</h2>
-          <p class="muted">Deux cartes, une seule question : laquelle a la plus grosse cote aujourd'hui ? Enchaîne les bonnes réponses.</p>
+          <p class="muted" id="du-lead">Deux cartes, une seule question : laquelle a la plus grosse cote aujourd'hui ?</p>
+          <div class="du-tabs" role="group" aria-label="Type de duel">
+            <button type="button" data-du="daily" aria-pressed="true">Duel du jour</button>
+            <button type="button" data-du="train" aria-pressed="false">Entraînement</button>
+          </div>
         </div>
-        <div class="duel-score">
+        <div class="duel-score" id="du-score" hidden>
           <div><strong id="du-streak">0</strong><span class="muted small">série</span></div>
           <div><strong id="du-best">0</strong><span class="muted small">record</span></div>
         </div>
@@ -177,6 +182,15 @@ import { mascotSvg } from '../lib/mascot';
         <div class="du-coti" id="du-coti"></div>
         <p class="du-msg" id="du-msg"></p>
         <button type="button" class="btn btn-primary" id="du-next">Duel suivant</button>
+      </div>
+      <div class="du-reward" id="du-reward" hidden>
+        <div class="du-reward-card" id="du-reward-card"></div>
+        <div>
+          <p class="du-reward-k" id="du-reward-k">Ta récompense</p>
+          <p class="du-reward-t" id="du-reward-t"></p>
+          <button type="button" class="btn claim-btn" id="du-claim">Ajouter à mon classeur</button>
+          <p class="muted small" id="du-reward-note"></p>
+        </div>
       </div>
     </section>
   </div>
@@ -523,9 +537,8 @@ import { mascotSvg } from '../lib/mascot';
       $('st-mystery').textContent = d.done ? (d.won ? 'gagnée' : 'perdue') : d.guesses.length ? 'en cours' : 'à jouer';
       const b = getBooster();
       $('st-booster').textContent = !b ? 'à ouvrir' : b.claimed ? 'carte gagnée' : 'ouvert';
-      let best = 0;
-      try { best = JSON.parse(localStorage.getItem('holocote.duel.v1') || '{}').best || 0; } catch { /* rien */ }
-      $('st-duel').textContent = best ? `record ${best}` : 'illimité';
+      const dd = getDaily();
+      $('st-duel').textContent = !dd?.answered ? 'à jouer' : dd.ok ? (dd.claimed ? 'carte gagnée' : 'gagné') : 'perdu';
     }
 
     /* ---------- Booster du jour ---------- */
@@ -674,14 +687,25 @@ import { mascotSvg } from '../lib/mascot';
     }
 
     /* ---------- Duel ---------- */
+    // Duel du jour : un seul par jour, la même paire pour tous ; bonne réponse = la carte la moins chère des deux en récompense.
+    // Entraînement : duels illimités avec série et record, sans rien à gagner.
     const DKEY = 'holocote.duel.v1';
+    const DAYKEY = 'holocote.duel.day.v1';
+    interface Daily { day: number; a: string; b: string; answered: boolean; side?: 'a' | 'b'; ok?: boolean; claimed?: boolean }
+    function getDaily(): Daily | null {
+      try { const d = JSON.parse(localStorage.getItem(DAYKEY) || 'null'); return d && d.day === todayNumber() ? d : null; } catch { return null; }
+    }
+    const saveDaily = (d: Daily) => { try { localStorage.setItem(DAYKEY, JSON.stringify(d)); } catch { /* rien */ } };
+
     let pool: Quote[] = [];
     let pair: [Quote, Quote] | null = null;
+    let duMode: 'daily' | 'train' = 'daily';
     let streak = 0;
     let best = 0;
     let answered = false;
     try { best = JSON.parse(localStorage.getItem(DKEY) || '{}').best || 0; } catch { /* rien */ }
     const saveBest = () => { try { localStorage.setItem(DKEY, JSON.stringify({ best })); } catch { /* rien */ } };
+    const fair = (a: Quote, b: Quote) => { const r = Math.max(a.price, b.price) / Math.min(a.price, b.price); return a.id !== b.id && r >= 1.2 && r <= 5; };
 
     function duelCard(q: Quote, side: 'a' | 'b') {
       const b = $(`du-${side}`) as HTMLButtonElement;
@@ -696,16 +720,52 @@ import { mascotSvg } from '../lib/mascot';
       b.setAttribute('aria-label', `${q.name}, choisir cette carte`);
     }
 
-    function nextDuel() {
+    /** Paire du jour : tirage fixe (même graine pour tous) parmi les cartes suivies en permanence. */
+    function dailyPair(): [Quote, Quote] | null {
+      const legends = pool.filter((q) => q.group === 'legend').sort((x, y) => x.id.localeCompare(y.id));
+      const list = legends.length >= 4 ? legends : [...pool].sort((x, y) => x.id.localeCompare(y.id));
+      let seed = todayNumber() * 7919 + 17;
+      const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      for (let k = 0; k < 400; k++) {
+        const a = list[Math.floor(rnd() * list.length)], b = list[Math.floor(rnd() * list.length)];
+        if (fair(a, b)) return [a, b];
+      }
+      return null;
+    }
+
+    function hideResult() { $('du-result').hidden = true; $('du-reward').hidden = true; }
+
+    function setDuMode(m: 'daily' | 'train') {
+      duMode = m;
+      document.querySelectorAll<HTMLElement>('[data-du]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.du === m)));
+      $('du-score').hidden = m !== 'train';
+      $('du-lead').textContent = m === 'daily'
+        ? 'Un duel par jour : trouve la carte qui a la plus grosse cote et gagne la moins chère des deux pour ton classeur.'
+        : 'Entraîne-toi sans limite et bats ton record de bonnes réponses d’affilée. Rien à gagner ici.';
       answered = false;
-      $('du-result').hidden = true;
-      // Deux cartes d'écart raisonnable (rapport de prix entre 1,2 et 5) pour que ça reste jouable.
-      for (let k = 0; k < 200; k++) {
-        const a = pool[Math.floor(Math.random() * pool.length)];
-        const b = pool[Math.floor(Math.random() * pool.length)];
-        if (a.id === b.id) continue;
-        const r = Math.max(a.price, b.price) / Math.min(a.price, b.price);
-        if (r >= 1.2 && r <= 5) { pair = [a, b]; break; }
+      hideResult();
+      if (m === 'train') { nextTrain(); return; }
+      // Duel du jour : reprendre la paire déjà vue aujourd'hui, sinon la paire fixe du jour.
+      const d = getDaily();
+      const byId = (id: string) => pool.find((q) => q.id === id);
+      let p: [Quote, Quote] | null = d && byId(d.a) && byId(d.b) ? [byId(d.a)!, byId(d.b)!] : dailyPair();
+      if (!p) { $('du-state').replaceChildren(el('p', { class: 'muted' }, ['Pas assez de cotes aujourd’hui pour le duel. Essaie l’entraînement.'])); return; }
+      pair = p;
+      if (!d) saveDaily({ day: todayNumber(), a: p[0].id, b: p[1].id, answered: false });
+      duelCard(p[0], 'a');
+      duelCard(p[1], 'b');
+      $('du-arena').hidden = false;
+      const dd = getDaily();
+      if (dd?.answered && dd.side) reveal(dd.side, false);
+    }
+
+    function nextTrain() {
+      answered = false;
+      hideResult();
+      pair = null;
+      for (let k = 0; k < 200 && !pair; k++) {
+        const a = pool[Math.floor(Math.random() * pool.length)], b = pool[Math.floor(Math.random() * pool.length)];
+        if (fair(a, b)) pair = [a, b];
       }
       if (!pair) return;
       duelCard(pair[0], 'a');
@@ -713,8 +773,23 @@ import { mascotSvg } from '../lib/mascot';
       $('du-arena').hidden = false;
     }
 
-    function choose(side: 'a' | 'b') {
-      if (!pair || answered) return;
+    function renderReward(d: Daily) {
+      if (!pair || !d.ok) { $('du-reward').hidden = true; return; }
+      const cheap = pair[0].price <= pair[1].price ? pair[0] : pair[1];
+      $('du-reward-card').replaceChildren(holoCard(cheap.image, cheap.name));
+      $('du-reward-k').textContent = d.claimed ? 'Récompense récupérée' : 'Ta récompense';
+      $('du-reward-t').textContent = `${cheap.name} (${fmt(cheap.price)}), la moins chère des deux.`;
+      const btn = $('du-claim') as HTMLButtonElement;
+      btn.disabled = !!d.claimed;
+      btn.textContent = d.claimed ? 'Dans ton classeur' : 'Ajouter à mon classeur';
+      btn.classList.toggle('done', !!d.claimed);
+      $('du-reward-note').textContent = d.claimed ? 'Rangée dans ta collection. Nouveau duel demain.' : 'Elle rejoint ta collection (état Near Mint). Un seul duel du jour : reviens demain.';
+      $('du-reward').hidden = false;
+    }
+
+    /** Affiche la réponse (après un choix, ou en revenant sur un duel du jour déjà joué). */
+    function reveal(side: 'a' | 'b', fresh: boolean) {
+      if (!pair) return;
       answered = true;
       const [a, b] = pair;
       const pick = side === 'a' ? a : b;
@@ -728,17 +803,33 @@ import { mascotSvg } from '../lib/mascot';
         btn.classList.add(q.price >= (s === 'a' ? b : a).price ? 'win' : 'lose');
         if (s === side) btn.classList.add('picked');
       });
-      if (ok) { streak++; if (streak > best) { best = streak; saveBest(); } } else streak = 0;
-      $('du-streak').textContent = String(streak);
-      $('du-best').textContent = String(best);
       const ratio = Math.max(a.price, b.price) / Math.min(a.price, b.price);
-      $('du-coti').innerHTML = mascotSvg(ok ? (streak >= 5 ? 'wow' : 'happy') : 'sad', 64);
+      if (duMode === 'train') {
+        if (fresh) { if (ok) { streak++; if (streak > best) { best = streak; saveBest(); } } else streak = 0; }
+        $('du-streak').textContent = String(streak);
+        $('du-best').textContent = String(best);
+      }
+      $('du-coti').innerHTML = mascotSvg(ok ? (duMode === 'train' && streak >= 5 ? 'wow' : 'happy') : 'sad', 64);
       $('du-msg').textContent = ok
-        ? `Bien vu ! ${pick.name} vaut ${ratio.toFixed(1).replace('.', ',')} fois plus.${streak >= 3 ? ` Série de ${streak} !` : ''}`
+        ? `Bien vu ! ${pick.name} vaut ${ratio.toFixed(1).replace('.', ',')} fois plus.${duMode === 'train' && streak >= 3 ? ` Série de ${streak} !` : ''}`
         : `Raté : ${other.name} vaut ${fmt(other.price)}, contre ${fmt(pick.price)}.`;
+      const next = $('du-next') as HTMLButtonElement;
+      next.textContent = duMode === 'train' ? 'Duel suivant' : 'S’entraîner';
       $('du-result').hidden = false;
+      if (duMode === 'daily') {
+        let d = getDaily() ?? { day: todayNumber(), a: a.id, b: b.id, answered: false };
+        if (fresh) { d = { ...d, answered: true, side, ok }; saveDaily(d); }
+        renderReward(d);
+        if (!ok) $('du-msg').textContent += ' Pas de récompense aujourd’hui, nouveau duel demain.';
+      }
       refreshStatus();
-      ($('du-next') as HTMLButtonElement).focus({ preventScroll: true });
+      if (fresh) next.focus({ preventScroll: true });
+    }
+
+    function choose(side: 'a' | 'b') {
+      if (!pair || answered) return;
+      if (duMode === 'daily' && getDaily()?.answered) return;
+      reveal(side, true);
     }
 
     async function initDuel() {
@@ -755,14 +846,28 @@ import { mascotSvg } from '../lib/mascot';
       $('du-state').replaceChildren();
       $('du-a').addEventListener('click', () => choose('a'));
       $('du-b').addEventListener('click', () => choose('b'));
-      $('du-next').addEventListener('click', nextDuel);
+      $('du-next').addEventListener('click', () => (duMode === 'train' ? nextTrain() : setDuMode('train')));
+      document.querySelectorAll<HTMLButtonElement>('[data-du]').forEach((b) => b.addEventListener('click', () => setDuMode(b.dataset.du as 'daily' | 'train')));
+      $('du-claim').addEventListener('click', () => {
+        const d = getDaily();
+        if (!d?.ok || d.claimed || !pair) return;
+        const cheap = pair[0].price <= pair[1].price ? pair[0] : pair[1];
+        addItem({ cardId: cheap.id, lang: cheap.lang, name: cheap.name, image: cheap.image, setName: cheap.setName, rarity: cheap.rarity, condition: 'NM', finish: 'normal', quantity: 1 });
+        const nd = { ...d, claimed: true };
+        saveDaily(nd);
+        renderReward(nd);
+        refreshStatus();
+        toast(`${cheap.name} rejoint ton classeur !`);
+      });
       document.addEventListener('keydown', (e) => {
         if ($('mode-duel').hidden) return;
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         if (e.key === 'ArrowLeft') choose('a');
         else if (e.key === 'ArrowRight') choose('b');
-        else if ((e.key === 'Enter' || e.key === ' ') && answered && document.activeElement?.id !== 'du-next') { e.preventDefault(); nextDuel(); }
+        else if ((e.key === 'Enter' || e.key === ' ') && answered && duMode === 'train' && document.activeElement?.id !== 'du-next') { e.preventDefault(); nextTrain(); }
       });
-      nextDuel();
+      setDuMode('daily');
     }
 
     show(fromHash());
@@ -832,6 +937,7 @@ import { mascotSvg } from '../lib/mascot';
     .hit-k { margin: 0 0 4px; font-weight: 800; color: var(--gold); }
     .hit-name { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 4px; }
     .hit-price { margin: 10px 0 14px; } .hit-price :global(strong) { font-family: var(--font-display); font-size: 1.5rem; color: var(--gold); }
+    .bx-rates { margin: -10px 0 0; text-align: center; }
     .bx-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .bx-sum div { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
     .bx-sum strong { font-family: var(--font-display); font-size: 1.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -856,6 +962,15 @@ import { mascotSvg } from '../lib/mascot';
     .du-card.picked.lose { border-color: var(--down); opacity: 1; }
     .du-card:disabled { cursor: default; }
     .du-vs { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; color: #0a0812; background: var(--holo); box-shadow: 0 0 30px rgba(255, 79, 216, 0.4); }
+    .du-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); margin: 4px 0 22px; }
+    .du-tabs button { border: 0; background: none; color: var(--muted); padding: 8px 16px; border-radius: 999px; font-weight: 700; cursor: pointer; font: inherit; }
+    .du-tabs button[aria-pressed='true'] { background: var(--holo); color: #0a0812; }
+    .du-reward { display: grid; grid-template-columns: 120px 1fr; gap: 20px; align-items: center; max-width: 620px; margin: -14px auto 34px; padding: 18px; border-radius: 20px;
+      background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, linear-gradient(120deg, #3dffa8, #3ef0ff) border-box; border: 1px solid transparent; }
+    .du-reward-card { width: 120px; }
+    .du-reward-k { margin: 0 0 2px; font-weight: 800; color: var(--up); }
+    .du-reward-t { margin: 0 0 10px; font-weight: 700; }
+    .du-reward p.muted { margin: 8px 0 0; }
     .du-result { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 34px; text-align: center; }
     .du-msg { margin: 0; font-weight: 700; max-width: 36em; }
     @media (max-width: 560px) { .duel-arena { grid-template-columns: 1fr 1fr; } .du-vs { display: none; } .du-card { padding: 10px; } .du-card :global(.du-price) { font-size: 1.15rem; } }

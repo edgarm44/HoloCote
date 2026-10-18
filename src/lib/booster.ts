@@ -8,6 +8,9 @@ import { todayNumber } from './mystery';
 /** Extensions proposées, une par jour à tour de rôle. */
 export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me02', 'swsh12.5', 'sv06', '30th', 'me02.5', 'sv02', 'swsh11', 'sv01', 'me03', 'swsh9', 'me04', 'sv09', 'me05', 'swsh12', 'sv10'];
 
+/** Chances pour la dixième carte (affichées sur la page). */
+export const RATES = { top: 0.01, chase: 0.06, upper: 0.23 };
+
 export const setOfDay = (n = todayNumber()) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
 
 export interface BoosterState { day: number; setId: string; setName: string; cards: string[]; opened: boolean; claimed: boolean }
@@ -48,11 +51,15 @@ export async function drawBooster(): Promise<BoosterState | null> {
   if (main.length < 10) return null;
   const chosen = new Set<string>();
   while (chosen.size < 9) chosen.add(pick(main).id);
-  // Dernière carte : 6 % parmi les plus rares, 24 % parmi les cartes « chasse », sinon le haut de l'extension.
+  // Dernière carte, chances proches d'un vrai booster (voir RATES) : les plus belles restent rares.
   const r = Math.random();
-  const top = chase.slice(-Math.max(3, Math.ceil(chase.length / 4)));
+  const top = chase.slice(-Math.max(3, Math.ceil(chase.length / 5)));
+  const rest = chase.filter((c) => !top.includes(c));
   const upper = main.slice(Math.floor(main.length * 0.6));
-  let last = r < 0.06 && top.length ? pick(top) : r < 0.3 && chase.length ? pick(chase) : pick(upper);
+  let last = r < RATES.top && top.length ? pick(top)
+    : r < RATES.top + RATES.chase && (rest.length || top.length) ? pick(rest.length ? rest : top)
+      : r < RATES.top + RATES.chase + RATES.upper ? pick(upper)
+        : pick(main);
   while (chosen.has(last.id)) last = pick(main);
   const s: BoosterState = { day, setId, setName: d.name, cards: [...chosen, last.id], opened: false, claimed: false };
   saveBooster(s);
