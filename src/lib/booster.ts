@@ -9,7 +9,7 @@ import { todayNumber } from './mystery';
 export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me02', 'swsh12.5', 'sv06', '30th', 'me02.5', 'sv02', 'swsh11', 'sv01', 'me03', 'swsh9', 'me04', 'sv09', 'me05', 'swsh12', 'sv10'];
 
 /** Chances pour la dixième carte (affichées sur la page). */
-export const RATES = { top: 0.01, chase: 0.06, upper: 0.23 };
+export const RATES = { top: 0.03, chase: 0.12, upper: 0.3 };
 
 export const setOfDay = (n = todayNumber()) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
 
@@ -39,9 +39,9 @@ async function setDetail(id: string): Promise<SetDetail | null> {
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
 /** Tire un nouveau booster : 9 cartes de l'extension, puis une 10ᵉ « carte à gagner » plus souvent rare. */
-export async function drawBooster(): Promise<BoosterState | null> {
+export async function drawBooster(opts: { save?: boolean; setId?: string } = {}): Promise<BoosterState | null> {
   const day = todayNumber();
-  const setId = setOfDay(day);
+  const setId = opts.setId ?? setOfDay(day);
   const d = await setDetail(setId);
   if (!d?.cards?.length) return null;
   const official = d.cardCount?.official ?? d.cards.length;
@@ -62,7 +62,7 @@ export async function drawBooster(): Promise<BoosterState | null> {
         : pick(main);
   while (chosen.has(last.id)) last = pick(main);
   const s: BoosterState = { day, setId, setName: d.name, cards: [...chosen, last.id], opened: false, claimed: false };
-  saveBooster(s);
+  if (opts.save !== false) saveBooster(s);
   return s;
 }
 

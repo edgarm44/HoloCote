@@ -74,28 +74,17 @@ import { mascotSvg } from '../lib/mascot';
   <section class="panel backup">
     <div>
       <h2>Sauvegarde</h2>
-      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil. Une sauvegarde se restaure sur une collection vide.</p>
+      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil. Une sauvegarde se restaure sur une collection vide (par exemple sur un nouvel appareil). Les cartes rangées restent dans ton classeur : on ne peut ni les supprimer ni les dupliquer.</p>
     </div>
     <div class="backup-actions">
       <button class="btn" id="export" type="button">Exporter</button>
       <label class="btn" for="import-file">Restaurer une sauvegarde</label>
       <input id="import-file" type="file" accept="application/json,.json" class="sr-only" />
-      <button class="btn btn-danger" id="clear" type="button">Tout supprimer</button>
     </div>
   </section>
 
   <p class="notice">Estimation approximative : cote Near Mint (Cardmarket) multipliée par un coefficient d'état. Elle ne tient pas compte de l'authenticité ni d'une expertise.</p>
 
-  <dialog id="confirm-clear">
-    <form method="dialog">
-      <h2>Supprimer toute la collection ?</h2>
-      <p class="muted">Cette action est définitive. Exporte-la d'abord si tu veux la garder.</p>
-      <div class="dialog-actions">
-        <button class="btn" value="cancel">Annuler</button>
-        <button class="btn btn-danger" value="ok">Tout supprimer</button>
-      </div>
-    </form>
-  </dialog>
 
   <template id="slot-tpl">
     <article class="slot">
@@ -109,20 +98,18 @@ import { mascotSvg } from '../lib/mascot';
         <span class="slot-sub" data-slot="sub"></span>
       </div>
       <div class="slot-controls">
-        <div class="stepper">
-          <button type="button" data-slot="minus" aria-label="Retirer un exemplaire">−</button>
-          <span data-slot="qty" title="Pour ajouter un exemplaire, scanne la carte"></span>
+        <div class="stepper" title="Une carte rangée reste dans ton classeur. Pour un exemplaire de plus, scanne-la.">
+          <span class="qty-x">×</span><span data-slot="qty"></span>
         </div>
         <select data-slot="cond">
           {CONDITIONS.map((c) => <option value={c.code} title={c.label}>{c.code} · {c.label}</option>)}
         </select>
-        <button type="button" class="remove" data-slot="remove" aria-label="Retirer">✕</button>
       </div>
     </article>
   </template>
 
   <script>
-    import { getItems, updateItem, removeItem, clearAll, exportJson, importJson, storageAvailable, type Item } from '../lib/collection';
+    import { getItems, updateItem, exportJson, importJson, storageAvailable, type Item } from '../lib/collection';
     import { conditionFactor, type Condition } from '../lib/condition';
     import { getCard, priceFor, formatPrice, type Card, type PriceInfo } from '../lib/tcgdex';
     import { rarityTier, USD_TO_EUR, type Tier } from '../lib/rarity';
@@ -196,17 +183,10 @@ import { mascotSvg } from '../lib/mascot';
       s('sub').textContent = [it.setName, it.lang.toUpperCase()].filter(Boolean).join(' · ');
       s('qty').textContent = String(it.quantity);
 
-      s('minus').addEventListener('click', () => {
-        if (it.quantity <= 1) { removeItem(it); toast(`${it.name} retirée`); }
-        else updateItem(it, { quantity: it.quantity - 1 });
-        render();
-      });
       const cond = s('cond') as HTMLSelectElement;
       cond.value = it.condition;
       cond.setAttribute('aria-label', `État de ${it.name}`);
       cond.addEventListener('change', () => { updateItem(it, { condition: cond.value as Condition }); render(); });
-      s('remove').setAttribute('aria-label', `Retirer ${it.name}`);
-      s('remove').addEventListener('click', () => { removeItem(it); render(); toast(`${it.name} retirée`); });
       return node;
     }
 
@@ -278,7 +258,7 @@ import { mascotSvg } from '../lib/mascot';
       if (!f) return;
       if (f.size > 2_000_000) { toast('Fichier trop gros'); return; }
       // Une sauvegarde ne s'ajoute pas à une collection existante : impossible de s'ajouter des cartes sans les scanner.
-      if (getItems().length > 0) { toast("Pour restaurer une sauvegarde, ta collection doit être vide (bouton « Tout supprimer »)."); return; }
+      if (getItems().length > 0) { toast("Pour restaurer une sauvegarde, ta collection doit être vide : une sauvegarde sert à retrouver ta collection sur un nouvel appareil."); return; }
       try {
         const n = importJson(await f.text(), 'replace');
         toast(`${n} carte${n > 1 ? 's' : ''} restaurée${n > 1 ? 's' : ''}`);
@@ -289,11 +269,6 @@ import { mascotSvg } from '../lib/mascot';
       }
     });
 
-    const dialog = $<HTMLDialogElement>('confirm-clear');
-    $('clear').addEventListener('click', () => dialog.showModal());
-    dialog.addEventListener('close', () => {
-      if (dialog.returnValue === 'ok') { clearAll(); render(); toast('Collection supprimée'); }
-    });
 
     render();
     loadCards();
@@ -376,7 +351,8 @@ import { mascotSvg } from '../lib/mascot';
     .slot-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
     .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
     .stepper button { width: 30px; height: 34px; border: 0; background: none; color: var(--text); cursor: pointer; font-size: 1.05rem; }
-    .stepper span { min-width: 22px; padding-right: 8px; text-align: center; font-weight: 700; font-size: 0.9rem; }
+    .stepper .qty-x { min-width: 0; padding: 0 0 0 10px; color: var(--muted); }
+    .stepper span { min-width: 22px; padding: 0 10px 0 2px; line-height: 34px; text-align: center; font-weight: 700; font-size: 0.9rem; }
     .slot-controls select { order: 3; flex: 1 1 100%; min-width: 0; min-height: 36px; padding: 4px 6px; font-size: 0.8rem; border-radius: 10px; }
     .remove { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
     .remove:hover { color: var(--danger); border-color: rgba(255, 90, 122, 0.5); }
