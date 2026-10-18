@@ -110,8 +110,7 @@ import { CONDITIONS } from '../lib/condition';
       <div class="slot-controls">
         <div class="stepper">
           <button type="button" data-slot="minus" aria-label="Retirer un exemplaire">−</button>
-          <span data-slot="qty"></span>
-          <button type="button" data-slot="plus" aria-label="Ajouter un exemplaire">+</button>
+          <span data-slot="qty" title="Pour ajouter un exemplaire, scanne la carte"></span>
         </div>
         <select data-slot="cond">
           {CONDITIONS.map((c) => <option value={c.code} title={c.label}>{c.code} · {c.label}</option>)}
@@ -201,7 +200,6 @@ import { CONDITIONS } from '../lib/condition';
         else updateItem(it, { quantity: it.quantity - 1 });
         render();
       });
-      s('plus').addEventListener('click', () => { updateItem(it, { quantity: it.quantity + 1 }); render(); });
       const cond = s('cond') as HTMLSelectElement;
       cond.value = it.condition;
       cond.setAttribute('aria-label', `État de ${it.name}`);
@@ -376,7 +374,7 @@ import { CONDITIONS } from '../lib/condition';
     .slot-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
     .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
     .stepper button { width: 30px; height: 34px; border: 0; background: none; color: var(--text); cursor: pointer; font-size: 1.05rem; }
-    .stepper span { min-width: 22px; text-align: center; font-weight: 700; font-size: 0.9rem; }
+    .stepper span { min-width: 22px; padding-right: 8px; text-align: center; font-weight: 700; font-size: 0.9rem; }
     .slot-controls select { order: 3; flex: 1 1 100%; min-width: 0; min-height: 36px; padding: 4px 6px; font-size: 0.8rem; border-radius: 10px; }
     .remove { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
     .remove:hover { color: var(--danger); border-color: rgba(255, 90, 122, 0.5); }
