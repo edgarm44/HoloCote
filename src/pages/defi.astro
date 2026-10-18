@@ -138,6 +138,7 @@ import { mascotSvg } from '../lib/mascot';
         <p class="muted" id="bx-lead">Aujourd'hui : <strong id="bx-set">…</strong>. Un booster gratuit par jour, dix cartes. La dixième est pour ton classeur.</p>
         <p class="muted" id="bx-lead-train" hidden>Une extension tirée au hasard à chaque ouverture. Entraînement : aucune carte n'est gagnée.</p>
       </div>
+      <p class="bx-boost" id="bx-boost" hidden><strong>Bonus série :</strong> <span id="bx-boost-t"></span></p>
       <div id="bx-state" aria-live="polite"></div>
       <div class="bx-stage" id="bx-stage" hidden>
         <button type="button" class="pack" id="bx-pack" aria-label="Ouvrir le booster du jour">
@@ -161,7 +162,7 @@ import { mascotSvg } from '../lib/mascot';
             <p class="muted small" id="bx-claim-note">La dixième carte du booster rejoint ta collection (état Near Mint), une fois par jour.</p>
           </div>
         </div>
-        <p class="bx-rates muted small">Chances pour la dixième carte : 3 % carte exceptionnelle (hyper rare, dorée…), 12 % carte « chasse » (numéro au-delà de la série), 30 % rare de la série, 55 % carte ordinaire. Simulation : ce ne sont pas les taux officiels.</p>
+        <p class="bx-rates muted small" id="bx-rates">Chances pour la dixième carte : 3 % carte exceptionnelle (hyper rare, dorée…), 12 % carte « chasse » (numéro au-delà de la série), 30 % rare de la série, 55 % carte ordinaire. Simulation : ce ne sont pas les taux officiels.</p>
         <button type="button" class="btn btn-primary bx-again" id="bx-again" hidden>Ouvrir un autre booster</button>
         <div class="bx-sum" id="bx-sum" hidden>
           <div><span class="muted small">Valeur du booster</span><strong id="bx-total">—</strong></div>
@@ -206,6 +207,20 @@ import { mascotSvg } from '../lib/mascot';
       </div>
     </section>
   </div>
+
+  <section class="week" id="semaine" aria-labelledby="week-h">
+    <div class="wk-streak">
+      <div class="wk-flame" aria-hidden="true"><span id="wk-cur">0</span></div>
+      <div>
+        <h2 id="week-h">Ma semaine</h2>
+        <p class="wk-line" id="wk-line">Joue un des trois jeux du jour pour lancer ta série.</p>
+        <p class="muted small" id="wk-best"></p>
+      </div>
+    </div>
+    <ol class="wk-days" id="wk-days" aria-label="Les 7 derniers jours"></ol>
+    <div class="wk-tot" id="wk-tot"></div>
+    <p class="muted small wk-note">Une série compte les jours d'affilée où tu joues au moins un jeu du jour (l'entraînement ne compte pas). Tous les 7 jours d'affilée, le booster du jour est boosté.</p>
+  </section>
 
   <p class="notice">
     Jeux gratuits, sans achat, sans compte et sans classement en ligne : rien n'est vendu ni gagné en vrai, les cartes gagnées rejoignent seulement ta collection, qui reste dans ton navigateur. Images et données de cartes : TCGdex.
@@ -365,7 +380,7 @@ import { mascotSvg } from '../lib/mascot';
       const ok = !!g && isRight(g, mc.answer);
       if (ok) rec.won = true;
       if (ok || rec.guesses.length >= MAX_TRIES) rec.done = true;
-      if (mode === 'daily') saveDay(today, rec);
+      if (mode === 'daily') { saveDay(today, rec); window.dispatchEvent(new CustomEvent('defi:changed')); }
       ($('guess') as HTMLInputElement).value = '';
       closeList();
       if (!ok && g) { $('stage').classList.remove('shake'); void $('stage').offsetWidth; $('stage').classList.add('shake'); }
@@ -425,6 +440,7 @@ import { mascotSvg } from '../lib/mascot';
       if (!addItem({ cardId: card.id, lang: 'fr', name: card.name, image: card.image, setName: card.set?.name, rarity: card.rarity, condition: 'NM', finish: 'normal', quantity: 1 })) { toast('Cette carte est déjà dans ton classeur.'); showResult(); return; }
       rec.claimed = true;
       saveDay(today, rec);
+      window.dispatchEvent(new CustomEvent('defi:changed'));
       showResult();
       toast(`${card.name} rejoint ton classeur !`);
     });
@@ -533,7 +549,8 @@ import { mascotSvg } from '../lib/mascot';
   </script>
 
   <script>
-    import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, type BoosterState, type Pulled } from '../lib/booster';
+    import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
+    import { syncToday, streak as getStreak, week, played } from '../lib/progress';
     import { todayNumber, msToMidnight, getDay } from '../lib/mystery';
     import { loadMarket, type Quote } from '../lib/market';
     import { addItem, hasCard } from '../lib/collection';
@@ -582,6 +599,58 @@ import { mascotSvg } from '../lib/mascot';
       $('st-booster').textContent = !b ? 'à ouvrir' : b.claimed ? 'carte gagnée' : 'ouvert';
       const dd = getDaily();
       $('st-duel').textContent = !dd?.answered ? 'à jouer' : dd.ok ? (dd.claimed ? 'carte gagnée' : 'gagné') : 'perdu';
+      const hit = b?.opened && !bxTrain && pulled.length === 10 ? hitLevel(pulled[9].card) : undefined;
+      syncToday({ boosterOpened: !!b?.opened, boosterClaimed: !!b?.claimed, hit, duel: dd?.answered ? (dd.ok ? 'ok' : 'ko') : undefined, duelClaimed: !!dd?.claimed });
+      renderWeek();
+      renderBoost();
+    }
+    window.addEventListener('defi:changed', () => refreshStatus());
+
+    /* ---------- Série et récap de la semaine ---------- */
+    const pct = (x: number) => `${Math.round(x * 100)} %`;
+    const rateText = (r: typeof RATES) => `Chances pour la dixième carte : ${pct(r.top)} carte exceptionnelle (hyper rare, dorée…), ${pct(r.chase)} carte « chasse » (numéro au-delà de la série), ${pct(r.upper)} rare de la série, ${pct(1 - r.top - r.chase - r.upper)} carte ordinaire. Simulation : ce ne sont pas les taux officiels.`;
+    function renderBoost() {
+      const st = getStreak();
+      const daily = !bxTrain;
+      const saved = getBooster();
+      const boosted = daily && (saved ? !!saved.boost : st.boostToday);
+      $('bx-boost').hidden = !boosted;
+      if (boosted) $('bx-boost-t').textContent = `${st.playedToday ? st.current : st.current + 1} jours d'affilée, ton booster du jour a de meilleures chances.`;
+      $('bx-rates').textContent = rateText(boosted ? BOOST_RATES : RATES);
+    }
+    const DAYS = ['di', 'lu', 'ma', 'me', 'je', 've', 'sa'];
+    function renderWeek() {
+      const st = getStreak();
+      $('wk-cur').textContent = String(st.current);
+      $('wk-line').textContent = st.current === 0
+        ? 'Joue un des trois jeux du jour pour lancer ta série.'
+        : `${st.current} jour${st.current > 1 ? 's' : ''} d'affilée${st.playedToday ? '' : ' : joue aujourd’hui pour ne pas la perdre'}.`;
+      $('wk-best').textContent = `Record : ${st.best} jour${st.best > 1 ? 's' : ''}. ${st.boostToday && !st.playedToday ? 'Aujourd’hui : booster boosté !' : st.nextBoostIn === 0 ? 'Booster boosté aujourd’hui.' : `Booster boosté dans ${st.nextBoostIn} jour${st.nextBoostIn > 1 ? 's' : ''} si tu continues.`}`;
+      const w = week();
+      const today = todayNumber();
+      $('wk-days').replaceChildren(...w.map((d) => {
+        const l = d.log;
+        const dot = (on: boolean | undefined, ok: boolean | undefined, label: string, short: string) =>
+          el('span', { class: `wk-g ${on ? (ok ? 'ok' : 'ko') : ''}`, title: label }, [short]);
+        return el('li', { class: `wk-day ${played(l) ? 'on' : ''} ${d.n === today ? 'today' : ''}` }, [
+          el('span', { class: 'wk-d' }, [d.n === today ? 'auj.' : DAYS[d.date.getDay()]]),
+          el('span', { class: 'wk-n' }, [String(d.date.getDate())]),
+          el('span', { class: 'wk-gs' }, [
+            dot(!!l.m, l.m === 'won', l.m ? (l.m === 'won' ? `Carte mystère trouvée en ${l.mt} essai${(l.mt ?? 1) > 1 ? 's' : ''}` : 'Carte mystère ratée') : 'Carte mystère pas jouée', 'M'),
+            dot(l.b !== undefined, l.b !== undefined, l.b !== undefined ? 'Booster ouvert' : 'Booster pas ouvert', 'B'),
+            dot(!!l.d, l.d === 'ok', l.d ? (l.d === 'ok' ? 'Duel gagné' : 'Duel perdu') : 'Duel pas joué', 'D'),
+          ]),
+        ]);
+      }));
+      const sum = (f: (x: typeof w[number]) => number) => w.reduce((n, x) => n + f(x), 0);
+      const tiles: [string, number][] = [
+        ['jours joués', sum((x) => (played(x.log) ? 1 : 0))],
+        ['cartes mystère trouvées', sum((x) => (x.log.m === 'won' ? 1 : 0))],
+        ['boosters ouverts', sum((x) => (x.log.b !== undefined ? 1 : 0))],
+        ['duels gagnés', sum((x) => (x.log.d === 'ok' ? 1 : 0))],
+        ['cartes rangées', sum((x) => x.log.cards ?? 0)],
+      ];
+      $('wk-tot').replaceChildren(...tiles.map(([k, v]) => el('div', {}, [el('strong', {}, [String(v)]), el('span', { class: 'muted small' }, [k])])));
     }
 
     /* ---------- Booster du jour ---------- */
@@ -590,17 +659,25 @@ import { mascotSvg } from '../lib/mascot';
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    function mini(p: Pulled, i: number, faceUp: boolean) {
+    function mini(p: Pulled, i: number, faceUp: boolean, last = false) {
       const c = p.card;
-      const box = el('div', { class: `bx-c ${faceUp ? 'up' : ''}`, style: `--i:${i}` }, [
+      const box = el('div', { class: `bx-c ${faceUp ? 'up' : ''} ${last ? 'last' : ''}`, style: `--i:${i}` }, [
         el('div', { class: 'bx-inner' }, [
-          el('div', { class: 'bx-back' }, [el('span', {}, ['HC'])]),
+          last
+            ? el('button', { type: 'button', class: 'bx-back', 'aria-label': 'Retourner la dixième carte' }, [el('span', {}, ['10']), el('small', {}, ['Retourne-moi'])])
+            : el('div', { class: 'bx-back' }, [el('span', {}, ['HC'])]),
           el('a', { class: 'bx-front', href: c ? url(`/carte/?id=${encodeURIComponent(p.id)}&lang=fr`) : '#', title: c?.name ?? '' }, [
             c?.image ? el('img', { src: `${c.image}/low.webp`, alt: c.name, loading: 'lazy', referrerpolicy: 'no-referrer' }) : el('span', { class: 'bx-ph' }, [c?.name ?? 'Carte']),
             el('span', { class: 'bx-v' }, [fmt(p.value, p.unit)]),
           ]),
         ]),
       ]);
+      const img = box.querySelector('img');
+      img?.addEventListener('error', () => {
+        if (img.src.includes('/fr/')) { img.dataset.fbk = '1'; img.src = img.src.replace('/fr/', '/en/'); return; }
+        img.replaceWith(el('span', { class: 'bx-ph' }, [c?.name ?? 'Carte']));
+      });
+      if (last) box.querySelector('button.bx-back')?.addEventListener('click', () => revealHit());
       return box;
     }
 
@@ -611,11 +688,11 @@ import { mascotSvg } from '../lib/mascot';
       const box = $('hit-card');
       if (!reveal) {
         box.className = 'hit-card hidden-card';
-        box.replaceChildren(el('button', { type: 'button', class: 'hit-back', id: 'hit-reveal' }, [el('span', {}, ['?']), el('small', {}, ['Touche pour révéler'])]));
+        box.replaceChildren(el('button', { type: 'button', class: 'hit-back', id: 'hit-reveal' }, [el('span', {}, ['10']), el('small', {}, ['Retourner la dernière carte'])]));
         $('hit-reveal').addEventListener('click', () => revealHit());
-        $('hit-k').textContent = 'Ta carte à gagner';
-        $('hit-name').textContent = 'Mystère…';
-        $('hit-meta').textContent = 'La dernière carte du booster, celle que tu peux garder.';
+        $('hit-k').textContent = 'Dernière carte du booster';
+        $('hit-name').textContent = '10ᵉ carte, encore face cachée';
+        $('hit-meta').textContent = bxTrain ? 'Retourne-la pour voir ce que tu as tiré.' : 'Retourne-la : c’est cette carte du booster du jour que tu peux ranger dans ton classeur.';
         $('hit-price').textContent = '';
         ($('bx-claim') as HTMLButtonElement).hidden = true;
         $('bx-claim-note').hidden = true;
@@ -624,7 +701,8 @@ import { mascotSvg } from '../lib/mascot';
       const lvl = hitLevel(c ?? null);
       box.className = `hit-card lvl-${lvl}`;
       box.replaceChildren(holoCard(c?.image, c?.name ?? 'Carte', 'high'));
-      $('hit-k').textContent = ['Ta carte à gagner', 'Belle prise !', 'Superbe carte !', 'Carte exceptionnelle !'][lvl];
+      $('hit-k').textContent = ['Dernière carte du booster', 'Dernière carte : belle prise !', 'Dernière carte : superbe !', 'Dernière carte : exceptionnelle !'][lvl];
+      document.querySelector('#bx-cards .bx-c.last')?.classList.add('up');
       $('hit-name').textContent = c?.name ?? 'Carte inconnue';
       $('hit-meta').textContent = [c?.set?.name, c?.rarity].filter(Boolean).join(' · ');
       $('hit-price').replaceChildren(...(p?.value !== undefined ? [el('span', { class: 'muted small' }, ['Cote du jour ']), el('strong', {}, [fmt(p.value, p.unit)])] : []));
@@ -654,7 +732,12 @@ import { mascotSvg } from '../lib/mascot';
       $('bx-sum').hidden = false;
     }
 
+    let revealing = false;
     async function revealHit() {
+      if (revealing || !$('hit-card').classList.contains('hidden-card')) return;
+      revealing = true;
+      setTimeout(() => { revealing = false; }, 600);
+      document.querySelector('#bx-cards .bx-c.last')?.classList.add('up');
       const box = $('hit-card');
       box.classList.add('flipping');
       if (!reduced) await sleep(450);
@@ -672,7 +755,7 @@ import { mascotSvg } from '../lib/mascot';
       pack.classList.add('tearing');
       try {
         if (bxTrain) bState = await drawBooster({ save: false, setId: BOOSTER_SETS[Math.floor(Math.random() * BOOSTER_SETS.length)] });
-        else if (!bState) bState = await drawBooster();
+        else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday });
         if (!bState) throw new Error('booster');
         pulled = await loadPulled(bState.cards);
       } catch {
@@ -686,7 +769,7 @@ import { mascotSvg } from '../lib/mascot';
       const grid = $('bx-cards');
       grid.hidden = false;
       const nine = pulled.slice(0, 9);
-      grid.replaceChildren(...nine.map((p, i) => mini(p, i, false)));
+      grid.replaceChildren(...nine.map((p, i) => mini(p, i, false)), mini(pulled[9], 9, false, true));
       for (let i = 0; i < nine.length; i++) {
         await sleep(reduced ? 0 : 170);
         grid.children[i]?.classList.add('up');
@@ -733,7 +816,7 @@ import { mascotSvg } from '../lib/mascot';
       pulled = await loadPulled(bState.cards);
       $('bx-state').replaceChildren();
       $('bx-cards').hidden = false;
-      $('bx-cards').replaceChildren(...pulled.slice(0, 9).map((p, i) => mini(p, i, true)));
+      $('bx-cards').replaceChildren(...pulled.slice(0, 9).map((p, i) => mini(p, i, true)), mini(pulled[9], 9, bState.opened, true));
       renderSummary();
       renderHit(bState.opened);
     }
@@ -1016,9 +1099,13 @@ import { mascotSvg } from '../lib/mascot';
     .pack-cta { position: absolute; bottom: 7%; font-weight: 800; font-size: 0.9rem; padding: 8px 16px; border-radius: 999px; background: #0a0812; color: #fff; animation: blink 1.6s infinite; }
     .pack.tearing { animation: tear 0.6s ease-in forwards; }
     @keyframes tear { 30% { transform: rotate(-4deg) scale(1.03); } 60% { transform: rotate(4deg) scale(1.05); } 100% { transform: translateY(-40px) scale(0.9); opacity: 0; } }
-    .bx-cards { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 10px; perspective: 1000px; }
-    @media (max-width: 900px) { .bx-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-    @media (max-width: 520px) { .bx-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .bx-cards { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 10px; perspective: 1000px; }
+    @media (max-width: 900px) { .bx-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; } }
+    .bx-cards :global(.bx-c.last) { border-radius: 8px; box-shadow: 0 0 0 2px rgba(255, 210, 90, 0.85), 0 0 26px rgba(255, 79, 216, 0.45); }
+    .bx-cards :global(button.bx-back) { width: 100%; height: 100%; padding: 0; cursor: pointer; font: inherit; grid-template-rows: auto auto; align-content: center; gap: 2px; animation: pulseg 1.6s ease-in-out infinite; }
+    .bx-cards :global(button.bx-back span) { font-size: 1.4rem; }
+    .bx-cards :global(button.bx-back small) { font-size: 0.6rem; font-weight: 700; color: var(--text); }
+    .bx-cards :global(.bx-c.up button.bx-back) { pointer-events: none; animation: none; }
     .bx-cards :global(.bx-c) { aspect-ratio: 245 / 342; }
     .bx-cards :global(.bx-inner) { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1); }
     .bx-cards :global(.bx-c.up .bx-inner) { transform: rotateY(180deg); }
@@ -1038,16 +1125,48 @@ import { mascotSvg } from '../lib/mascot';
     .hit-card.lvl-2::before, .hit-card.lvl-3::before { content: ''; position: absolute; inset: -18%; z-index: -1; border-radius: 50%; filter: blur(30px); opacity: 0.7; background: radial-gradient(circle, rgba(255, 210, 90, 0.8), transparent 65%); }
     .hit-card.lvl-3::after { content: ''; position: absolute; inset: -40%; z-index: -2; background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.16) 0 8deg, transparent 8deg 24deg); border-radius: 50%; animation: spinr 9s linear infinite; mask: radial-gradient(circle, #000 30%, transparent 70%); -webkit-mask: radial-gradient(circle, #000 30%, transparent 70%); }
     @keyframes spinr { to { transform: rotate(360deg); } }
-    .hit-back { width: 100%; height: 100%; border-radius: 12px; border: 2px solid rgba(255, 210, 90, 0.7); cursor: pointer; color: var(--gold); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    .hit-card :global(.hit-back) { width: 100%; height: 100%; border-radius: 12px; border: 2px solid rgba(255, 210, 90, 0.7); cursor: pointer; color: var(--gold); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
       background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 8px, transparent 8px 16px), linear-gradient(160deg, #2a2260, #120f26); box-shadow: 0 0 40px rgba(255, 210, 90, 0.35); animation: pulseg 1.6s ease-in-out infinite; }
-    .hit-back span { font-family: var(--font-display); font-weight: 800; font-size: 4rem; line-height: 1; }
-    .hit-back small { font-weight: 700; color: var(--text); }
-    .hit-back:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }
+    .hit-card :global(.hit-back span) { font-family: var(--font-display); font-weight: 800; font-size: 4rem; line-height: 1; }
+    .hit-card :global(.hit-back small) { font-weight: 700; color: var(--text); }
+    .hit-card :global(.hit-back:focus-visible) { outline: 3px solid var(--cyan); outline-offset: 4px; }
     @keyframes pulseg { 50% { box-shadow: 0 0 70px rgba(255, 79, 216, 0.55); } }
     .hit-k { margin: 0 0 4px; font-weight: 800; color: var(--gold); }
     .hit-name { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 4px; }
     .hit-price { margin: 10px 0 14px; } .hit-price :global(strong) { font-family: var(--font-display); font-size: 1.5rem; color: var(--gold); }
     .bx-rates { margin: -10px 0 0; text-align: center; }
+    .bx-boost { margin: 0 0 16px; padding: 12px 16px; border-radius: 14px; text-align: center; color: #0a0812; background: var(--holo); font-weight: 600; box-shadow: 0 0 30px rgba(255, 79, 216, 0.3); }
+
+    .week { margin: 48px 0 24px; padding: 24px; border-radius: 24px; border: 1px solid var(--line); background: linear-gradient(160deg, rgba(138, 123, 255, 0.08), rgba(255, 79, 216, 0.04) 60%, transparent), var(--surface); display: grid; gap: 20px; }
+    .wk-streak { display: flex; align-items: center; gap: 18px; }
+    .wk-streak h2 { margin: 0 0 4px; font-size: 1.5rem; }
+    .wk-line { margin: 0 0 2px; font-weight: 600; }
+    .wk-best { margin: 0; }
+    .wk-flame { flex: 0 0 auto; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(from 200deg, #ffd25a, #ff4fd8, #8a7bff, #3ef0ff, #ffd25a); box-shadow: 0 0 30px rgba(255, 79, 216, 0.35); }
+    .wk-flame span { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-2); font-family: var(--font-display, inherit); font-size: 1.6rem; font-weight: 800; }
+    .wk-days { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    :global(.wk-day) { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); color: var(--muted); }
+    :global(.wk-day.on) { border-color: rgba(62, 240, 255, 0.45); background: rgba(62, 240, 255, 0.06); color: var(--text); }
+    :global(.wk-day.today) { box-shadow: 0 0 0 2px rgba(255, 79, 216, 0.6); }
+    :global(.wk-d) { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    :global(.wk-n) { font-size: 1.2rem; font-weight: 800; }
+    :global(.wk-gs) { display: flex; gap: 3px; }
+    :global(.wk-g) { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 0.62rem; font-weight: 800; background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+    :global(.wk-g.ok) { background: rgba(61, 255, 168, 0.22); color: var(--up); }
+    :global(.wk-g.ko) { background: rgba(255, 90, 122, 0.2); color: var(--down); }
+    .wk-tot { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .wk-tot :global(div) { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); }
+    .wk-tot :global(strong) { font-size: 1.4rem; }
+    .wk-note { margin: 0; }
+    @media (max-width: 720px) {
+      .week { padding: 18px 14px; }
+      .wk-days { gap: 4px; }
+      :global(.wk-day) { padding: 8px 2px; }
+      :global(.wk-gs) { flex-direction: column; }
+      :global(.wk-g) { width: 18px; height: 16px; }
+      .wk-tot { grid-template-columns: repeat(2, 1fr); }
+      .wk-tot :global(div:last-child) { grid-column: 1 / -1; }
+    }
     .bx-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .bx-sum div { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
     .bx-sum strong { font-family: var(--font-display); font-size: 1.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }

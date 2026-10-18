@@ -119,6 +119,7 @@ import { CONDITIONS } from '../lib/condition';
           </div>
         </div>
         <p class="muted small" data-slot="estimate"></p>
+        <p class="muted small">Choisis bien l'état : une fois la carte rangée, il ne pourra plus être changé.</p>
         <div class="confirm-actions">
           <button class="btn btn-primary" type="submit">Ajouter à ma collection</button>
           <button class="btn" type="button" data-slot="not-mine">Ce n'est pas ma carte</button>
@@ -518,7 +519,7 @@ import { CONDITIONS } from '../lib/condition';
       $('cam-diag-text').textContent = [
         `Navigateur : ${browser} · ${os}`,
         `Adresse sécurisée : ${window.isSecureContext ? 'oui' : 'non'}`,
-        `Accès caméra possible : ${navigator.mediaDevices?.getUserMedia ? 'oui' : 'non'}`,
+        `Accès caméra possible : ${typeof navigator.mediaDevices?.getUserMedia === 'function' ? 'oui' : 'non'}`,
         `Caméras trouvées : ${camList.length ? camList.map((c) => c.label).join(' / ') : 'aucune (ou accès pas encore donné)'}`,
         `Caméra utilisée : ${t ? t.label || 'sans nom' : 'aucune'}`,
         `Image : ${video.videoWidth || 0} × ${video.videoHeight || 0}${st.frameRate ? ` à ${Math.round(st.frameRate)} i/s` : ''}`,

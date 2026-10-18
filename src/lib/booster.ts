@@ -10,10 +10,12 @@ export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me0
 
 /** Chances pour la dixième carte (affichées sur la page). */
 export const RATES = { top: 0.03, chase: 0.12, upper: 0.3 };
+/** Bonus de série (7ᵉ jour d'affilée) : chances augmentées pour la dixième carte. */
+export const BOOST_RATES = { top: 0.08, chase: 0.22, upper: 0.35 };
 
 export const setOfDay = (n = todayNumber()) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
 
-export interface BoosterState { day: number; setId: string; setName: string; cards: string[]; opened: boolean; claimed: boolean }
+export interface BoosterState { day: number; setId: string; setName: string; cards: string[]; opened: boolean; claimed: boolean; boost?: boolean }
 const KEY = 'holocote.booster.v1';
 
 export function getBooster(): BoosterState | null {
@@ -39,7 +41,7 @@ async function setDetail(id: string): Promise<SetDetail | null> {
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
 /** Tire un nouveau booster : 9 cartes de l'extension, puis une 10ᵉ « carte à gagner » plus souvent rare. */
-export async function drawBooster(opts: { save?: boolean; setId?: string } = {}): Promise<BoosterState | null> {
+export async function drawBooster(opts: { save?: boolean; setId?: string; boost?: boolean } = {}): Promise<BoosterState | null> {
   const day = todayNumber();
   const setId = opts.setId ?? setOfDay(day);
   const d = await setDetail(setId);
@@ -52,16 +54,17 @@ export async function drawBooster(opts: { save?: boolean; setId?: string } = {})
   const chosen = new Set<string>();
   while (chosen.size < 9) chosen.add(pick(main).id);
   // Dernière carte, chances proches d'un vrai booster (voir RATES) : les plus belles restent rares.
+  const R = opts.boost ? BOOST_RATES : RATES;
   const r = Math.random();
   const top = chase.slice(-Math.max(3, Math.ceil(chase.length / 5)));
   const rest = chase.filter((c) => !top.includes(c));
   const upper = main.slice(Math.floor(main.length * 0.6));
-  let last = r < RATES.top && top.length ? pick(top)
-    : r < RATES.top + RATES.chase && (rest.length || top.length) ? pick(rest.length ? rest : top)
-      : r < RATES.top + RATES.chase + RATES.upper ? pick(upper)
+  let last = r < R.top && top.length ? pick(top)
+    : r < R.top + R.chase && (rest.length || top.length) ? pick(rest.length ? rest : top)
+      : r < R.top + R.chase + R.upper ? pick(upper)
         : pick(main);
   while (chosen.has(last.id)) last = pick(main);
-  const s: BoosterState = { day, setId, setName: d.name, cards: [...chosen, last.id], opened: false, claimed: false };
+  const s: BoosterState = { day, setId, setName: d.name, cards: [...chosen, last.id], opened: false, claimed: false, boost: !!opts.boost };
   if (opts.save !== false) saveBooster(s);
   return s;
 }

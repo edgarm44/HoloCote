@@ -1,0 +1,246 @@
+---
+import Base from '../layouts/Base.astro';
+import { mascotSvg } from '../lib/mascot';
+const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
+---
+<Base title="Mon compte" active="account" description="Ton pseudo, tes quêtes du jour et tes succès HoloCote. Sans e-mail, sans mot de passe : tout reste dans ton navigateur.">
+  <section class="ac-hero">
+    <div class="ac-avatar" id="ac-avatar" set:html={mascotSvg('happy', 120)} />
+    <div class="ac-id">
+      <p class="eyebrow">Mon compte</p>
+      <h1><span id="ac-name">Dresseur</span></h1>
+      <p class="muted">Pas d'e-mail, pas de mot de passe, pas de connexion : ton compte vit dans ce navigateur.</p>
+    </div>
+  </section>
+
+  <section class="panel ac-edit" aria-labelledby="edit-h">
+    <h2 id="edit-h">Ton profil</h2>
+    <form id="ac-form" class="ac-form" autocomplete="off">
+      <div class="field">
+        <label for="ac-pseudo">Pseudo</label>
+        <input id="ac-pseudo" type="text" maxlength="20" placeholder="Ex. : Dresseur du Bourg" />
+        <p class="muted small">20 caractères maximum. Choisis un surnom, pas ton vrai nom. Il s'affiche sur le site (classement compris) et n'est jamais envoyé.</p>
+      </div>
+      <fieldset class="ac-moods">
+        <legend>Ton avatar</legend>
+        <div class="mood-row">
+          {MOODS.map((m) => (
+            <label class="mood">
+              <input type="radio" name="mood" value={m} />
+              <span set:html={mascotSvg(m, 56, `Coti ${m}`)} />
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <button class="btn btn-primary" type="submit">Enregistrer</button>
+    </form>
+  </section>
+
+  <section class="ac-stats" aria-label="Résumé">
+    <a class="tile" href="../collection/"><span class="t-v" id="t-cards">0</span><span class="t-l">cartes au classeur</span></a>
+    <a class="tile" href="#succes"><span class="t-v" id="t-badges">0</span><span class="t-l">succès</span></a>
+    <a class="tile" href="../defi/#semaine"><span class="t-v" id="t-streak">0</span><span class="t-l">jours d'affilée au Défi</span></a>
+    <a class="tile" href="#quetes"><span class="t-v" id="t-quests">0</span><span class="t-l">jours de quêtes terminées</span></a>
+  </section>
+
+  <section class="quests" id="quetes" aria-labelledby="q-h">
+    <div class="q-head">
+      <div>
+        <h2 id="q-h">Quêtes du jour</h2>
+        <p class="muted">Trois missions, les mêmes pour tout le monde, renouvelées à minuit. Nouvelles quêtes dans <strong id="q-next">--:--:--</strong>.</p>
+      </div>
+      <div class="q-score"><strong id="q-done">0</strong>/3</div>
+    </div>
+    <ol class="q-list" id="q-list"></ol>
+    <p class="muted small q-note" id="q-note">Termine les trois pour débloquer des succès (1, 7 et 30 jours). Rien n'est vendu ni gagné en vrai.</p>
+  </section>
+
+  <section class="badges" id="succes" aria-labelledby="succes-h">
+    <div class="bd-head">
+      <h2 id="succes-h">Succès</h2>
+      <p class="muted"><strong id="bd-count">0</strong> débloqués sur <span id="bd-total">0</span>. Remplis ton classeur, joue au Défi et fais tes quêtes pour les obtenir.</p>
+    </div>
+    <div id="bd-groups"></div>
+  </section>
+
+  <p class="notice">Ton pseudo, ton avatar, tes quêtes et tes succès sont gardés uniquement dans ce navigateur. Si tu effaces les données du site, ils disparaissent ; ta collection peut être exportée depuis l'onglet Collection.</p>
+
+  <script>
+    import { computeBadges } from '../lib/badges';
+    import { todayQuests, questDays } from '../lib/quests';
+    import { streak } from '../lib/progress';
+    import { countCards } from '../lib/collection';
+    import { getPseudo, setPseudo } from '../lib/leaderboard';
+    import { mascotSvg, type Mood } from '../lib/mascot';
+    import { msToMidnight } from '../lib/mystery';
+    import { el, url, toast } from '../lib/ui';
+
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const AV = 'holocote.avatar.v1';
+    const MOODS: Mood[] = ['happy', 'wink', 'wow', 'think', 'sad'];
+    const getMood = (): Mood => { try { const m = localStorage.getItem(AV) as Mood; return MOODS.includes(m) ? m : 'happy'; } catch { return 'happy'; } };
+
+    function renderProfile() {
+      const p = getPseudo();
+      $('ac-name').textContent = p === 'Toi' ? 'Dresseur sans nom' : p;
+      $('ac-avatar').innerHTML = mascotSvg(getMood(), 120);
+      $<HTMLInputElement>('ac-pseudo').value = p === 'Toi' ? '' : p;
+      const r = document.querySelector<HTMLInputElement>(`input[name=mood][value=${getMood()}]`);
+      if (r) r.checked = true;
+    }
+
+    $('ac-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const raw = $<HTMLInputElement>('ac-pseudo').value;
+      const clean = raw.replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
+      if (raw.trim() && !clean) { toast('Utilise des lettres, des chiffres, des espaces ou - _ . \''); return; }
+      setPseudo(clean);
+      const m = document.querySelector<HTMLInputElement>('input[name=mood]:checked')?.value;
+      try { if (m) localStorage.setItem(AV, m); } catch { /* rien */ }
+      renderProfile();
+      window.dispatchEvent(new CustomEvent('holocote:progress'));
+      toast(clean ? `Profil enregistré, ${clean} !` : 'Profil enregistré.');
+    });
+    document.querySelectorAll<HTMLInputElement>('input[name=mood]').forEach((r) => r.addEventListener('change', () => { $('ac-avatar').innerHTML = mascotSvg(r.value as Mood, 120); }));
+
+    function renderQuests() {
+      const q = todayQuests();
+      $('q-done').textContent = String(q.filter((x) => x.done).length);
+      $('q-list').replaceChildren(...q.map((x, i) => el('li', { class: `q ${x.done ? 'done' : ''}` }, [
+        el('span', { class: 'q-n', 'aria-hidden': 'true' }, [x.done ? '✓' : String(i + 1)]),
+        el('div', { class: 'q-tx' }, [
+          el('strong', {}, [x.title]),
+          el('span', { class: 'muted small' }, [x.hint]),
+          x.goal > 1 ? el('span', { class: 'q-bar', 'aria-label': `${x.value} sur ${x.goal}` }, [el('i', { style: `width:${(x.value / x.goal) * 100}%` })]) : null,
+        ]),
+        x.done ? el('span', { class: 'q-ok' }, ['Fait']) : el('a', { class: 'btn q-go', href: url(x.href) }, [x.goal > 1 ? `${x.value}/${x.goal} · Y aller` : 'Y aller']),
+      ])));
+      const all = q.every((x) => x.done);
+      $('q-note').textContent = all
+        ? 'Bravo, les trois quêtes du jour sont terminées. Reviens demain pour les suivantes.'
+        : 'Termine les trois pour débloquer des succès (1, 7 et 30 jours). Rien n’est vendu ni gagné en vrai.';
+      $('quetes').classList.toggle('all', all);
+    }
+
+    function renderBadges() {
+      const all = computeBadges();
+      const got = all.filter((b) => b.got).length;
+      $('bd-count').textContent = String(got);
+      $('bd-total').textContent = String(all.length);
+      $('t-badges').textContent = `${got}/${all.length}`;
+      const groups = [...new Set(all.map((b) => b.group))];
+      $('bd-groups').replaceChildren(...groups.map((g) => el('div', { class: 'bd-group' }, [
+        el('h3', {}, [g]),
+        el('ul', { class: 'bd-grid' }, all.filter((b) => b.group === g).map((b) => el('li', { class: `bd ${b.got ? 'got' : ''}`, title: b.got ? 'Débloqué' : 'À débloquer' }, [
+          el('span', { class: 'bd-ic', 'aria-hidden': 'true' }, [b.icon]),
+          el('span', { class: 'bd-tx' }, [
+            el('strong', {}, [b.name]),
+            el('span', { class: 'muted small' }, [b.hint]),
+            !b.got && b.progress ? el('span', { class: 'bd-bar', 'aria-label': `${b.progress[0]} sur ${b.progress[1]}` }, [el('i', { style: `width:${(b.progress[0] / b.progress[1]) * 100}%` }), el('em', {}, [`${b.progress[0]}/${b.progress[1]}`])]) : null,
+          ]),
+          b.got ? el('span', { class: 'bd-ok', 'aria-label': 'débloqué' }, ['✓']) : null,
+        ]))),
+      ])));
+    }
+
+    function renderAll() {
+      $('t-cards').textContent = String(countCards());
+      $('t-streak').textContent = String(streak().current);
+      $('t-quests').textContent = String(questDays().length);
+      renderQuests();
+      renderBadges();
+    }
+
+    renderProfile();
+    renderAll();
+    window.addEventListener('holocote:progress', () => setTimeout(renderAll, 800));
+    window.addEventListener('holocote:collection', renderAll);
+    const tick = () => {
+      const ms = msToMidnight();
+      $('q-next').textContent = [Math.floor(ms / 3.6e6), Math.floor((ms % 3.6e6) / 6e4), Math.floor((ms % 6e4) / 1000)].map((v) => String(v).padStart(2, '0')).join(':');
+      if (ms < 1500) setTimeout(renderAll, 2000);
+    };
+    tick();
+    setInterval(tick, 1000);
+  </script>
+
+  <style>
+    .ac-hero { display: flex; align-items: center; gap: clamp(18px, 4vw, 36px); padding: clamp(28px, 6vw, 56px) 0 24px; }
+    .ac-avatar { flex: 0 0 auto; width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center;
+      background: radial-gradient(circle at 50% 40%, rgba(138, 123, 255, 0.35), rgba(255, 79, 216, 0.12) 60%, transparent 72%); border: 2px solid rgba(255, 255, 255, 0.08); }
+    .eyebrow { margin: 0 0 6px; color: var(--cyan); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.8rem; }
+    .ac-id h1 { margin: 0 0 8px; font-family: var(--font-display); font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.05; word-break: break-word;
+      background: var(--holo); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .ac-id p { margin: 0; }
+    .ac-edit { margin-bottom: 20px; }
+    .ac-edit h2 { margin-top: 0; }
+    .ac-form { display: grid; gap: 16px; max-width: 640px; }
+    .ac-form .field p { margin: 6px 0 0; }
+    .ac-moods { border: 0; padding: 0; margin: 0; }
+    .ac-moods legend { font-weight: 600; margin-bottom: 8px; padding: 0; }
+    .mood-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .mood { position: relative; cursor: pointer; }
+    .mood input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+    .mood span { display: grid; place-items: center; width: 74px; height: 74px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); transition: border-color 0.2s, transform 0.2s; }
+    .mood input:checked + span { border-color: var(--magenta); box-shadow: 0 0 20px rgba(255, 79, 216, 0.3); transform: translateY(-2px); }
+    .mood input:focus-visible + span { outline: 3px solid var(--cyan); outline-offset: 3px; }
+    .ac-form .btn { justify-self: start; }
+
+    .ac-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 28px; }
+    .tile { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); color: var(--text); text-decoration: none; transition: border-color 0.2s; }
+    .tile:hover { border-color: rgba(62, 240, 255, 0.5); }
+    .t-v { font-family: var(--font-display); font-size: 1.7rem; font-weight: 800; }
+    .t-l { color: var(--muted); font-size: 0.85rem; }
+
+    .quests, .badges { margin: 0 0 28px; padding: 24px; border-radius: 24px; border: 1px solid var(--line); scroll-margin-top: 90px; }
+    .quests { background: linear-gradient(160deg, rgba(62, 240, 255, 0.08), rgba(138, 123, 255, 0.05) 60%, transparent), var(--surface); }
+    .quests.all { border-color: rgba(61, 255, 168, 0.5); }
+    .q-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+    .q-head h2 { margin: 0 0 4px; }
+    .q-head p { margin: 0; }
+    .q-score { font-family: var(--font-display); font-size: 1.2rem; color: var(--muted); white-space: nowrap; }
+    .q-score strong { font-size: 2.2rem; color: var(--text); }
+    .q-list { list-style: none; margin: 18px 0 12px; padding: 0; display: grid; gap: 10px; }
+    .q-list :global(.q) { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); }
+    .q-list :global(.q.done) { border-color: rgba(61, 255, 168, 0.45); background: rgba(61, 255, 168, 0.05); }
+    .q-list :global(.q-n) { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--surface-2); }
+    .q-list :global(.q.done .q-n) { background: rgba(61, 255, 168, 0.22); color: var(--up); }
+    .q-list :global(.q-tx) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .q-list :global(.q.done strong) { text-decoration: line-through; text-decoration-color: rgba(61, 255, 168, 0.6); }
+    .q-list :global(.q-bar) { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); position: relative; max-width: 260px; }
+    .q-list :global(.q-bar i) { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--holo); }
+    .q-list :global(.q-go) { flex: 0 0 auto; white-space: nowrap; }
+    .q-list :global(.q-ok) { flex: 0 0 auto; color: var(--up); font-weight: 800; }
+    .q-note { margin: 0; }
+
+    .badges { background: linear-gradient(160deg, rgba(255, 210, 90, 0.07), rgba(255, 79, 216, 0.04) 55%, transparent), var(--surface); }
+    .bd-head h2 { margin: 0 0 4px; }
+    .bd-head p { margin: 0 0 8px; }
+    #bd-groups :global(h3) { margin: 18px 0 10px; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+    #bd-groups :global(.bd-grid) { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    #bd-groups :global(.bd) { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); }
+    #bd-groups :global(.bd:not(.got) .bd-ic) { filter: grayscale(1); opacity: 0.35; }
+    #bd-groups :global(.bd:not(.got) strong) { color: var(--muted); }
+    #bd-groups :global(.bd.got) { border-color: rgba(255, 210, 90, 0.45); box-shadow: 0 0 22px rgba(255, 210, 90, 0.1); }
+    #bd-groups :global(.bd-ic) { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--holo); color: #0a0812; font-weight: 800; font-size: 0.8rem; }
+    #bd-groups :global(.bd-tx) { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+    #bd-groups :global(.bd-bar) { position: relative; display: block; height: 6px; margin-top: 4px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); }
+    #bd-groups :global(.bd-bar i) { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--holo); }
+    #bd-groups :global(.bd-bar em) { position: absolute; right: 0; top: 8px; font-style: normal; font-size: 0.68rem; color: var(--muted); }
+    #bd-groups :global(.bd-ok) { position: absolute; top: 8px; right: 10px; color: var(--gold, #ffd25a); font-weight: 800; }
+
+    @media (max-width: 720px) {
+      .ac-hero { flex-direction: column; text-align: center; padding-top: 24px; }
+      .ac-avatar { width: 130px; height: 130px; }
+      .ac-stats { grid-template-columns: 1fr 1fr; }
+      .quests, .badges { padding: 18px 14px; }
+      .q-list :global(.q) { flex-wrap: wrap; }
+      .q-list :global(.q-go) { width: 100%; text-align: center; }
+      .mood span { width: 58px; height: 58px; }
+      .mood span :global(svg) { width: 44px; height: auto; }
+      #bd-groups :global(.bd-grid) { grid-template-columns: 1fr 1fr; }
+      #bd-groups :global(.bd) { flex-direction: column; text-align: center; }
+      #bd-groups :global(.bd-bar) { margin-bottom: 14px; }
+    }
+  </style>
+</Base>

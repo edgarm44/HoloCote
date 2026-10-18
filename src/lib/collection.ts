@@ -63,11 +63,6 @@ export function storageAvailable(): boolean {
   }
 }
 
-export type ItemKey = Pick<Item, 'cardId' | 'lang' | 'condition' | 'finish'>;
-
-const sameLine = (a: ItemKey, b: ItemKey) =>
-  a.cardId === b.cardId && a.lang === b.lang && a.condition === b.condition && a.finish === b.finish;
-
 export function getItems(): Item[] {
   return [...load().items].sort((a, b) => b.addedAt - a.addedAt);
 }
@@ -91,23 +86,6 @@ export function addItem(item: Omit<Item, 'addedAt'>): boolean {
   store.items.push({ ...item, quantity: 1, addedAt: Date.now() });
   save(store);
   return true;
-}
-
-export function updateItem(key: ItemKey, patch: Partial<Pick<Item, 'quantity' | 'condition'>>): void {
-  const store = load();
-  const item = store.items.find((i) => sameLine(i, key));
-  if (!item) return;
-  if (patch.quantity !== undefined) item.quantity = clampQty(patch.quantity);
-  if (patch.condition && patch.condition !== item.condition) {
-    const target = store.items.find((i) => sameLine(i, { ...item, condition: patch.condition! }));
-    if (target) {
-      target.quantity = clampQty(target.quantity + item.quantity);
-      store.items = store.items.filter((i) => i !== item);
-    } else {
-      item.condition = patch.condition;
-    }
-  }
-  save(store);
 }
 
 export function exportJson(): string {

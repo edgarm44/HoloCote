@@ -1,6 +1,5 @@
 ---
 import Base from '../layouts/Base.astro';
-import { CONDITIONS } from '../lib/condition';
 import { mascotSvg } from '../lib/mascot';
 ---
 <Base title="Ma collection" active="collection" description="Ta collection de cartes, stockée dans ton navigateur.">
@@ -74,7 +73,7 @@ import { mascotSvg } from '../lib/mascot';
   <section class="panel backup">
     <div>
       <h2>Sauvegarde</h2>
-      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil. Une sauvegarde se restaure sur une collection vide (par exemple sur un nouvel appareil). Les cartes rangées restent dans ton classeur : on ne peut ni les supprimer ni les dupliquer.</p>
+      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil. Une sauvegarde se restaure sur une collection vide (par exemple sur un nouvel appareil). Les cartes rangées restent dans ton classeur : on ne peut ni les supprimer, ni les dupliquer, ni changer leur état.</p>
     </div>
     <div class="backup-actions">
       <button class="btn" id="export" type="button">Exporter</button>
@@ -101,16 +100,14 @@ import { mascotSvg } from '../lib/mascot';
         <div class="stepper" title="Une carte rangée reste dans ton classeur. Pour un exemplaire de plus, scanne-la.">
           <span class="qty-x">×</span><span data-slot="qty"></span>
         </div>
-        <select data-slot="cond">
-          {CONDITIONS.map((c) => <option value={c.code} title={c.label}>{c.code} · {c.label}</option>)}
-        </select>
+        <span class="cond-chip" data-slot="cond" title="État choisi à l'ajout : il ne change plus ensuite."></span>
       </div>
     </article>
   </template>
 
   <script>
-    import { getItems, updateItem, exportJson, importJson, storageAvailable, type Item } from '../lib/collection';
-    import { conditionFactor, type Condition } from '../lib/condition';
+    import { getItems, exportJson, importJson, storageAvailable, type Item } from '../lib/collection';
+    import { conditionFactor, conditionLabel } from '../lib/condition';
     import { getCard, priceFor, formatPrice, type Card, type PriceInfo } from '../lib/tcgdex';
     import { rarityTier, USD_TO_EUR, type Tier } from '../lib/rarity';
     import { holoCard, el, toast, url } from '../lib/ui';
@@ -183,10 +180,7 @@ import { mascotSvg } from '../lib/mascot';
       s('sub').textContent = [it.setName, it.lang.toUpperCase()].filter(Boolean).join(' · ');
       s('qty').textContent = String(it.quantity);
 
-      const cond = s('cond') as HTMLSelectElement;
-      cond.value = it.condition;
-      cond.setAttribute('aria-label', `État de ${it.name}`);
-      cond.addEventListener('change', () => { updateItem(it, { condition: cond.value as Condition }); render(); });
+      s('cond').textContent = `${it.condition} · ${conditionLabel(it.condition)}`;
       return node;
     }
 
@@ -353,7 +347,8 @@ import { mascotSvg } from '../lib/mascot';
     .stepper button { width: 30px; height: 34px; border: 0; background: none; color: var(--text); cursor: pointer; font-size: 1.05rem; }
     .stepper .qty-x { min-width: 0; padding: 0 0 0 10px; color: var(--muted); }
     .stepper span { min-width: 22px; padding: 0 10px 0 2px; line-height: 34px; text-align: center; font-weight: 700; font-size: 0.9rem; }
-    .slot-controls select { order: 3; flex: 1 1 100%; min-width: 0; min-height: 36px; padding: 4px 6px; font-size: 0.8rem; border-radius: 10px; }
+    .cond-chip { order: 3; flex: 1 1 100%; min-width: 0; padding: 6px 8px; font-size: 0.78rem; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
     .remove { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; }
     .remove:hover { color: var(--danger); border-color: rgba(255, 90, 122, 0.5); }
 
