@@ -5,7 +5,7 @@ import { CONDITIONS } from '../lib/condition';
 <Base title="Scanner" active="scanner" description="Scanne ta carte pour retrouver sa cote et l'ajouter à ta collection.">
   <section class="sc-hero">
     <h1>Pose ta carte.<br />On lit tout.</h1>
-    <p class="sc-lead">Nom, PV, numéro, illustration : en quelques secondes, le scanner reconnaît ta carte parmi des milliers et affiche sa cote du jour. Rien n'est envoyé, tout se passe dans ton téléphone.</p>
+    <p class="sc-lead">Nom, PV, numéro, illustration : en quelques secondes, le scanner reconnaît ta carte parmi des milliers et affiche sa cote du jour. Rien n'est envoyé, tout se passe sur ton appareil (ordi ou téléphone).</p>
     <ol class="steps" id="steps" aria-label="Étapes du scan">
       <li data-step="1" class="on"><span class="st-n">1</span><span>Vise</span></li>
       <li data-step="2"><span class="st-n">2</span><span>Lecture</span></li>
@@ -396,7 +396,7 @@ import { CONDITIONS } from '../lib/condition';
       stepEls.forEach((li) => {
         const k = Number(li.dataset.step);
         li.classList.toggle('on', k === n);
-        li.classList.toggle('done', k < n);
+        li.classList.toggle('past', k < n);
       });
     }
     const HIST_KEY = 'holocote.scans.v1';
@@ -917,8 +917,8 @@ import { CONDITIONS } from '../lib/condition';
     .st-n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-size: 0.8rem; }
     .steps li.on { color: var(--text); border-color: rgba(62, 240, 255, 0.6); box-shadow: 0 0 20px rgba(62, 240, 255, 0.15); }
     .steps li.on .st-n { background: var(--holo); color: #0a0812; }
-    .steps li.done { color: var(--up); }
-    .steps li.done .st-n { background: rgba(61, 255, 168, 0.2); }
+    .steps li.past { color: var(--up); }
+    .steps li.past .st-n { background: rgba(61, 255, 168, 0.2); }
     .history { margin-bottom: 28px; }
     .h-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
     .h-head h2 { margin: 0; font-size: 1.3rem; }
