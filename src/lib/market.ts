@@ -89,6 +89,90 @@ export const WATCHLIST: string[] = [
   '30th-158',       // Mew-ex — 30ᵉ Anniversaire
   '30th-157',       // Mewtwo-ex — 30ᵉ Anniversaire
   '30th-154',       // Ectoplasma-ex — 30ᵉ Anniversaire
+  // Ajouts du 18 octobre 2026, après-midi (identifiants vérifiés dans la base TCGdex du 3 octobre 2026)
+  'base1-3',                  // Leveinard
+  'base1-5',                  // Mélofée
+  'base1-6',                  // Léviator
+  'base1-7',                  // Tygnon
+  'base1-8',                  // Mackogneur
+  'base1-9',                  // Magnéton
+  'base1-11',                  // Nidoking
+  'base1-12',                  // Feunard
+  'base1-13',                  // Tartard
+  'base1-14',                  // Raichu
+  'base1-44',                  // Bulbizarre
+  'base1-46',                  // Salamèche
+  'base1-63',                  // Carapuce
+  'swsh3-20',                  // Dracaufeu VMAX
+  'swsh3-19',                  // Dracaufeu V
+  'swsh1-142',                  // Ronflex VMAX
+  'swsh3-117',                  // Éthernatos VMAX
+  'swsh7-217',                  // Rayquaza VMAX
+  'swsh7-211',                  // Nymphali VMAX
+  'swsh7-214',                  // Noctali VMAX
+  'swsh7-209',                  // Givrali VMAX
+  'swsh8-268',                  // Mew VMAX
+  'swsh8-270',                  // Mentali VMAX
+  'swsh8-265',                  // Lugulabre VMAX
+  'swsh9-176',                  // Arceus VSTAR
+  'swsh9-184',                  // Arceus VSTAR
+  'swsh10-099',                  // Darkrai VSTAR
+  'swsh10-040',                  // Palkia Originel VSTAR
+  'swsh11-212',                  // Giratina VSTAR
+  'swsh11-131',                  // Giratina VSTAR
+  'swsh12-211',                  // Lugia VSTAR
+  'swsh12-202',                  // Lugia VSTAR
+  'swsh12.5-019',                  // Dracaufeu VSTAR
+  'sv01-253',                  // Miraidon-ex
+  'sv01-244',                  // Miraidon-ex
+  'sv01-247',                  // Koraidon-ex
+  'sv02-263',                  // Dinglu-ex
+  'sv02-264',                  // Tapatoès-ex
+  'sv03-228',                  // Dracaufeu-ex
+  'sv03-215',                  // Dracaufeu-ex
+  'sv05-208',                  // Ire-Foudre-ex
+  'sv05-205',                  // Serpente-Eau-ex
+  'sv06-211',                  // Ogerpon Masque Turquoise-ex
+  'sv06-221',                  // Ogerpon Masque Turquoise-ex
+  'sv06.5-095',                  // Pêchaminus-ex
+  'sv07-170',                  // Terapagos-ex
+  'sv07-173',                  // Terapagos-ex
+  'sv07-169',                  // Briochien-ex
+  'sv08-236',                  // Fermite-ex
+  'sv08-237',                  // Milobellus-ex
+  'sv08-220',                  // Latias-ex
+  'sv08.5-157',                  // Garde-de-Fer-ex
+  'sv08.5-149',                  // Aquali-ex
+  'sv08.5-153',                  // Voltali-ex
+  'sv08.5-146',                  // Pyroli-ex
+  'sv08.5-144',                  // Phyllali-ex
+  'sv08.5-150',                  // Givrali-ex
+  'sv08.5-180',                  // Terapagos-ex
+  'sv09-189',                  // Zoroark-ex de N
+  'sv09-186',                  // Zacian-ex de Nabil
+  'me01-180',                  // Méga-Absol-ex
+  'me01-181',                  // Méga-Latias-ex
+  'me01-182',                  // Méga-Kangourex-ex
+  'me02-128',                  // Méga-Lockpin-ex
+  'me02-127',                  // Méga-Sharpedo-ex
+  'me02-126',                  // Motisma-ex
+  'me02.5-295',                  // Méga-Dracolosse-ex
+  'me02.5-290',                  // Méga-Dracolosse-ex
+  'me02.5-281',                  // Mewtwo-ex de la Team Rocket
+  'me02.5-286',                  // Zoroark-ex de N
+  'me03-119',                  // Méga-Mélodelfe-ex
+  'me03-120',                  // Méga-Zygarde-ex
+  'me04-117',                  // Méga-Floette-ex
+  'me04-118',                  // Méga-Kravarech-ex
+  'me05-115',                  // Méga-Lugulabre-ex
+  'me05-114',                  // Méga-Zeraora-ex
+  'me05-117',                  // Morpeko-ex
+  '30th-149',                  // Pikachu-ex
+  '30th-151',                  // Mewtwo-ex
+  '30th-153',                  // Nymphali-ex
+  '30th-155',                  // Jirachi-ex
+  '30th-156',                  // Drattak-ex
+  '30th-148',                  // Amphinobi-ex
 ];
 
 /** Époque d'une carte, d'après le préfixe de son identifiant (filtres du Marché). */
@@ -188,7 +272,7 @@ export interface Market {
   loadedAt: number;
 }
 
-const CACHE_KEY = 'holocote.market.v4';
+const CACHE_KEY = 'holocote.market.v5';
 const TTL = 30 * 60 * 1000;
 
 function readCache(): Market | null {
@@ -225,7 +309,7 @@ export function loadMarket(force = false): Promise<Market> {
   if (cached) return Promise.resolve(cached);
   if (inflight) return inflight;
   inflight = (async () => {
-    const legends = await pool(WATCHLIST, 6, async (id) => {
+    const legends = await pool(WATCHLIST, 8, async (id) => {
       const r = await cardAnyLang(id);
       return r ? toQuote(r.card, r.lang, 'legend') : null;
     });

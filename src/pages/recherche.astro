@@ -1,6 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
-const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 'Rayquaza', 'Ectoplasma', 'Mewtwo', 'Gardevoir', 'Ronflex', 'Léviator'];
+const popular = [
+  'Dracaufeu', 'Pikachu', 'Mew', 'Mewtwo', 'Évoli', 'Noctali', 'Mentali', 'Nymphali', 'Pyroli', 'Aquali', 'Voltali', 'Givrali', 'Phyllali',
+  'Lucario', 'Rayquaza', 'Ectoplasma', 'Gardevoir', 'Ronflex', 'Léviator', 'Lugia', 'Giratina', 'Arceus', 'Darkrai', 'Tortank', 'Florizarre',
+  'Salamèche', 'Carapuce', 'Bulbizarre', 'Dracolosse', 'Amphinobi', 'Zoroark', 'Miraidon', 'Koraidon', 'Terapagos', 'Pêchaminus', 'Miaouss',
+];
 ---
 <Base title="Recherche" active="search" description="Cherche une carte par son nom, même avec une faute : rareté, cote et fiche détaillée.">
   <section class="s-hero">
@@ -38,7 +42,18 @@ const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 
     </div>
     <div class="d-block" id="hot-block" hidden>
       <h2>Les cartes du moment</h2>
+      <p class="muted small d-sub">Les plus fortes hausses de la semaine.</p>
       <div class="grid" id="hot"></div>
+    </div>
+    <div class="d-block" id="top-block" hidden>
+      <h2>Les plus chères</h2>
+      <p class="muted small d-sub">Les cartes suivies dont la cote est la plus haute aujourd'hui.</p>
+      <div class="grid" id="top"></div>
+    </div>
+    <div class="d-block" id="cheap-block" hidden>
+      <h2>Petits prix, belles cartes</h2>
+      <p class="muted small d-sub">Des cartes rares à moins de 20 € en ce moment.</p>
+      <div class="grid" id="cheap"></div>
     </div>
   </section>
 
@@ -49,6 +64,7 @@ const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 
       <div class="chips" id="near"></div>
     </div>
     <div id="results" class="grid"></div>
+    <button type="button" class="btn more-results" id="more-results" hidden></button>
     <div id="state"></div>
   </section>
 
@@ -92,10 +108,21 @@ const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 
       if (chip) { input.value = chip.dataset.q!; run(chip.dataset.q!); }
     });
     loadMarket().then((m) => {
-      const hot = [...m.quotes].filter((q) => q.image).sort((a, b) => (b.change7 ?? -99) - (a.change7 ?? -99)).slice(0, 8);
-      if (!hot.length) return;
-      $('hot').replaceChildren(...hot.map((q) => cardTile({ id: q.id, localId: '', name: q.name, image: q.image }, q.lang, `${formatPrice(q.price, 'EUR')}${q.setName ? ` · ${q.setName}` : ''}`)));
-      $('hot-block').hidden = false;
+      const qs = m.quotes.filter((q) => q.image);
+      const tile = (q: (typeof qs)[number]) => cardTile({ id: q.id, localId: '', name: q.name, image: q.image }, q.lang, `${formatPrice(q.price, 'EUR')}${q.setName ? ` · ${q.setName}` : ''}`);
+      const fill = (grid: string, block: string, list: typeof qs) => {
+        if (!list.length) return;
+        $(grid).replaceChildren(...list.map(tile));
+        $(block).hidden = false;
+      };
+      const hot = [...qs].sort((a, b) => (b.change7 ?? -99) - (a.change7 ?? -99)).slice(0, 12);
+      const used = new Set(hot.map((q) => q.id));
+      const top = [...qs].filter((q) => !used.has(q.id)).sort((a, b) => b.price - a.price).slice(0, 12);
+      top.forEach((q) => used.add(q.id));
+      const cheap = [...qs].filter((q) => !used.has(q.id) && q.price >= 1 && q.price < 20).sort((a, b) => b.price - a.price).slice(0, 12);
+      fill('hot', 'hot-block', hot);
+      fill('top', 'top-block', top);
+      fill('cheap', 'cheap-block', cheap);
     }).catch(() => {});
 
     /* ---------- Autocomplétion ---------- */
@@ -150,11 +177,12 @@ const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 
       $('discover').hidden = true;
       $('results-wrap').hidden = false;
       results.replaceChildren();
+      ($('more-results') as HTMLElement).hidden = true;
       $('near').replaceChildren();
       $('dym').hidden = true;
       $('summary').textContent = '';
       state.replaceChildren(status('Recherche en cours… (la première fois, HoloCote charge la liste de toutes les cartes)'));
-      const r = await smartSearch(q, lang);
+      const r = await smartSearch(q, lang, 400);
       if (my !== seq) return;
       state.replaceChildren();
       if (!r.cards.length) {
@@ -167,14 +195,24 @@ const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 
         return;
       }
       const n = r.cards.length;
-      $('summary').textContent = `${n}${n >= 72 ? '+' : ''} carte${n > 1 ? 's' : ''}`;
+      $('summary').textContent = `${n}${n >= 400 ? '+' : ''} carte${n > 1 ? 's' : ''}`;
       if (r.didYouMean) {
         $('dym').replaceChildren('Résultats pour ', el('strong', {}, [r.didYouMean]), ` (tu as tapé « ${q} »)`);
         $('dym').hidden = false;
       }
       const others = r.names.filter((x) => x.label !== r.didYouMean && x.score < 0.999).slice(0, 6);
       $('near').replaceChildren(...others.map((x) => el('button', { type: 'button', class: 'chip small', 'data-q': x.label }, [x.label])));
-      results.replaceChildren(...r.cards.map((c) => cardTile(c, lang)));
+      // Affichage par paquets de 48 : la page reste rapide même avec des centaines de cartes.
+      let shown = 0;
+      const more = $('more-results') as HTMLButtonElement;
+      const page = () => {
+        results.append(...r.cards.slice(shown, shown + 48).map((c) => cardTile(c, lang)));
+        shown = Math.min(r.cards.length, shown + 48);
+        more.hidden = shown >= r.cards.length;
+        more.textContent = `Voir plus de cartes (${r.cards.length - shown} restantes)`;
+      };
+      more.onclick = page;
+      page();
     }
 
     form.addEventListener('submit', (e) => {
@@ -229,6 +267,8 @@ const popular = ['Dracaufeu', 'Pikachu', 'Mew', 'Noctali', 'Évoli', 'Lucario', 
     .d-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
     .link-btn { border: 0; background: none; color: var(--muted); cursor: pointer; text-decoration: underline; font: inherit; }
     .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .d-sub { margin: -6px 0 14px; }
+    .more-results { display: flex; margin: 22px auto 0; min-width: 260px; justify-content: center; }
     .discover :global(.chip), .r-head :global(.chip) {
       border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer;
       padding: 10px 16px; border-radius: 999px; font: inherit; font-weight: 600; transition: border-color 0.2s, transform 0.15s;
