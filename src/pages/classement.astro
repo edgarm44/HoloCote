@@ -1,0 +1,323 @@
+---
+import Base from '../layouts/Base.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Classement" active="ranking" description="Ton classeur face aux rivaux HoloCote : qui a les cartes qui valent le plus ?">
+  <section class="rk-hero">
+    <h1>Le Classement.</h1>
+    <p class="rk-slogan">Qui a le classeur le plus précieux ?</p>
+    <p class="muted rk-lead">Ton classeur affronte 14 rivaux HoloCote. La valeur de chaque classeur est calculée avec les cotes du jour : quand le marché bouge, le classement aussi.</p>
+    <p class="fiction">Les rivaux sont des joueurs fictifs inventés par HoloCote : leurs pseudos et leurs classeurs sont imaginaires, leurs cartes et leurs cotes sont réelles.</p>
+  </section>
+
+  <section class="me-card" id="me-card" hidden>
+    <div class="me-left">
+      <span class="me-rank" id="me-rank">—</span>
+      <div class="me-id">
+        <div class="me-name-row">
+          <span class="me-name" id="me-name">Toi</span>
+          <button type="button" class="link-btn" id="edit-pseudo">Changer de pseudo</button>
+        </div>
+        <span class="league-badge" id="me-league"></span>
+        <span class="me-delta" id="me-delta"></span>
+      </div>
+    </div>
+    <div class="me-right">
+      <span class="me-value" id="me-value">—</span>
+      <span class="me-next" id="me-next"></span>
+      <div class="me-bar"><span id="me-bar"></span></div>
+    </div>
+    <form class="pseudo-form" id="pseudo-form" hidden>
+      <label for="pseudo">Ton pseudo (évite ton vrai nom)</label>
+      <div class="pf-row">
+        <input id="pseudo" maxlength="20" autocomplete="off" />
+        <button class="btn btn-primary" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </section>
+
+  <div id="state" aria-live="polite">
+    <div class="status" role="status"><div class="spinner"></div>Calcul de la valeur des classeurs…</div>
+  </div>
+
+  <section class="podium" id="podium" hidden></section>
+
+  <section class="board" id="board" hidden>
+    <div class="leagues" id="leagues"></div>
+    <ol class="rk-list" id="rk-list"></ol>
+  </section>
+
+  <dialog id="binder-dialog" class="binder-dialog">
+    <div class="bd-head">
+      <div>
+        <h2 id="bd-name"></h2>
+        <p class="muted small" id="bd-sub"></p>
+      </div>
+      <button type="button" class="bd-close" id="bd-close" aria-label="Fermer">✕</button>
+    </div>
+    <div class="bd-grid" id="bd-grid"></div>
+  </dialog>
+
+  <p class="notice">
+    Valeur d'un classeur = somme des cotes HoloCote du jour (version normale ou reverse, en euros) multipliées par l'état et la quantité. Les cartes sans cote en euros ne comptent pas.
+    Ta collection reste dans ton navigateur : le classement est calculé sur ton appareil et personne d'autre ne voit tes cartes.
+  </p>
+
+  <script>
+    import { buildLeaderboard, getPseudo, setPseudo, rankDelta, LEAGUES, type Entry } from '../lib/leaderboard';
+    import { conditionLabel } from '../lib/condition';
+    import { formatPrice } from '../lib/tcgdex';
+    import { holoCard, el, url, toast } from '../lib/ui';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const eur = (v: number) => formatPrice(v, 'EUR');
+    let entries: Entry[] = [];
+
+    const avatar = (e: Entry, size = 44) => {
+      const a = el('span', { class: `avatar ${e.isMe ? 'me' : ''}`, 'aria-hidden': 'true' }, [e.name.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '?']);
+      a.style.setProperty('--h', String(e.hue));
+      a.style.width = a.style.height = `${size}px`;
+      return a;
+    };
+    const leagueBadge = (e: Entry) => el('span', { class: `league-badge l-${e.league.key}` }, [e.league.name]);
+    const tag = (e: Entry) => e.isMe ? el('span', { class: 'who me' }, ['Toi']) : el('span', { class: 'who' }, ['Fictif']);
+
+    function openBinder(e: Entry) {
+      $('bd-name').textContent = e.isMe ? `Ton classeur (${e.name})` : `Classeur de ${e.name}`;
+      $('bd-sub').textContent = `${e.count} carte${e.count > 1 ? 's' : ''}, valeur estimée ${eur(e.value)}${e.isMe ? '' : ' · rival fictif'}`;
+      const cards = [...e.cards].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+      $('bd-grid').replaceChildren(...cards.map((c) =>
+        el('a', { class: 'bd-card', href: url(`/carte/?id=${encodeURIComponent(c.id)}&lang=${c.lang}`) }, [
+          holoCard(c.image, c.name),
+          el('span', { class: 'bd-name' }, [c.qty > 1 ? `${c.name} ×${c.qty}` : c.name]),
+          el('span', { class: 'bd-meta' }, [`${conditionLabel(c.cond)} · ${c.value !== undefined ? eur(c.value * c.qty) : 'sans cote'}`]),
+        ]),
+      ));
+      ($('binder-dialog') as HTMLDialogElement).showModal();
+    }
+    $('bd-close').addEventListener('click', () => ($('binder-dialog') as HTMLDialogElement).close());
+    $('binder-dialog').addEventListener('click', (ev) => { if (ev.target === ev.currentTarget) ($('binder-dialog') as HTMLDialogElement).close(); });
+
+    function renderMe() {
+      const i = entries.findIndex((e) => e.isMe);
+      const me = entries[i];
+      $('me-rank').textContent = `${i + 1}ᵉ`;
+      if (i === 0) $('me-rank').textContent = '1ᵉʳ';
+      $('me-name').textContent = me.name;
+      const lb = $('me-league'); lb.textContent = `Ligue ${me.league.name}`; lb.className = `league-badge l-${me.league.key}`;
+      $('me-value').textContent = eur(me.value);
+      const d = rankDelta(i + 1);
+      $('me-delta').textContent = d === undefined ? '' : d > 0 ? `▲ ${d} place${d > 1 ? 's' : ''} depuis ta dernière visite` : d < 0 ? `▼ ${-d} place${d < -1 ? 's' : ''} depuis ta dernière visite` : 'Même place qu\'à ta dernière visite';
+      $('me-delta').className = `me-delta ${d && d > 0 ? 'up' : d && d < 0 ? 'down' : ''}`;
+      if (!me.count) {
+        $('me-next').replaceChildren('Ton classeur est vide : ', el('a', { href: url('/scanner/') }, ['scanne tes cartes']), ' pour entrer dans la course.');
+        ($('me-bar') as HTMLElement).style.width = '0%';
+      } else if (i === 0) {
+        $('me-next').textContent = `Tu es en tête ! ${eur(me.value - entries[1].value)} d'avance sur ${entries[1].name}.`;
+        ($('me-bar') as HTMLElement).style.width = '100%';
+      } else {
+        const ahead = entries[i - 1];
+        const gap = ahead.value - me.value;
+        $('me-next').textContent = `Encore ${eur(gap)} pour dépasser ${ahead.name}.`;
+        ($('me-bar') as HTMLElement).style.width = `${ahead.value ? Math.min(100, (me.value / ahead.value) * 100) : 0}%`;
+      }
+      $('me-card').hidden = false;
+    }
+
+    function renderPodium() {
+      const top = entries.slice(0, 3);
+      const order = [1, 0, 2].filter((k) => top[k]);
+      $('podium').replaceChildren(...order.map((k) => {
+        const e = top[k];
+        const b = el('button', { type: 'button', class: `pod pod-${k + 1} ${e.isMe ? 'is-me' : ''}` }, [
+          el('div', { class: 'pod-card' }, [e.star ? holoCard(e.star.image, e.star.name) : el('div', { class: 'pod-empty' })]),
+          el('div', { class: 'pod-id' }, [avatar(e, 40), el('div', { class: 'pod-text' }, [el('span', { class: 'pod-name' }, [e.name]), tag(e)])]),
+          el('span', { class: 'pod-value' }, [eur(e.value)]),
+          el('div', { class: 'pod-step' }, [el('span', {}, [String(k + 1)])]),
+        ]);
+        b.addEventListener('click', () => openBinder(e));
+        return b;
+      }));
+      $('podium').hidden = false;
+    }
+
+    function renderList() {
+      const counts = new Map(LEAGUES.map((l) => [l.key, 0]));
+      entries.forEach((e) => counts.set(e.league.key, (counts.get(e.league.key) ?? 0) + 1));
+      $('leagues').replaceChildren(...LEAGUES.map((l) => el('span', { class: `lg l-${l.key}` }, [`${l.name}`, el('small', {}, [l.min ? `dès ${eur(l.min)}` : 'pour commencer'])])));
+      let lastLeague = '';
+      const items: HTMLElement[] = [];
+      entries.forEach((e, i) => {
+        if (e.league.key !== lastLeague) {
+          lastLeague = e.league.key;
+          items.push(el('li', { class: `league-sep l-${e.league.key}` }, [`Ligue ${e.league.name}`]));
+        }
+        const row = el('li', { class: `rk-row ${e.isMe ? 'is-me' : ''} ${i < 3 ? 'top' : ''}` }, []);
+        const btn = el('button', { type: 'button', class: 'rk-btn', 'aria-label': `Voir le classeur de ${e.name}` }, [
+          el('span', { class: 'rk-pos' }, [String(i + 1)]),
+          avatar(e),
+          el('span', { class: 'rk-id' }, [
+            el('span', { class: 'rk-name' }, [e.name, tag(e)]),
+            el('span', { class: 'rk-motto' }, [e.isMe ? `${e.count} carte${e.count > 1 ? 's' : ''} dans ton classeur` : e.motto ?? '']),
+          ]),
+          el('span', { class: 'rk-star' }, e.star ? [
+            el('span', { class: 'rk-thumb' }, e.star.image ? [el('img', { src: `${e.star.image}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' })] : []),
+            el('span', { class: 'rk-star-name' }, [e.star.name]),
+          ] : []),
+          el('span', { class: 'rk-value' }, [eur(e.value), el('small', {}, [`${e.count} carte${e.count > 1 ? 's' : ''}`])]),
+        ]);
+        btn.addEventListener('click', () => openBinder(e));
+        row.append(btn);
+        items.push(row);
+      });
+      $('rk-list').replaceChildren(...items);
+      $('board').hidden = false;
+    }
+
+    async function main() {
+      try {
+        entries = await buildLeaderboard();
+      } catch {
+        $('state').replaceChildren(el('div', { class: 'status' }, ['Impossible de calculer le classement pour le moment. Réessaie dans un instant.']));
+        return;
+      }
+      $('state').replaceChildren();
+      renderMe();
+      renderPodium();
+      renderList();
+    }
+
+    $('edit-pseudo').addEventListener('click', () => {
+      const f = $('pseudo-form');
+      f.hidden = !f.hidden;
+      const input = $('pseudo') as HTMLInputElement;
+      input.value = getPseudo() === 'Toi' ? '' : getPseudo();
+      if (!f.hidden) input.focus();
+    });
+    $('pseudo-form').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const v = ($('pseudo') as HTMLInputElement).value.trim();
+      setPseudo(v);
+      $('pseudo-form').hidden = true;
+      const me = entries.find((e) => e.isMe);
+      if (me) me.name = getPseudo();
+      renderMe(); renderPodium(); renderList();
+      toast(v ? `Pseudo enregistré : ${v}` : 'Pseudo retiré');
+    });
+
+    main();
+  </script>
+
+  <style>
+    .rk-hero { padding: clamp(24px, 5vw, 56px) 0 22px; }
+    .rk-hero h1 { font-size: clamp(2.3rem, 11vw, 7.2rem); line-height: 0.88; letter-spacing: -0.05em; font-weight: 800; margin: 0 0 12px; }
+    .rk-slogan { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.2rem, 3vw, 1.8rem); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 12px;
+      background: linear-gradient(100deg, var(--gold), #ffb35a 35%, var(--magenta) 70%, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .rk-lead { max-width: 640px; }
+    .fiction { display: inline-block; margin: 6px 0 0; padding: 8px 14px; border-radius: 12px; font-size: 0.85rem; color: var(--muted); background: var(--surface); border: 1px dashed rgba(255, 255, 255, 0.2); max-width: 680px; }
+
+    /* Ma position */
+    .me-card {
+      display: grid; gap: 18px; grid-template-columns: 1fr; align-items: center; margin-bottom: 30px;
+      padding: clamp(18px, 3vw, 28px); border-radius: 26px;
+      background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, linear-gradient(120deg, var(--cyan), #8a7bff, var(--magenta)) border-box;
+      border: 2px solid transparent; box-shadow: 0 20px 60px rgba(138, 123, 255, 0.18);
+    }
+    @media (min-width: 820px) { .me-card { grid-template-columns: 1fr 1fr; } }
+    .me-left { display: flex; gap: 18px; align-items: center; min-width: 0; }
+    .me-rank { font-family: var(--font-display); font-weight: 800; font-size: clamp(3rem, 9vw, 5rem); line-height: 1; letter-spacing: -0.05em;
+      background: var(--holo); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 6s linear infinite; }
+    .me-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .me-name-row { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+    .me-name { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; }
+    .link-btn { border: 0; background: none; color: var(--muted); cursor: pointer; text-decoration: underline; font: inherit; font-size: 0.85rem; padding: 0; }
+    .me-delta { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+    .me-right { display: flex; flex-direction: column; gap: 6px; }
+    .me-value { font-family: var(--font-display); font-weight: 800; font-size: clamp(2rem, 6vw, 3rem); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+    .me-next { color: var(--muted); }
+    .me-next :global(a) { color: var(--cyan); font-weight: 700; }
+    .me-bar { height: 10px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+    .me-bar span { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--holo); transition: width 0.8s; }
+    .pseudo-form { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
+    .pseudo-form label { font-size: 0.85rem; color: var(--muted); }
+    .pf-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .pf-row input { flex: 1 1 200px; }
+
+    /* Ligues */
+    :global(.league-badge), :global(.lg) { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 0.8rem; border: 1px solid var(--line); }
+    :global(.l-legend) { color: #0a0812; background: var(--holo); border-color: transparent; }
+    :global(.l-diamond) { color: var(--cyan); border-color: rgba(62, 240, 255, 0.5); background: rgba(62, 240, 255, 0.08); }
+    :global(.l-gold) { color: var(--gold); border-color: rgba(255, 210, 90, 0.5); background: rgba(255, 210, 90, 0.08); }
+    :global(.l-silver) { color: #d6d3e6; border-color: rgba(214, 211, 230, 0.4); background: rgba(214, 211, 230, 0.06); }
+    :global(.l-bronze) { color: #e0a070; border-color: rgba(224, 160, 112, 0.45); background: rgba(224, 160, 112, 0.08); }
+    .leagues { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .leagues :global(.lg small) { font-weight: 600; opacity: 0.8; }
+
+    .rk-list :global(.league-sep.l-legend) { color: var(--gold); }
+
+    /* Podium */
+    .podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: end; margin-bottom: 36px; }
+    .podium :global(.pod) { display: flex; flex-direction: column; align-items: center; gap: 10px; border: 0; background: none; color: var(--text); cursor: pointer; font: inherit; padding: 0; min-width: 0; }
+    .podium :global(.pod-card) { width: min(180px, 80%); }
+    .podium :global(.pod-1 .pod-card) { width: min(220px, 92%); filter: drop-shadow(0 0 30px rgba(255, 210, 90, 0.4)); }
+    .podium :global(.pod-empty) { aspect-ratio: 245 / 342; border-radius: 10px; background: var(--surface); border: 1px dashed var(--line); }
+    .podium :global(.pod-id) { display: flex; gap: 8px; align-items: center; min-width: 0; max-width: 100%; }
+    .podium :global(.pod-text) { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+    .podium :global(.pod-name) { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+    .podium :global(.pod-value) { font-family: var(--font-display); font-weight: 800; font-size: clamp(1rem, 2.6vw, 1.5rem); letter-spacing: -0.02em; }
+    .podium :global(.pod-step) { width: 100%; display: grid; place-items: center; border-radius: 18px 18px 6px 6px; font-family: var(--font-display); font-weight: 800; color: #0a0812; }
+    .podium :global(.pod-1 .pod-step) { height: 110px; background: linear-gradient(180deg, var(--gold), #b8862a); font-size: 3rem; }
+    .podium :global(.pod-2 .pod-step) { height: 80px; background: linear-gradient(180deg, #e8e6f2, #8e8aa3); font-size: 2.4rem; }
+    .podium :global(.pod-3 .pod-step) { height: 60px; background: linear-gradient(180deg, #e8a878, #8a5432); font-size: 2rem; }
+    .podium :global(.pod.is-me .pod-name) { color: var(--cyan); }
+    @media (max-width: 560px) { .podium :global(.pod-id .avatar) { display: none; } .podium :global(.pod-name) { max-width: 92px; font-size: 0.85rem; } }
+
+    /* Liste */
+    .rk-list { list-style: none; margin: 0 0 24px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .rk-list :global(.league-sep) { margin: 14px 0 2px; font-family: var(--font-display); font-weight: 800; font-size: 0.9rem; background: none !important; border: 0 !important; padding: 0; width: auto; }
+    .rk-list :global(.rk-btn) {
+      width: 100%; display: grid; grid-template-columns: 34px 44px 1fr auto auto; gap: 14px; align-items: center;
+      padding: 10px 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); color: var(--text);
+      cursor: pointer; font: inherit; text-align: left; transition: border-color 0.2s, transform 0.15s;
+    }
+    .rk-list :global(.rk-btn:hover) { border-color: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
+    .rk-list :global(.rk-btn:focus-visible) { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .rk-list :global(.rk-row.is-me .rk-btn) { border: 2px solid transparent; background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, linear-gradient(120deg, var(--cyan), var(--magenta)) border-box; box-shadow: 0 0 30px rgba(62, 240, 255, 0.15); }
+    .rk-list :global(.rk-pos) { font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; text-align: center; color: var(--muted); }
+    .rk-list :global(.rk-row.top .rk-pos) { color: var(--gold); }
+    .rk-list :global(.rk-id) { display: flex; flex-direction: column; min-width: 0; }
+    .rk-list :global(.rk-name) { display: flex; gap: 8px; align-items: center; font-weight: 800; white-space: nowrap; min-width: 0; overflow: hidden; }
+    .rk-list :global(.rk-motto) { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rk-list :global(.rk-star) { display: flex; gap: 8px; align-items: center; max-width: 200px; min-width: 0; }
+    .rk-list :global(.rk-thumb) { width: 30px; flex: 0 0 30px; aspect-ratio: 245 / 342; border-radius: 3px; overflow: hidden; background: var(--bg-2); }
+    .rk-list :global(.rk-thumb img) { width: 100%; height: 100%; object-fit: cover; }
+    .rk-list :global(.rk-star-name) { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rk-list :global(.rk-value) { display: flex; flex-direction: column; align-items: flex-end; font-family: var(--font-display); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rk-list :global(.rk-value small) { font-family: var(--font-body); font-weight: 600; color: var(--muted); font-size: 0.75rem; }
+    @media (max-width: 720px) {
+      .rk-list :global(.rk-btn) { grid-template-columns: 28px 38px 1fr auto; gap: 10px; padding: 10px; }
+      .rk-list :global(.rk-star) { display: none; }
+      .rk-list :global(.avatar) { width: 38px !important; height: 38px !important; }
+    }
+
+    :global(.avatar) {
+      display: inline-grid; place-items: center; flex: 0 0 auto; border-radius: 14px; font-family: var(--font-display); font-weight: 800; font-size: 0.85rem; color: #0a0812;
+      background: linear-gradient(135deg, hsl(var(--h) 90% 65%), hsl(calc(var(--h) + 50) 90% 60%));
+    }
+    :global(.avatar.me) { background: var(--holo); box-shadow: 0 0 16px rgba(62, 240, 255, 0.4); }
+    :global(.who) { display: inline-flex; padding: 1px 7px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; color: var(--muted); border: 1px solid var(--line); letter-spacing: 0.02em; }
+    :global(.who.me) { color: #0a0812; background: var(--cyan); border-color: transparent; }
+
+    /* Classeur d'un joueur */
+    .binder-dialog { width: min(920px, calc(100vw - 24px)); max-height: calc(100vh - 40px); padding: 22px; border-radius: 24px; background: var(--bg-2); color: var(--text); border: 1px solid var(--line); }
+    .binder-dialog::backdrop { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); }
+    .bd-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 16px; }
+    .bd-head h2 { margin: 0 0 2px; font-size: 1.5rem; }
+    .bd-head p { margin: 0; }
+    .bd-close { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; flex: 0 0 40px; }
+    .bd-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .bd-grid :global(.bd-card) { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--text); }
+    .bd-grid :global(.bd-name) { font-weight: 700; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bd-grid :global(.bd-meta) { color: var(--muted); font-size: 0.75rem; }
+  </style>
+</Base>
