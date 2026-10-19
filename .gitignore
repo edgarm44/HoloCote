@@ -6,3 +6,4 @@ dist/
 .env
 *.log
 public/ocr/
+public/data/history.json

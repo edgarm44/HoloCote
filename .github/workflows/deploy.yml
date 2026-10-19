@@ -23,6 +23,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Ajouter l'historique des cotes (branche « prix »)
+        run: |
+          mkdir -p public/data
+          if git fetch --depth=1 origin prix 2>/dev/null; then git show FETCH_HEAD:history.json > public/data/history.json; else echo "Pas encore d'historique"; fi
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3

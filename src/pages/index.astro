@@ -70,6 +70,7 @@ const TOOLS = [
         <span class="mini-card" aria-hidden="true"><span>?</span></span>
         <div class="day-body">
           <h3>Défi du jour <span class="muted" id="defi-n"></span></h3>
+          <span class="ev-chip" id="ev-chip" hidden></span>
           <p id="defi-text">Une carte mystère, un booster et un duel : des cartes à gagner chaque jour.</p>
           <ul class="games" id="games">
             <li data-g="m"><i aria-hidden="true"></i><span>Carte mystère</span><b>à jouer</b></li>
@@ -156,7 +157,7 @@ const TOOLS = [
     import { countCards } from '../lib/collection';
     import { todayNumber, getDay } from '../lib/mystery';
     import { getLog, streak } from '../lib/progress';
-    import { getBooster } from '../lib/booster';
+    import { getBooster, eventOfDay, nextEvent } from '../lib/booster';
     import { todayQuests, pendingRewards, rewardText } from '../lib/quests';
     import { levelInfo } from '../lib/level';
     import { holoCard, attachTilt, el, url } from '../lib/ui';
@@ -170,6 +171,12 @@ const TOOLS = [
     const n = todayNumber();
     const day = getDay(n);
     $('defi-n').textContent = `n° ${n}`;
+    const ev = eventOfDay();
+    const ne = ev ? null : nextEvent();
+    if (ev || (ne && ne.inDays <= 2)) {
+      $('ev-chip').textContent = ev ? `Événement : ${ev.name}, booster ${ev.setName} !` : `${ne!.ev.name} ${ne!.inDays === 1 ? 'demain' : `dans ${ne!.inDays} jours`}`;
+      $('ev-chip').hidden = false;
+    }
     function renderToday() {
       const log = getLog()[n] ?? {};
       const st = streak();
@@ -378,6 +385,8 @@ const TOOLS = [
     .games b, .q-mini :global(b) { font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
     .games li.ok b { color: var(--up); }
     .q-mini :global(li.ok span) { color: var(--muted); text-decoration: line-through; }
+    .ev-chip { align-self: flex-start; padding: 3px 10px; border-radius: 999px; background: var(--gold); color: #0a0812; font-weight: 800; font-size: 0.78rem; }
+    .ev-chip[hidden] { display: none; }
     .q-lvl { margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; color: #0a0812; background: var(--holo); vertical-align: middle; font-family: var(--font-body); }
     .day p:global(.pend) { color: var(--up); font-weight: 700; }
     .day-quests { background: linear-gradient(160deg, rgba(62, 240, 255, 0.07), transparent 60%), var(--bg-2); }

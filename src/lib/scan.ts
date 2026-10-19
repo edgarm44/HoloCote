@@ -34,32 +34,53 @@ type Progress = (p: number, label: string) => void;
 /* Moteur OCR                                                          */
 /* ------------------------------------------------------------------ */
 
-let workerPromise: Promise<Worker> | null = null;
+// Plusieurs moteurs en parallèle (nom, numéro et PV lus en même temps) quand l'appareil a assez de cœurs.
+const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2;
+const POOL_SIZE = cores >= 6 ? 3 : cores >= 4 ? 2 : 1;
+let poolPromise: Promise<Worker[]> | null = null;
+const idle: Worker[] = [];
+const waiters: ((w: Worker) => void)[] = [];
 let progressCb: Progress = () => {};
 
-function getWorker(onProgress: Progress): Promise<Worker> {
+function createOne(withLog: boolean): Promise<Worker> {
+  const abs = (p: string) => new URL(url(p), location.href).href;
+  return createWorker(['eng', 'fra'], 1, {
+    workerPath: abs('/ocr/worker.min.js'),
+    corePath: abs('/ocr'),
+    langPath: abs('/ocr'),
+    workerBlobURL: false,
+    logger: withLog ? (m: { status: string; progress: number }) => {
+      if (/load|init/i.test(m.status)) progressCb(m.progress ?? 0, 'Préparation du scanner (première fois : quelques secondes)…');
+    } : () => {},
+  });
+}
+
+function getPool(onProgress: Progress): Promise<Worker[]> {
   progressCb = onProgress;
-  if (!workerPromise) {
-    const abs = (p: string) => new URL(url(p), location.href).href;
-    workerPromise = createWorker(['eng', 'fra'], 1, {
-      workerPath: abs('/ocr/worker.min.js'),
-      corePath: abs('/ocr'),
-      langPath: abs('/ocr'),
-      workerBlobURL: false,
-      logger: (m: { status: string; progress: number }) => {
-        if (/load|init/i.test(m.status)) progressCb(m.progress ?? 0, 'Préparation du scanner (première fois : quelques secondes)…');
-      },
-    }).catch((e) => {
-      workerPromise = null;
-      throw e;
-    });
+  if (!poolPromise) {
+    poolPromise = (async () => {
+      // Le premier moteur d'abord (le plus vite possible), les autres ensuite.
+      const first = await createOne(true);
+      idle.push(first);
+      const rest = await Promise.allSettled(Array.from({ length: POOL_SIZE - 1 }, () => createOne(false)));
+      for (const r of rest) if (r.status === 'fulfilled') release(r.value);
+      return [first, ...rest.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))];
+    })().catch((e) => { poolPromise = null; throw e; });
   }
-  return workerPromise;
+  return poolPromise;
+}
+function acquire(): Promise<Worker> {
+  const w = idle.pop();
+  return w ? Promise.resolve(w) : new Promise((r) => waiters.push(r));
+}
+function release(w: Worker) {
+  const next = waiters.shift();
+  if (next) next(w); else idle.push(w);
 }
 
 /** Précharge le moteur en arrière-plan (ouverture de la page scanner). */
 export function warmUp() {
-  getWorker(() => {}).catch(() => {});
+  getPool(() => {}).catch(() => {});
 }
 
 /* ------------------------------------------------------------------ */
@@ -220,66 +241,79 @@ export function parseHp(text: string): number | undefined {
   return v >= 30 && v <= 400 && v % 10 === 0 ? v : undefined;
 }
 
-async function ocr(worker: Worker, canvas: HTMLCanvasElement, psm: PSM, whitelist = ''): Promise<string> {
-  await worker.setParameters({ tessedit_pageseg_mode: psm, tessedit_char_whitelist: whitelist });
-  return (await worker.recognize(canvas)).data.text;
+async function ocr(canvas: HTMLCanvasElement, psm: PSM, whitelist = ''): Promise<string> {
+  const worker = await acquire();
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: psm, tessedit_char_whitelist: whitelist });
+    return (await worker.recognize(canvas)).data.text;
+  } finally {
+    release(worker);
+  }
 }
 
 /** Lit nom et numéro sur une carte déjà isolée (rectangle au format carte). */
-async function readZones(worker: Worker, src: Source, card: Rect): Promise<ScanReading> {
+async function readZones(src: Source, card: Rect): Promise<ScanReading> {
   const at = (x0: number, y0: number, x1: number, y1: number): Rect => ({
     x: card.x + card.w * x0, y: card.y + card.h * y0, w: card.w * (x1 - x0), h: card.h * (y1 - y0),
   });
-  const nameZone = cut(src, at(0.03, 0.02, 0.82, 0.115), 1200);
-  const numZones = [cut(src, at(0, 0.875, 0.5, 0.985), 1000), cut(src, at(0.5, 0.875, 1, 0.985), 1000)];
+  const nameZone = cut(src, at(0.03, 0.02, 0.82, 0.115), 1100);
+  const numZones = [cut(src, at(0, 0.875, 0.5, 0.985), 900), cut(src, at(0.5, 0.875, 1, 0.985), 900)];
+  const hpZone = cut(src, at(0.6, 0.02, 0.98, 0.115), 700);
+  const raws: string[] = [];
 
-  const hpZone = cut(src, at(0.6, 0.02, 0.98, 0.115), 800);
-  let name = '', raw = '';
-  for (const mode of ['gray', 'otsu', 'invert'] as const) {
-    const t = await ocr(worker, prepare(nameZone, mode), PSM.SINGLE_LINE);
-    raw += t + '\n';
-    name = parseName(t);
-    if (name.length >= 4) break;
-  }
-
-  if (name.length < 4) {
+  // Les trois lectures partent en même temps (une par moteur disponible).
+  const nameTask = (async () => {
+    let name = '';
+    for (const mode of ['gray', 'otsu', 'invert'] as const) {
+      const t = await ocr(prepare(nameZone, mode), PSM.SINGLE_LINE);
+      raws.push(t);
+      name = parseName(t);
+      if (name.length >= 4) return name;
+    }
     // Repli : zone de nom plus serrée (cartes récentes, mention « DE BASE » à gauche).
-    const alt = cut(src, at(0.12, 0.03, 0.72, 0.1), 1200);
+    const alt = cut(src, at(0.12, 0.03, 0.72, 0.1), 1100);
     for (const mode of ['gray', 'otsu'] as const) {
-      const t = await ocr(worker, prepare(alt, mode), PSM.SINGLE_LINE);
-      raw += t + '\n';
+      const t = await ocr(prepare(alt, mode), PSM.SINGLE_LINE);
+      raws.push(t);
       const n2 = parseName(t);
       if (n2.length > name.length) name = n2;
       if (name.length >= 4) break;
     }
-  }
+    return name;
+  })();
 
-  let num: { number?: string; total?: number } = {};
-  outer: for (const zone of numZones) {
-    for (const mode of ['gray', 'otsu', 'invert'] as const) {
-      const t = await ocr(worker, prepare(zone, mode), PSM.SPARSE_TEXT, '0123456789/');
-      raw += t + '\n';
-      num = parseNumber(t);
-      if (num.number) break outer;
+  const numTask = (async () => {
+    for (const zone of numZones) {
+      for (const mode of ['gray', 'otsu', 'invert'] as const) {
+        const t = await ocr(prepare(zone, mode), PSM.SPARSE_TEXT, '0123456789/');
+        raws.push(t);
+        const num = parseNumber(t);
+        if (num.number) return num;
+      }
     }
-  }
-  if (!num.number) {
     // Repli : toute la bande du bas, lue comme une seule ligne.
-    const strip = cut(src, at(0, 0.86, 1, 0.99), 1400);
+    const strip = cut(src, at(0, 0.86, 1, 0.99), 1300);
     for (const mode of ['gray', 'otsu', 'invert'] as const) {
-      const t = await ocr(worker, prepare(strip, mode), PSM.SINGLE_LINE, '0123456789/');
-      raw += t + '\n';
-      num = parseNumber(t);
-      if (num.number) break;
+      const t = await ocr(prepare(strip, mode), PSM.SINGLE_LINE, '0123456789/');
+      raws.push(t);
+      const num = parseNumber(t);
+      if (num.number) return num;
     }
-  }
-  let hp: number | undefined;
-  for (const mode of ['gray', 'otsu'] as const) {
-    const t = await ocr(worker, prepare(hpZone, mode), PSM.SINGLE_LINE, '0123456789PVH ');
-    raw += t + '\n';
-    hp = parseHp(t);
-    if (hp) break;
-  }
+    return {} as { number?: string; total?: number };
+  })();
+
+  const hpTask = (async () => {
+    for (const mode of ['gray', 'otsu'] as const) {
+      const t = await ocr(prepare(hpZone, mode), PSM.SINGLE_LINE, '0123456789PVH ');
+      raws.push(t);
+      const hp = parseHp(t);
+      if (hp) return hp;
+    }
+    return undefined;
+  })();
+
+  const [name, num, hp] = await Promise.all([nameTask, numTask, hpTask]);
+  const raw = raws.join('\n');
   // Plusieurs empreintes légèrement décalées : tolère un cadrage imparfait.
   const shifts = [[0, 0], [-0.03, 0], [0.03, 0], [0, -0.02], [0, 0.02]];
   const art = shifts.map(([dx, dy]) => fingerprint(src, card, dx, dy)).filter(Boolean) as Float32Array[];
@@ -363,7 +397,7 @@ function imageFingerprint(base?: string): Promise<Float32Array | undefined> {
  */
 /** `card` : un cadrage pour toutes les images, ou une liste de cadrages par image (caméra). */
 export async function readCard(input: Source | Source[], onProgress: Progress, card?: Rect | Rect[][]): Promise<ScanReading> {
-  const worker = await getWorker(onProgress);
+  await getPool(onProgress);
   const frames = Array.isArray(input) ? input : [input];
   const jobs: { src: Source; rect: Rect }[] = [];
   for (const [k, src] of frames.entries()) {
@@ -376,7 +410,7 @@ export async function readCard(input: Source | Source[], onProgress: Progress, c
   const numbers = new Map<string, number>();
   for (let i = 0; i < jobs.length; i++) {
     onProgress(i / jobs.length, 'Lecture de la carte…');
-    const r = await readZones(worker, jobs[i].src, jobs[i].rect);
+    const r = await readZones(jobs[i].src, jobs[i].rect);
     if (r.number) {
       const k = `${r.number}/${r.total ?? ''}`;
       numbers.set(k, (numbers.get(k) ?? 0) + 1);
@@ -392,7 +426,6 @@ export async function readCard(input: Source | Source[], onProgress: Progress, c
     best.number = n;
     best.total = t ? Number(t) : best.total;
   }
-  await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO, tessedit_char_whitelist: '' });
   return best;
 }
 

@@ -13,9 +13,37 @@ export const RATES = { top: 0.03, chase: 0.12, upper: 0.3 };
 /** Bonus (7ᵉ jour d'affilée ou quêtes de la veille terminées) : chances augmentées pour la dixième carte. */
 export const BOOST_RATES = { top: 0.08, chase: 0.22, upper: 0.35 };
 
-export const setOfDay = (n = todayNumber()) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
+const regularSet = (n: number) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
 
-export interface BoosterState { day: number; setId: string; setName: string; cards: string[]; opened: boolean; claimed: boolean; boost?: boolean }
+/* ---------- Événements ---------- */
+/** Extensions d'époque (1999-2000) : numéros des cartes holo et rares, l'ordre n'étant pas celui des séries récentes. */
+export const VINTAGE: Record<string, { name: string; holo: [number, number]; rare: [number, number]; last?: number }> = {
+  base1: { name: 'Set de Base', holo: [1, 16], rare: [17, 22], last: 95 }, // 96 à 102 : énergies
+  base2: { name: 'Jungle', holo: [1, 16], rare: [17, 32] },
+  base3: { name: 'Fossile', holo: [1, 15], rare: [16, 31] },
+};
+/** Chances pour la dixième carte d'un booster d'époque (simulation). */
+export const VINTAGE_RATES = { holo: 0.2, rare: 0.35 };
+export const VINTAGE_BOOST = { holo: 0.33, rare: 0.4 };
+
+export interface BoosterEvent { id: 'retro'; name: string; setId: string; setName: string; text: string }
+/** Le n° 1 (18 octobre 2026) est un dimanche : samedi et dimanche, c'est le « Week-end rétro ». */
+export const isWeekend = (n: number) => { const w = (((n - 1) % 7) + 7) % 7; return w === 0 || w === 6; };
+export function eventOfDay(n = todayNumber()): BoosterEvent | null {
+  if (!isWeekend(n)) return null;
+  const ids = Object.keys(VINTAGE);
+  const setId = ids[Math.floor(n / 7) % ids.length];
+  return { id: 'retro', name: 'Week-end rétro', setId, setName: VINTAGE[setId].name, text: `Ce week-end, le booster du jour vient de l'extension ${VINTAGE[setId].name} de 1999-2000 : une carte holo d'époque dans un booster sur cinq.` };
+}
+/** Prochain événement (pour l'annoncer). */
+export function nextEvent(n = todayNumber()): { inDays: number; ev: BoosterEvent } | null {
+  for (let k = 0; k < 8; k++) { const ev = eventOfDay(n + k); if (ev) return { inDays: k, ev }; }
+  return null;
+}
+
+export const setOfDay = (n = todayNumber()) => eventOfDay(n)?.setId ?? regularSet(n);
+
+export interface BoosterState { day: number; setId: string; setName: string; cards: string[]; opened: boolean; claimed: boolean; boost?: boolean; event?: 'retro' }
 const KEY = 'holocote.booster.v1';
 
 export function getBooster(): BoosterState | null {
@@ -48,6 +76,23 @@ export async function drawBooster(opts: { save?: boolean; setId?: string; boost?
   if (!d?.cards?.length) return null;
   const official = d.cardCount?.official ?? d.cards.length;
   const num = (c: CardBrief) => (/^\d+$/.test(c.localId) ? Number(c.localId) : 0);
+  const vintage = VINTAGE[setId];
+  if (vintage) {
+    const inR = (c: CardBrief, [a, b]: [number, number]) => num(c) >= a && num(c) <= b;
+    const holo = d.cards.filter((c) => inR(c, vintage.holo));
+    const rare = d.cards.filter((c) => inR(c, vintage.rare));
+    const rest = d.cards.filter((c) => num(c) > vintage.rare[1] && num(c) <= (vintage.last ?? 999));
+    if (rest.length < 10 || !holo.length) return null;
+    const nine = new Set<string>();
+    while (nine.size < 9) nine.add(pick(rest).id);
+    const R = opts.boost ? VINTAGE_BOOST : VINTAGE_RATES;
+    const r = Math.random();
+    let last = r < R.holo ? pick(holo) : r < R.holo + R.rare && rare.length ? pick(rare) : pick(rest);
+    while (nine.has(last.id)) last = pick(rest);
+    const s: BoosterState = { day, setId, setName: d.name || vintage.name, cards: [...nine, last.id], opened: false, claimed: false, boost: !!opts.boost, event: eventOfDay(day)?.setId === setId ? 'retro' : undefined };
+    if (opts.save !== false) saveBooster(s);
+    return s;
+  }
   const main = d.cards.filter((c) => num(c) > 0 && num(c) <= official);
   const chase = d.cards.filter((c) => num(c) > official);
   if (main.length < 10) return null;
@@ -83,6 +128,7 @@ export async function loadPulled(ids: string[]): Promise<Pulled[]> {
 /** Niveau d'effet pour la révélation de la dernière carte. */
 export function hitLevel(c: Card | null): 0 | 1 | 2 | 3 {
   const r = (c?.rarity ?? '').toLowerCase();
+  if (c && VINTAGE[c.set?.id ?? '']) return c.id === 'base1-4' ? 3 : /holo/.test(r) ? 2 : /rare/.test(r) ? 1 : 0;
   if (/hyper|mega hyper|secr|gold|dor|special illustration|illustration sp/.test(r)) return 3;
   if (/ultra|illustration rare|double|vmax|vstar|ex\b|full/.test(r)) return 2;
   if (/rare|holo/.test(r)) return 1;

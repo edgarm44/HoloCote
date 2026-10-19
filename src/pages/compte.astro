@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { avatarSvg } from '../lib/avatar';
-const DEF = { palette: 'holo', acc: 'none', aura: 'none' };
+const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'none', pet: 'none' };
 ---
 <Base title="Mon compte" active="account" description="Ton personnage, ton niveau, tes quêtes du jour et tes succès HoloCote. Sans e-mail, sans mot de passe : tout reste dans ton navigateur.">
   <section class="ac-hero">
@@ -36,9 +36,7 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none' };
         <p class="muted small">20 caractères maximum. Choisis un surnom, pas ton vrai nom. Il s'affiche sur le site (classement compris) et n'est jamais envoyé.</p>
       </div>
       <fieldset class="wr"><legend>Expression</legend><div class="wr-row" id="wr-mood"></div></fieldset>
-      <fieldset class="wr"><legend>Couleur</legend><div class="wr-row" id="wr-palette"></div></fieldset>
-      <fieldset class="wr"><legend>Accessoire</legend><div class="wr-row" id="wr-acc"></div></fieldset>
-      <fieldset class="wr"><legend>Aura</legend><div class="wr-row" id="wr-aura"></div></fieldset>
+      <div id="wr-slots" class="wr-slots"></div>
       <div class="ed-actions">
         <button class="btn btn-primary" type="submit">Enregistrer</button>
         <span class="muted small" id="ed-dirty" hidden>Modifications non enregistrées</span>
@@ -127,7 +125,7 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none' };
     import { streak } from '../lib/progress';
     import { countCards } from '../lib/collection';
     import { getPseudo, setPseudo } from '../lib/leaderboard';
-    import { avatarSvg, getLook, setLook, getMood, PALETTES, ACCESSORIES, AURAS, MOODS, nextUnlock, type Look, type Item } from '../lib/avatar';
+    import { avatarSvg, getLook, setLook, getMood, SLOTS, MOODS, nextUnlock, type Look } from '../lib/avatar';
     import { levelInfo } from '../lib/level';
     import type { Mood } from '../lib/mascot';
     import { msToMidnight } from '../lib/mystery';
@@ -186,13 +184,16 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none' };
       return card;
     }
     function renderWardrobe() {
-      const base: Look = { palette: draft.palette, acc: draft.acc, aura: draft.aura };
+      const base: Look = { palette: draft.palette, acc: draft.acc, aura: draft.aura, pose: draft.pose, bg: draft.bg, pet: draft.pet };
       $('wr-mood').replaceChildren(...MOODS.map((m) => option('mood', m, MOOD_NAMES[m], 1, avatarSvg(base, m, 54, ''), draft.mood === m)));
-      const row = (id: string, group: keyof Look, list: Item[]) =>
-        $(id).replaceChildren(...list.map((it) => option(group, it.id, it.name, it.lvl, avatarSvg({ ...base, [group]: it.id }, draft.mood, 54, ''), draft[group] === it.id)));
-      row('wr-palette', 'palette', PALETTES);
-      row('wr-acc', 'acc', ACCESSORIES);
-      row('wr-aura', 'aura', AURAS);
+      $('wr-slots').replaceChildren(...SLOTS.map((sl) => {
+        const free = sl.list.filter((x) => x.lvl <= lv.level).length;
+        const fs = el('fieldset', { class: 'wr' }, [
+          el('legend', {}, [sl.label, el('span', { class: 'wr-count' }, [`${free}/${sl.list.length}`])]),
+          el('div', { class: 'wr-row' }, sl.list.map((it) => option(sl.key, it.id, it.name, it.lvl, avatarSvg({ ...base, [sl.key]: it.id }, draft.mood, 54, ''), draft[sl.key] === it.id))),
+        ]);
+        return fs;
+      }));
     }
 
     $('ac-form').addEventListener('submit', (e) => {
@@ -395,7 +396,11 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none' };
     .ac-form .field { max-width: 520px; }
     .ac-form .field p { margin: 6px 0 0; }
     .wr { border: 0; padding: 0; margin: 0; min-width: 0; }
-    .wr legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
+    .wr legend { font-weight: 700; margin-bottom: 8px; padding: 0; display: flex; align-items: center; gap: 8px; }
+    .wr-slots { display: grid; gap: 18px; }
+    .wr-slots :global(.wr) { border: 0; padding: 0; margin: 0; min-width: 0; }
+    .wr-slots :global(.wr legend) { font-weight: 700; margin-bottom: 8px; padding: 0; display: flex; align-items: center; gap: 8px; }
+    .wr-slots :global(.wr-count), .wr :global(.wr-count) { font-size: 0.72rem; font-weight: 700; color: var(--muted); padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); }
     .wr-row { display: flex; gap: 10px; flex-wrap: wrap; }
     .wr-row :global(.wr-opt) { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 92px; padding: 8px 4px 8px; border-radius: 16px;
       border: 2px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color 0.2s, transform 0.2s; }

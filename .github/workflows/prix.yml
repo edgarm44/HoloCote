@@ -1,0 +1,69 @@
+name: Relevé quotidien des cotes
+
+# Chaque matin : relève la cote des cartes suivies, l'ajoute à l'historique (branche « prix »,
+# séparée du code pour ne jamais gêner publier.bat), puis republie le site avec l'historique à jour.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  releve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Récupérer l'historique existant
+        run: |
+          if git ls-remote --exit-code --heads origin prix >/dev/null; then
+            git fetch origin prix
+            git worktree add prix-data origin/prix
+          else
+            git worktree add --detach prix-data
+            cd prix-data
+            git checkout --orphan prix
+            git rm -rfq .
+          fi
+      - name: Relever les cotes du jour
+        run: node scripts/prices.mjs prix-data/history.json
+      - name: Enregistrer l'historique
+        run: |
+          cd prix-data
+          git config user.name "holocote-releve"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add history.json
+          git commit -qm "Relevé des cotes du $(date -u +%F)" || echo "Rien de nouveau"
+          git push origin HEAD:prix
+      - name: Construire le site
+        run: |
+          mkdir -p public/data
+          cp prix-data/history.json public/data/history.json
+          npm ci
+          npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: releve
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

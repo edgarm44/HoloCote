@@ -138,6 +138,11 @@ import { mascotSvg } from '../lib/mascot';
         <p class="muted" id="bx-lead">Aujourd'hui : <strong id="bx-set">…</strong>. Un booster gratuit par jour, dix cartes. La dixième est pour ton classeur.</p>
         <p class="muted" id="bx-lead-train" hidden>Une extension tirée au hasard à chaque ouverture. Entraînement : aucune carte n'est gagnée.</p>
       </div>
+      <div class="bx-event" id="bx-event" hidden>
+        <span class="ev-tag">Événement</span>
+        <div><strong id="bx-event-name">Week-end rétro</strong><p id="bx-event-t"></p></div>
+      </div>
+      <p class="bx-next-ev muted small" id="bx-next-ev" hidden></p>
       <p class="bx-boost" id="bx-boost" hidden><strong>Bonus :</strong> <span id="bx-boost-t"></span></p>
       <div id="bx-state" aria-live="polite"></div>
       <div class="bx-stage" id="bx-stage" hidden>
@@ -553,7 +558,7 @@ import { mascotSvg } from '../lib/mascot';
   </script>
 
   <script>
-    import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
+    import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, eventOfDay, nextEvent, BOOSTER_SETS, VINTAGE, VINTAGE_RATES, VINTAGE_BOOST, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
     import { syncToday, streak as getStreak, week, played } from '../lib/progress';
     import { rerolls, useReroll } from '../lib/xp';
     import { todayNumber, msToMidnight, getDay } from '../lib/mystery';
@@ -621,7 +626,17 @@ import { mascotSvg } from '../lib/mascot';
       const boosted = daily && (saved ? !!saved.boost : st.boostToday);
       $('bx-boost').hidden = !boosted;
       if (boosted) $('bx-boost-t').textContent = `${st.playedToday ? st.current : st.current + 1} jours d'affilée : ton booster du jour a de meilleures chances.`;
-      $('bx-rates').textContent = rateText(boosted ? BOOST_RATES : RATES);
+      const ev = daily ? eventOfDay() : null;
+      $('bx-event').hidden = !ev;
+      if (ev) { $('bx-event-name').textContent = `${ev.name} : ${ev.setName}`; $('bx-event-t').textContent = ev.text; }
+      const ne = daily && !ev ? nextEvent() : null;
+      $('bx-next-ev').hidden = !ne;
+      if (ne) $('bx-next-ev').textContent = `Prochain événement : ${ne.ev.name} (booster ${ne.ev.setName}) ${ne.inDays === 1 ? 'demain' : `dans ${ne.inDays} jours`}.`;
+      const vintageSet = daily ? !!VINTAGE[setOfDay()] : !!(bState && VINTAGE[bState.setId]);
+      if (vintageSet) {
+        const R = boosted ? VINTAGE_BOOST : VINTAGE_RATES;
+        $('bx-rates').textContent = `Chances pour la dixième carte (booster d'époque) : ${pct(R.holo)} carte holo, ${pct(R.rare)} rare, ${pct(1 - R.holo - R.rare)} carte peu commune ou commune. Simulation : ce ne sont pas les taux officiels.`;
+      } else $('bx-rates').textContent = rateText(boosted ? BOOST_RATES : RATES);
     }
     const DAYS = ['di', 'lu', 'ma', 'me', 'je', 've', 'sa'];
     function renderWeek() {
@@ -771,7 +786,7 @@ import { mascotSvg } from '../lib/mascot';
       pack.disabled = true;
       pack.classList.add('tearing');
       try {
-        if (bxTrain) bState = await drawBooster({ save: false, setId: BOOSTER_SETS[Math.floor(Math.random() * BOOSTER_SETS.length)] });
+        if (bxTrain) { const pool = [...BOOSTER_SETS, ...Object.keys(VINTAGE)]; bState = await drawBooster({ save: false, setId: pool[Math.floor(Math.random() * pool.length)] }); }
         else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday });
         if (!bState) throw new Error('booster');
         pulled = await loadPulled(bState.cards);
@@ -847,6 +862,7 @@ import { mascotSvg } from '../lib/mascot';
       getSet(setId, 'fr').then((d) => {
         if (d?.name) { $('bx-set').textContent = d.name; $('bx-pack-set').textContent = d.name; }
       }).catch(() => {});
+      if (eventOfDay()) { $('bx-pack').classList.add('retro'); $('bx-pack').setAttribute('aria-label', 'Ouvrir le booster rétro du jour'); }
       $('bx-pack').addEventListener('click', openPack);
       $('bx-again').addEventListener('click', () => { bState = null; pulled = []; $('bx-again').hidden = true; resetPack('Extension surprise'); window.scrollTo({ top: $('bx-stage').offsetTop - 90, behavior: 'smooth' }); });
       $('bx-reroll').addEventListener('click', () => {
@@ -1278,6 +1294,12 @@ import { mascotSvg } from '../lib/mascot';
     .tries { text-align: center; font-family: var(--font-display); font-weight: 700; margin: 0; font-size: 0.95rem; }
 
     .console { min-width: 0; }
+    .pack:global(.retro) { filter: sepia(0.55) saturate(1.4) hue-rotate(-12deg); box-shadow: 0 0 40px rgba(255, 210, 90, 0.45); }
+    .bx-event { display: flex; gap: 14px; align-items: center; margin: 0 0 14px; padding: 14px 16px; border-radius: 18px;
+      background: linear-gradient(120deg, rgba(255, 210, 90, 0.16), rgba(255, 138, 61, 0.08)); border: 1px solid rgba(255, 210, 90, 0.55); }
+    .bx-event p { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
+    .ev-tag { flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; background: var(--gold); color: #0a0812; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .bx-next-ev { margin: 0 0 12px; }
     .bx-reroll { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
     .bx-reroll p { margin: 6px 0 0; }
     .link-btn { background: none; border: 0; padding: 0; color: var(--cyan); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 0.88rem; }

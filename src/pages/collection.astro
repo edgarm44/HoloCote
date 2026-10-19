@@ -48,6 +48,10 @@ import { mascotSvg } from '../lib/mascot';
       <button type="button" data-filter="secret" aria-pressed="false">Secrètes</button>
     </div>
     <div class="toolbar-right">
+      <div class="view-tg" role="group" aria-label="Affichage">
+        <button type="button" data-view="grid" aria-pressed="true">Grille</button>
+        <button type="button" data-view="book" aria-pressed="false">Classeur</button>
+      </div>
       <label class="sr-only" for="find">Chercher dans ma collection</label>
       <input id="find" type="search" placeholder="Chercher…" autocomplete="off" />
       <label class="sr-only" for="sort">Trier</label>
@@ -70,6 +74,15 @@ import { mascotSvg } from '../lib/mascot';
   </section>
 
   <div id="binder" class="binder"></div>
+  <section class="book" id="book" hidden aria-label="Classeur à feuilleter" tabindex="-1">
+    <div class="book-spread" id="book-spread"></div>
+    <div class="book-nav">
+      <button type="button" class="btn" id="book-prev" aria-label="Pages précédentes">‹ Précédente</button>
+      <span class="book-pg" id="book-pg" aria-live="polite"></span>
+      <button type="button" class="btn" id="book-next" aria-label="Pages suivantes">Suivante ›</button>
+    </div>
+    <p class="muted small book-help">Flèches du clavier ou glisse du doigt pour tourner les pages. Les poches vides attendent tes prochaines cartes.</p>
+  </section>
   <p id="no-match" class="muted" hidden>Aucune carte ne correspond à ce filtre.</p>
 
   <div id="empty" class="empty" hidden>
@@ -128,6 +141,10 @@ import { mascotSvg } from '../lib/mascot';
     const sortSel = $<HTMLSelectElement>('sort');
     const findIn = $<HTMLInputElement>('find');
     const chips = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    let lastShown: Item[] = [];
+    let view: 'grid' | 'book' = 'grid';
+    try { if (localStorage.getItem('holocote.view.v1') === 'book') view = 'book'; } catch { /* rien */ }
+    let spread = 0; // index de la double page affichée
     $<HTMLAnchorElement>('go-scan').href = url('/scanner/');
     if (!storageAvailable()) $('storage-warning').hidden = false;
 
@@ -170,7 +187,9 @@ import { mascotSvg } from '../lib/mascot';
         : unitEur(b) - unitEur(a),
       );
       $('no-match').hidden = !(items.length && !shown.length);
-      binder.replaceChildren(...shown.map(slotFor));
+      lastShown = shown;
+      if (view === 'book') { binder.replaceChildren(); binder.hidden = true; renderBook(); }
+      else { binder.hidden = false; $('book').hidden = true; binder.replaceChildren(...shown.map(slotFor)); }
     }
 
     function slotFor(it: Item): DocumentFragment {
@@ -238,6 +257,65 @@ import { mascotSvg } from '../lib/mascot';
       await Promise.all(Array.from({ length: 6 }, worker));
       render();
     }
+
+    /* ---------- Classeur en pages ---------- */
+    const PER_PAGE = 9;
+    const perSpread = () => (window.matchMedia('(min-width: 900px)').matches ? 2 : 1);
+    function pocket(it: Item | undefined, n: number): HTMLElement {
+      if (!it) return el('div', { class: 'pocket empty', 'aria-hidden': 'true' }, [el('span', {}, [String(n)])]);
+      const p = priceOf(it);
+      const tier = rarityTier(it.rarity);
+      return el('a', { class: `pocket tier-${tier}`, href: url(`/carte/?id=${encodeURIComponent(it.cardId)}&lang=${it.lang}`), title: it.name }, [
+        holoCard(it.image, it.name),
+        el('span', { class: 'pk-name' }, [it.name]),
+        p ? el('span', { class: 'pk-val' }, [formatPrice(lineValue(it, p), p.unit)]) : null,
+      ]);
+    }
+    function renderBook(dir = 0) {
+      const book = $('book');
+      book.hidden = false;
+      const per = perSpread();
+      const pages = Math.max(1, Math.ceil(lastShown.length / PER_PAGE));
+      const spreads = Math.ceil(pages / per);
+      spread = Math.max(0, Math.min(spread, spreads - 1));
+      const first = spread * per;
+      const pageEls: HTMLElement[] = [];
+      for (let k = 0; k < per; k++) {
+        const pi = first + k;
+        if (pi >= pages && per > 1 && k > 0) { pageEls.push(el('div', { class: 'page blank' }, [el('span', { class: 'pg-n' }, ['Fin du classeur'])])); continue; }
+        const cells = Array.from({ length: PER_PAGE }, (_, j) => pocket(lastShown[pi * PER_PAGE + j], pi * PER_PAGE + j + 1));
+        pageEls.push(el('div', { class: `page ${k === 0 ? 'left' : 'right'}` }, [el('div', { class: 'pg-grid' }, cells), el('span', { class: 'pg-n' }, [`Page ${pi + 1}`])]));
+      }
+      const sp = $('book-spread');
+      sp.replaceChildren(...pageEls);
+      sp.classList.remove('flip-next', 'flip-prev');
+      if (dir) { void sp.offsetWidth; sp.classList.add(dir > 0 ? 'flip-next' : 'flip-prev'); }
+      const a = first + 1, b = Math.min(first + per, pages);
+      $('book-pg').textContent = a === b ? `Page ${a} sur ${pages}` : `Pages ${a}-${b} sur ${pages}`;
+      ($('book-prev') as HTMLButtonElement).disabled = spread === 0;
+      ($('book-next') as HTMLButtonElement).disabled = spread >= spreads - 1;
+    }
+    const turn = (d: number) => { const before = spread; spread += d; renderBook(d); if (spread === before) renderBook(); };
+    $('book-prev').addEventListener('click', () => turn(-1));
+    $('book-next').addEventListener('click', () => turn(1));
+    $('book').addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') turn(1); if (e.key === 'ArrowLeft') turn(-1); });
+    document.addEventListener('keydown', (e) => {
+      if (view !== 'book' || (e.target as HTMLElement).closest('input, select, textarea')) return;
+      if (e.key === 'ArrowRight') turn(1); else if (e.key === 'ArrowLeft') turn(-1);
+    });
+    let touchX: number | null = null;
+    $('book').addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+    $('book').addEventListener('touchend', (e) => { if (touchX === null) return; const dx = e.changedTouches[0].clientX - touchX; touchX = null; if (Math.abs(dx) > 50) turn(dx < 0 ? 1 : -1); });
+    window.matchMedia('(min-width: 900px)').addEventListener('change', () => { if (view === 'book') renderBook(); });
+    const viewBtns = [...document.querySelectorAll<HTMLButtonElement>('[data-view]')];
+    const setView = (v: 'grid' | 'book') => {
+      view = v;
+      viewBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+      try { localStorage.setItem('holocote.view.v1', v); } catch { /* rien */ }
+      render();
+    };
+    viewBtns.forEach((b) => b.addEventListener('click', () => setView(b.dataset.view as 'grid' | 'book')));
+    viewBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
 
     chips.forEach((b) => b.addEventListener('click', () => {
       filter = b.dataset.filter as typeof filter;
@@ -376,6 +454,37 @@ import { mascotSvg } from '../lib/mascot';
     .toolbar-right input { flex: 1 1 140px; max-width: 220px; }
     .toolbar-right select { flex: 0 0 auto; width: auto; }
 
+    .view-tg { display: flex; gap: 3px; padding: 3px; border-radius: 12px; background: var(--surface-2); flex: 0 0 auto; }
+    .view-tg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 9px; cursor: pointer; }
+    .view-tg button[aria-pressed='true'] { background: var(--bg); color: var(--text); }
+    .binder[hidden] { display: none; }
+    .book { margin: 0 auto 24px; outline: none; max-width: 980px; }
+    .book-spread { display: grid; grid-template-columns: 1fr; gap: 0; perspective: 1600px; }
+    @media (min-width: 900px) { .book-spread { grid-template-columns: 1fr 1fr; } }
+    .book-spread :global(.page) { position: relative; padding: 18px 18px 34px; background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.25), transparent 6%) , linear-gradient(160deg, #1a1530, #120f22); border: 1px solid var(--line); min-width: 0; }
+    .book-spread :global(.page.left) { border-radius: 20px 6px 6px 20px; }
+    .book-spread :global(.page.right) { border-radius: 6px 20px 20px 6px; background: linear-gradient(270deg, rgba(0, 0, 0, 0.25), transparent 6%), linear-gradient(200deg, #1a1530, #120f22); }
+    @media (max-width: 899px) { .book-spread :global(.page) { border-radius: 20px !important; } }
+    .book-spread :global(.page.blank) { display: grid; place-items: center; color: var(--muted); }
+    .book-spread :global(.pg-grid) { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .book-spread :global(.pg-n) { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 0.75rem; color: var(--muted); }
+    .book-spread :global(.page.blank .pg-n) { position: static; }
+    .book-spread :global(.pocket) { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 10px; min-width: 0; text-decoration: none; color: var(--text);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: inset 0 10px 18px rgba(255, 255, 255, 0.03); }
+    .book-spread :global(.pocket:hover) { border-color: rgba(62, 240, 255, 0.5); }
+    .book-spread :global(.pocket.empty) { aspect-ratio: 245 / 360; border-style: dashed; display: grid; place-items: center; color: rgba(255, 255, 255, 0.15); font-weight: 800; }
+    .book-spread :global(.pocket.tier-ultra), .book-spread :global(.pocket.tier-secret) { border-color: rgba(255, 210, 90, 0.45); }
+    .book-spread :global(.pk-name) { font-size: 0.72rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .book-spread :global(.pk-val) { font-size: 0.7rem; color: var(--gold); font-weight: 700; }
+    .book-spread:global(.flip-next) :global(.page) { animation: flip-n 0.45s ease-out; transform-origin: left center; }
+    .book-spread:global(.flip-prev) :global(.page) { animation: flip-p 0.45s ease-out; transform-origin: right center; }
+    @keyframes flip-n { from { transform: rotateY(-25deg); opacity: 0.3; } }
+    @keyframes flip-p { from { transform: rotateY(25deg); opacity: 0.3; } }
+    @media (prefers-reduced-motion: reduce) { .book-spread :global(.page) { animation: none !important; } }
+    .book-nav { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 14px; }
+    .book-pg { font-weight: 700; min-width: 11ch; text-align: center; }
+    .book-help { text-align: center; margin: 8px 0 0; }
     .binder {
       display: grid; gap: 18px 14px;
       grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));

@@ -39,14 +39,61 @@ export interface CardIndex { cards: IndexEntry[]; sets: Map<string, { name: stri
 
 const indexes = new Map<Lang, Promise<CardIndex>>();
 
+/* Copie de la liste complète des cartes dans le navigateur (IndexedDB), valable 3 jours :
+   le scanner et la recherche démarrent sans retélécharger plusieurs mégaoctets. */
+const IDB = 'holocote-cache';
+const TTL = 3 * 864e5;
+function openDb(): Promise<IDBDatabase | null> {
+  return new Promise((res) => {
+    try {
+      const r = indexedDB.open(IDB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+      r.onblocked = () => res(null);
+    } catch { res(null); }
+  });
+}
+async function idbGet<T>(key: string): Promise<{ t: number; d: T } | undefined> {
+  const db = await openDb();
+  if (!db) return undefined;
+  return new Promise((res) => {
+    try {
+      const q = db.transaction('kv').objectStore('kv').get(key);
+      q.onsuccess = () => res(q.result);
+      q.onerror = () => res(undefined);
+    } catch { res(undefined); }
+  });
+}
+async function idbSet(key: string, d: unknown) {
+  const db = await openDb();
+  if (!db) return;
+  try { db.transaction('kv', 'readwrite').objectStore('kv').put({ t: Date.now(), d }, key); } catch { /* rien */ }
+}
+
+async function allCards(lang: Lang): Promise<CardBrief[]> {
+  const key = `cards-${lang}`;
+  const cached = await idbGet<CardBrief[]>(key);
+  if (cached && Array.isArray(cached.d) && Date.now() - cached.t < TTL) return cached.d;
+  try {
+    const r = await fetch(`https://api.tcgdex.net/v2/${lang}/cards`);
+    if (!r.ok) throw new Error(`TCGdex ${r.status}`);
+    const d = (await r.json()) as CardBrief[];
+    // On ne garde que l'utile (identifiant, numéro, nom, image) pour alléger la copie.
+    const slim = d.map((c) => ({ id: c.id, localId: c.localId, name: c.name, image: c.image }));
+    idbSet(key, slim);
+    return slim;
+  } catch (e) {
+    if (cached && Array.isArray(cached.d)) return cached.d; // base injoignable : ancienne copie
+    throw e;
+  }
+}
+
 export function loadIndex(lang: Lang): Promise<CardIndex> {
   if (!indexes.has(lang)) {
     const p = (async () => {
       const [cards, sets] = await Promise.all([
-        fetch(`https://api.tcgdex.net/v2/${lang}/cards`).then((r) => {
-          if (!r.ok) throw new Error(`TCGdex ${r.status}`);
-          return r.json() as Promise<CardBrief[]>;
-        }),
+        allCards(lang),
         listSets(lang),
       ]);
       return {

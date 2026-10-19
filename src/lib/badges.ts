@@ -7,6 +7,7 @@ import { getLog, streak } from './progress';
 import { rarityTier } from './rarity';
 import { questDays } from './quests';
 import { bestSetPct } from './sets';
+import { eventOfDay } from './booster';
 
 export type BadgeGroup = 'Classeur' | 'Défi' | 'Quêtes' | 'Fidélité' | 'Explorer';
 export interface Badge { id: string; group: BadgeGroup; name: string; hint: string; icon: string; got: boolean; progress?: [number, number] }
@@ -35,6 +36,7 @@ export function computeBadges(): Badge[] {
   try { pseudo = localStorage.getItem('holocote.pseudo.v1') || ''; } catch { /* rien */ }
   const fullDays = log.filter((l) => l.m && l.b !== undefined && l.d).length;
   const setPct = Math.round(bestSetPct() * 100);
+  const retro = Object.entries(getLog()).filter(([n, l]) => l.b !== undefined && eventOfDay(Number(n))).length;
   const saved = num('holocote.backup.v1', (v) => (typeof v === 'number' && v > 0 ? 1 : 0));
 
   const B = (id: string, group: BadgeGroup, icon: string, name: string, hint: string, value: number, goal: number): Badge =>
@@ -60,6 +62,8 @@ export function computeBadges(): Badge[] {
     B('duel1', 'Défi', 'VS', 'Duelliste', 'Gagne un duel du jour', duelWins, 1),
     B('duel10', 'Défi', 'VS+', 'Cote infaillible', '10 duels du jour gagnés', duelWins, 10),
     B('train', 'Défi', '10x', 'Acharné', 'Série de 10 en entraînement duel', trainBest, 10),
+    B('retro', 'Défi', '99', 'Rétro', 'Ouvre un booster du Week-end rétro', retro, 1),
+    B('retro4', 'Défi', '99+', 'Collectionneur d’époque', 'Ouvre 4 boosters rétro', retro, 4),
     B('full', 'Défi', '3/3', 'Journée complète', 'Joue les 3 jeux le même jour', fullDays, 1),
     B('q1', 'Quêtes', 'Q', 'Aventurier', 'Termine les 3 quêtes d’un jour', qDays, 1),
     B('q7', 'Quêtes', 'Q7', 'Héros du quotidien', 'Quêtes terminées 7 jours', qDays, 7),
