@@ -49,7 +49,8 @@ export function syncToday(state: { boosterOpened: boolean; boosterClaimed: boole
   logDay({
     m: m.done ? (m.won ? 'won' : 'lost') : undefined,
     mt: m.done && m.won ? m.guesses.length : undefined,
-    b: state.boosterOpened ? (state.hit ?? prev.b ?? 0) : undefined,
+    // Avec les relances, plusieurs boosters par jour : on garde la meilleure dernière carte.
+    b: state.boosterOpened ? Math.max(state.hit ?? 0, prev.b ?? 0) : undefined,
     d: state.duel,
     cards: (m.claimed ? 1 : 0) + (state.boosterClaimed ? 1 : 0) + (state.duelClaimed ? 1 : 0) || undefined,
   }, n);

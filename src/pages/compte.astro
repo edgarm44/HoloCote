@@ -1,44 +1,54 @@
 ---
 import Base from '../layouts/Base.astro';
-import { mascotSvg } from '../lib/mascot';
-const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
+import { avatarSvg } from '../lib/avatar';
+const DEF = { palette: 'holo', acc: 'none', aura: 'none' };
 ---
-<Base title="Mon compte" active="account" description="Ton pseudo, tes quêtes du jour et tes succès HoloCote. Sans e-mail, sans mot de passe : tout reste dans ton navigateur.">
+<Base title="Mon compte" active="account" description="Ton personnage, ton niveau, tes quêtes du jour et tes succès HoloCote. Sans e-mail, sans mot de passe : tout reste dans ton navigateur.">
   <section class="ac-hero">
-    <div class="ac-avatar" id="ac-avatar" set:html={mascotSvg('happy', 120)} />
+    <div class="ac-stage">
+      <div class="ac-avatar" id="ac-avatar" set:html={avatarSvg(DEF, 'happy', 170)} />
+      <span class="ac-lvl" id="ac-lvl" aria-hidden="true">1</span>
+    </div>
     <div class="ac-id">
-      <p class="eyebrow">Mon compte</p>
+      <p class="eyebrow" id="ac-title">Dresseur débutant</p>
       <h1><span id="ac-name">Dresseur</span></h1>
-      <p class="muted">Pas d'e-mail, pas de mot de passe, pas de connexion : ton compte vit dans ce navigateur.</p>
+      <div class="xp" aria-live="polite">
+        <div class="xp-top"><strong id="xp-level">Niveau 1</strong><span class="muted" id="xp-num">0 / 100 XP</span></div>
+        <div class="xp-bar" role="progressbar" aria-label="Progression vers le niveau suivant" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="xp-bar"><i id="xp-fill"></i></div>
+        <p class="muted small" id="xp-next">Prochain objet à débloquer : la couleur Océan au niveau 2.</p>
+      </div>
+      <div class="chips">
+        <a class="chip" href="#quetes" id="chip-rewards" hidden></a>
+        <a class="chip gold" href="../defi/#booster" id="chip-rerolls" hidden></a>
+      </div>
     </div>
   </section>
 
   <section class="panel ac-edit" aria-labelledby="edit-h">
-    <h2 id="edit-h">Ton profil</h2>
+    <div class="ed-head">
+      <h2 id="edit-h">Ton personnage</h2>
+      <p class="muted small">Monte de niveau pour débloquer de nouvelles couleurs, des accessoires et des auras.</p>
+    </div>
     <form id="ac-form" class="ac-form" autocomplete="off">
       <div class="field">
         <label for="ac-pseudo">Pseudo</label>
         <input id="ac-pseudo" type="text" maxlength="20" placeholder="Ex. : Dresseur du Bourg" />
         <p class="muted small">20 caractères maximum. Choisis un surnom, pas ton vrai nom. Il s'affiche sur le site (classement compris) et n'est jamais envoyé.</p>
       </div>
-      <fieldset class="ac-moods">
-        <legend>Ton avatar</legend>
-        <div class="mood-row">
-          {MOODS.map((m) => (
-            <label class="mood">
-              <input type="radio" name="mood" value={m} />
-              <span set:html={mascotSvg(m, 56, `Coti ${m}`)} />
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <button class="btn btn-primary" type="submit">Enregistrer</button>
+      <fieldset class="wr"><legend>Expression</legend><div class="wr-row" id="wr-mood"></div></fieldset>
+      <fieldset class="wr"><legend>Couleur</legend><div class="wr-row" id="wr-palette"></div></fieldset>
+      <fieldset class="wr"><legend>Accessoire</legend><div class="wr-row" id="wr-acc"></div></fieldset>
+      <fieldset class="wr"><legend>Aura</legend><div class="wr-row" id="wr-aura"></div></fieldset>
+      <div class="ed-actions">
+        <button class="btn btn-primary" type="submit">Enregistrer</button>
+        <span class="muted small" id="ed-dirty" hidden>Modifications non enregistrées</span>
+      </div>
     </form>
   </section>
 
   <section class="ac-stats" aria-label="Résumé">
     <a class="tile" href="../collection/"><span class="t-v" id="t-cards">0</span><span class="t-l">cartes au classeur</span></a>
-    <a class="tile" href="#succes"><span class="t-v" id="t-badges">0</span><span class="t-l">succès</span></a>
+    <a class="tile" href="#succes"><span class="t-v" id="t-badges">0</span><span class="t-l">succès (+25 XP chacun)</span></a>
     <a class="tile" href="../defi/#semaine"><span class="t-v" id="t-streak">0</span><span class="t-l">jours d'affilée au Défi</span></a>
     <a class="tile" href="#quetes"><span class="t-v" id="t-quests">0</span><span class="t-l">jours de quêtes terminées</span></a>
   </section>
@@ -52,8 +62,12 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
       <div class="q-score"><strong id="q-done">0</strong>/3</div>
     </div>
     <ol class="q-list" id="q-list"></ol>
-    <p class="q-reward" id="q-reward"><strong>Récompense :</strong> <span id="q-reward-t">termine les trois quêtes aujourd'hui et ton booster du jour de demain sera boosté (meilleures chances d'une carte rare).</span></p>
-    <p class="muted small q-note" id="q-note">Termine les trois pour débloquer des succès (1, 7 et 30 jours). Rien n'est vendu ni gagné en vrai.</p>
+    <div class="chest" id="chest">
+      <span class="chest-ic" aria-hidden="true"><svg viewBox="0 0 48 40"><rect x="4" y="16" width="40" height="22" rx="4" /><path d="M4 18 q0 -14 20 -14 q20 0 20 14z" /><rect x="20" y="16" width="8" height="10" rx="2" class="lock" /></svg></span>
+      <div class="chest-tx"><strong>Coffre du jour</strong><span class="muted small" id="chest-t">Récupère les 3 récompenses pour l'ouvrir : +50 XP.</span></div>
+      <button type="button" class="btn btn-primary" id="chest-btn" hidden>Ouvrir le coffre</button>
+    </div>
+    <p class="muted small q-note" id="q-note">Chaque quête réussie donne une récompense à récupérer : de l'XP, ou une relance du booster du jour pour la quête de jeu. Rien n'est vendu ni gagné en vrai.</p>
   </section>
 
   <section class="badges" id="succes" aria-labelledby="succes-h">
@@ -109,27 +123,76 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
 
   <script>
     import { computeBadges } from '../lib/badges';
-    import { todayQuests, questDays, questBonusToday } from '../lib/quests';
+    import { todayQuests, questDays, claimQuest, chestState, openChest, rewardText, pendingRewards, rerolls, MAX_REROLLS } from '../lib/quests';
     import { streak } from '../lib/progress';
     import { countCards } from '../lib/collection';
     import { getPseudo, setPseudo } from '../lib/leaderboard';
-    import { mascotSvg, type Mood } from '../lib/mascot';
+    import { avatarSvg, getLook, setLook, getMood, PALETTES, ACCESSORIES, AURAS, MOODS, nextUnlock, type Look, type Item } from '../lib/avatar';
+    import { levelInfo } from '../lib/level';
+    import type { Mood } from '../lib/mascot';
     import { msToMidnight } from '../lib/mystery';
     import { el, url, toast } from '../lib/ui';
     import { downloadBackup, backupCode, previewBackup, restoreBackup, lastBackup } from '../lib/backup';
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     const AV = 'holocote.avatar.v1';
-    const MOODS: Mood[] = ['happy', 'wink', 'wow', 'think', 'sad'];
-    const getMood = (): Mood => { try { const m = localStorage.getItem(AV) as Mood; return MOODS.includes(m) ? m : 'happy'; } catch { return 'happy'; } };
+    const MOOD_NAMES: Record<Mood, string> = { happy: 'Content', wink: 'Clin d’œil', wow: 'Épaté', think: 'Pensif', sad: 'Triste' };
 
-    function renderProfile() {
-      const p = getPseudo();
-      $('ac-name').textContent = p === 'Toi' ? 'Dresseur sans nom' : p;
-      $('ac-avatar').innerHTML = mascotSvg(getMood(), 120);
-      $<HTMLInputElement>('ac-pseudo').value = p === 'Toi' ? '' : p;
-      const r = document.querySelector<HTMLInputElement>(`input[name=mood][value=${getMood()}]`);
-      if (r) r.checked = true;
+    let lv = levelInfo();
+    let draft: Look & { mood: Mood } = { ...getLook(lv.level), mood: getMood() };
+    let saved = JSON.stringify(draft);
+
+    /* ---------- Héros : personnage, niveau, XP ---------- */
+    function renderHero() {
+      lv = levelInfo();
+      $('ac-avatar').innerHTML = avatarSvg(draft, draft.mood, 170, 'Ton personnage');
+      $('ac-lvl').textContent = String(lv.level);
+      $('ac-title').textContent = lv.title;
+      $('xp-level').textContent = `Niveau ${lv.level}`;
+      $('xp-num').textContent = lv.max ? `${lv.xp} XP · niveau maximum` : `${lv.into} / ${lv.need} XP`;
+      $('xp-fill').style.width = `${Math.round(lv.pct * 100)}%`;
+      $('xp-bar').setAttribute('aria-valuenow', String(Math.round(lv.pct * 100)));
+      const nu = nextUnlock(lv.level);
+      $('xp-next').textContent = lv.max ? 'Tu as tout débloqué. Respect.' : `${lv.need - lv.into} XP avant le niveau ${lv.level + 1}.${nu ? ` Prochain objet : ${nu.label} au niveau ${nu.lvl}.` : ''}`;
+      const p = pendingRewards();
+      $('chip-rewards').hidden = p === 0;
+      $('chip-rewards').textContent = `${p} récompense${p > 1 ? 's' : ''} à récupérer`;
+      const r = rerolls();
+      $('chip-rerolls').hidden = r === 0;
+      $('chip-rerolls').textContent = `${r} relance${r > 1 ? 's' : ''} du booster`;
+      const p0 = getPseudo();
+      $('ac-name').textContent = p0 === 'Toi' ? 'Dresseur sans nom' : p0;
+    }
+
+    /* ---------- Garde-robe ---------- */
+    function option(group: string, value: string, label: string, lvl: number, preview: string, checked: boolean): HTMLElement {
+      const locked = lvl > lv.level;
+      const input = el('input', { type: 'radio', name: group, value, 'aria-label': locked ? `${label}, débloqué au niveau ${lvl}` : label }) as HTMLInputElement;
+      input.checked = checked;
+      input.disabled = locked;
+      const card = el('label', { class: `wr-opt ${locked ? 'locked' : ''}`, title: locked ? `Niveau ${lvl}` : label }, [
+        input,
+        el('span', { class: 'wr-pv' }, []),
+        el('span', { class: 'wr-name' }, [label]),
+        locked ? el('span', { class: 'wr-lock' }, [`Niv. ${lvl}`]) : null,
+      ]);
+      (card.querySelector('.wr-pv') as HTMLElement).innerHTML = preview;
+      input.addEventListener('change', () => {
+        (draft as unknown as Record<string, string>)[group] = value;
+        renderHero();
+        renderWardrobe();
+        $('ed-dirty').hidden = JSON.stringify(draft) === saved;
+      });
+      return card;
+    }
+    function renderWardrobe() {
+      const base: Look = { palette: draft.palette, acc: draft.acc, aura: draft.aura };
+      $('wr-mood').replaceChildren(...MOODS.map((m) => option('mood', m, MOOD_NAMES[m], 1, avatarSvg(base, m, 54, ''), draft.mood === m)));
+      const row = (id: string, group: keyof Look, list: Item[]) =>
+        $(id).replaceChildren(...list.map((it) => option(group, it.id, it.name, it.lvl, avatarSvg({ ...base, [group]: it.id }, draft.mood, 54, ''), draft[group] === it.id)));
+      row('wr-palette', 'palette', PALETTES);
+      row('wr-acc', 'acc', ACCESSORIES);
+      row('wr-aura', 'aura', AURAS);
     }
 
     $('ac-form').addEventListener('submit', (e) => {
@@ -138,38 +201,63 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
       const clean = raw.replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
       if (raw.trim() && !clean) { toast('Utilise des lettres, des chiffres, des espaces ou - _ . \''); return; }
       setPseudo(clean);
-      const m = document.querySelector<HTMLInputElement>('input[name=mood]:checked')?.value;
-      try { if (m) localStorage.setItem(AV, m); } catch { /* rien */ }
-      renderProfile();
+      setLook(draft, lv.level);
+      try { localStorage.setItem(AV, draft.mood); } catch { /* rien */ }
+      saved = JSON.stringify(draft);
+      $('ed-dirty').hidden = true;
+      renderHero();
       window.dispatchEvent(new CustomEvent('holocote:progress'));
       toast(clean ? `Profil enregistré, ${clean} !` : 'Profil enregistré.');
     });
-    document.querySelectorAll<HTMLInputElement>('input[name=mood]').forEach((r) => r.addEventListener('change', () => { $('ac-avatar').innerHTML = mascotSvg(r.value as Mood, 120); }));
+
+    /* ---------- Quêtes et récompenses ---------- */
+    function celebrate(text: string) {
+      const before = lv.level;
+      toast(text);
+      renderAll();
+      if (lv.level > before) {
+        $('ac-avatar').classList.remove('lvlup'); void $('ac-avatar').offsetWidth; $('ac-avatar').classList.add('lvlup');
+        renderWardrobe();
+      } else {
+        $('xp-fill').classList.remove('gain'); void $('xp-fill').offsetWidth; $('xp-fill').classList.add('gain');
+      }
+    }
 
     function renderQuests() {
       const q = todayQuests();
       $('q-done').textContent = String(q.filter((x) => x.done).length);
-      $('q-list').replaceChildren(...q.map((x, i) => el('li', { class: `q ${x.done ? 'done' : ''}` }, [
-        el('span', { class: 'q-n', 'aria-hidden': 'true' }, [x.done ? '✓' : String(i + 1)]),
-        el('div', { class: 'q-tx' }, [
-          el('strong', {}, [x.title]),
-          el('span', { class: 'muted small' }, [x.hint]),
-          x.goal > 1 ? el('span', { class: 'q-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(x.goal), 'aria-valuenow': String(x.value), 'aria-label': `${x.title} : ${x.value} sur ${x.goal}` }, [el('i', { style: `width:${(x.value / x.goal) * 100}%` })]) : null,
-        ]),
-        x.done ? el('span', { class: 'q-ok' }, ['Fait']) : el('a', { class: 'btn q-go', href: url(x.href) }, [x.goal > 1 ? `${x.value}/${x.goal} · Y aller` : 'Y aller']),
-      ])));
-      const all = q.every((x) => x.done);
-      $('q-note').textContent = all
-        ? 'Bravo, les trois quêtes du jour sont terminées. Reviens demain pour les suivantes.'
-        : 'Termine les trois pour débloquer des succès (1, 7 et 30 jours). Rien n’est vendu ni gagné en vrai.';
-      $('quetes').classList.toggle('all', all);
-      $('q-reward-t').textContent = all
-        ? 'débloquée ! Demain, ton booster du jour sera boosté (meilleures chances d’une carte rare).'
-        : questBonusToday()
-          ? 'tes quêtes d’hier sont terminées : ton booster du jour est boosté aujourd’hui. Refais les trois pour le garder demain.'
-          : 'termine les trois quêtes aujourd’hui et ton booster du jour de demain sera boosté (meilleures chances d’une carte rare).';
-      $('q-reward').classList.toggle('on', all || questBonusToday());
+      $('q-list').replaceChildren(...q.map((x, i) => {
+        let action: HTMLElement;
+        if (x.claimed) action = el('span', { class: 'q-ok' }, ['Récupéré']);
+        else if (x.done) {
+          action = el('button', { type: 'button', class: 'btn btn-primary q-claim' }, [`Récupérer : ${rewardText(x.reward)}`]);
+          action.addEventListener('click', () => {
+            const r = claimQuest(x.id);
+            if (!r) { renderAll(); return; }
+            celebrate(r.reroll ? `+${r.xp} XP et une relance du booster du jour !` : r.full ? `Réserve de relances pleine (${MAX_REROLLS}) : +${r.xp} XP à la place.` : `+${r.xp} XP !`);
+          });
+        } else action = el('a', { class: 'btn q-go', href: url(x.href) }, [x.goal > 1 ? `${x.value}/${x.goal} · Y aller` : 'Y aller']);
+        return el('li', { class: `q ${x.done ? 'done' : ''} ${x.claimed ? 'claimed' : ''}` }, [
+          el('span', { class: 'q-n', 'aria-hidden': 'true' }, [x.done ? '✓' : String(i + 1)]),
+          el('div', { class: 'q-tx' }, [
+            el('strong', {}, [x.title]),
+            el('span', { class: 'muted small' }, [x.hint]),
+            el('span', { class: `q-rw ${x.reward.reroll ? 'reroll' : ''}` }, [`Récompense : ${rewardText(x.reward)}`]),
+            x.goal > 1 ? el('span', { class: 'q-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(x.goal), 'aria-valuenow': String(x.value), 'aria-label': `${x.title} : ${x.value} sur ${x.goal}` }, [el('i', { style: `width:${(x.value / x.goal) * 100}%` })]) : null,
+          ]),
+          action,
+        ]);
+      }));
+      const st = chestState();
+      $('chest').className = `chest ${st}`;
+      $('chest-btn').hidden = st !== 'ready';
+      $('chest-t').textContent = st === 'open' ? 'Ouvert ! Reviens demain pour un nouveau coffre.' : st === 'ready' ? 'Les 3 récompenses sont récupérées : ouvre-le !' : `Récupère les 3 récompenses pour l'ouvrir : +50 XP.`;
+      $('quetes').classList.toggle('all', q.every((x) => x.claimed));
     }
+    $('chest-btn').addEventListener('click', () => {
+      const xp = openChest();
+      if (xp) celebrate(`Coffre ouvert : +${xp} XP !`);
+    });
 
     function renderBadges() {
       const all = computeBadges();
@@ -198,6 +286,7 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
       $('t-quests').textContent = String(questDays().length);
       renderQuests();
       renderBadges();
+      renderHero();
     }
 
     /* ---------- Sauvegarde ---------- */
@@ -253,8 +342,9 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
       }
     });
 
-    renderProfile();
+    $<HTMLInputElement>('ac-pseudo').value = getPseudo() === 'Toi' ? '' : getPseudo();
     renderAll();
+    renderWardrobe();
     renderLast();
     window.addEventListener('holocote:progress', () => setTimeout(renderAll, 800));
     window.addEventListener('holocote:collection', renderAll);
@@ -268,26 +358,62 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
   </script>
 
   <style>
-    .ac-hero { display: flex; align-items: center; gap: clamp(18px, 4vw, 36px); padding: clamp(28px, 6vw, 56px) 0 24px; }
-    .ac-avatar { flex: 0 0 auto; width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center;
-      background: radial-gradient(circle at 50% 40%, rgba(138, 123, 255, 0.35), rgba(255, 79, 216, 0.12) 60%, transparent 72%); border: 2px solid rgba(255, 255, 255, 0.08); }
+    .ac-hero { display: flex; align-items: center; gap: clamp(20px, 5vw, 48px); padding: clamp(24px, 5vw, 48px) 0 24px; }
+    .ac-stage { position: relative; flex: 0 0 auto; width: 220px; height: 240px; display: grid; place-items: center; border-radius: 32px;
+      background: radial-gradient(circle at 50% 45%, rgba(138, 123, 255, 0.35), rgba(255, 79, 216, 0.1) 55%, transparent 72%), linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+      border: 1px solid var(--line); }
+    .ac-stage::after { content: ''; position: absolute; left: 22%; right: 22%; bottom: 18px; height: 10px; border-radius: 50%; background: radial-gradient(rgba(62, 240, 255, 0.35), transparent 70%); }
+    .ac-avatar { animation: av-bob 3.6s ease-in-out infinite; }
+    .ac-avatar :global(svg) { display: block; overflow: visible; }
+    .ac-avatar:global(.lvlup) { animation: av-lvl 1.2s ease-out, av-bob 3.6s ease-in-out 1.2s infinite; }
+    @keyframes av-bob { 50% { transform: translateY(-8px); } }
+    @keyframes av-lvl { 0% { transform: scale(1); filter: drop-shadow(0 0 0 #ffd25a); } 35% { transform: scale(1.18) rotate(-4deg); filter: drop-shadow(0 0 26px #ffd25a); } 100% { transform: scale(1); filter: none; } }
+    .ac-lvl { position: absolute; top: 12px; right: 12px; min-width: 46px; height: 46px; padding: 0 8px; border-radius: 16px; display: grid; place-items: center;
+      font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; color: #0a0812; background: var(--holo); box-shadow: 0 6px 20px rgba(255, 79, 216, 0.35); }
+    .ac-lvl::before { content: 'Niv.'; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); background: var(--bg-2); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
     .eyebrow { margin: 0 0 6px; color: var(--cyan); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.8rem; }
-    .ac-id h1 { margin: 0 0 8px; font-family: var(--font-display); font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.05; word-break: break-word;
+    .ac-id { flex: 1; min-width: 0; }
+    .ac-id h1 { margin: 0 0 14px; font-family: var(--font-display); font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.05; word-break: break-word;
       background: var(--holo); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .ac-id p { margin: 0; }
+    .xp { max-width: 520px; }
+    .xp-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 6px; }
+    .xp-top strong { font-family: var(--font-display); font-size: 1.1rem; }
+    .xp-bar { position: relative; height: 14px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); overflow: hidden; border: 1px solid var(--line); }
+    .xp-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 8px; background: var(--holo); background-size: 200% 100%; transition: width 0.8s cubic-bezier(.2,.8,.2,1); }
+    .xp-bar i:global(.gain) { animation: xp-gain 0.9s ease-out; }
+    @keyframes xp-gain { 0% { filter: brightness(1); } 30% { filter: brightness(1.8); } 100% { filter: brightness(1); } }
+    .xp p { margin: 8px 0 0; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .chip { padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; text-decoration: none; color: #0a0812; background: var(--up); }
+    .chip.gold { background: var(--gold); }
+    .chip[hidden] { display: none; }
+
     .ac-edit { margin-bottom: 20px; }
-    .ac-edit h2 { margin-top: 0; }
-    .ac-form { display: grid; gap: 16px; max-width: 640px; }
+    .ed-head h2 { margin: 0 0 4px; }
+    .ed-head p { margin: 0 0 16px; }
+    .ac-form { display: grid; gap: 18px; }
+    .ac-form .field { max-width: 520px; }
     .ac-form .field p { margin: 6px 0 0; }
-    .ac-moods { border: 0; padding: 0; margin: 0; }
-    .ac-moods legend { font-weight: 600; margin-bottom: 8px; padding: 0; }
-    .mood-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .mood { position: relative; cursor: pointer; }
-    .mood input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
-    .mood span { display: grid; place-items: center; width: 74px; height: 74px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); transition: border-color 0.2s, transform 0.2s; }
-    .mood input:checked + span { border-color: var(--magenta); box-shadow: 0 0 20px rgba(255, 79, 216, 0.3); transform: translateY(-2px); }
-    .mood input:focus-visible + span { outline: 3px solid var(--cyan); outline-offset: 3px; }
-    .ac-form .btn { justify-self: start; }
+    .wr { border: 0; padding: 0; margin: 0; min-width: 0; }
+    .wr legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
+    .wr-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .wr-row :global(.wr-opt) { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 92px; padding: 8px 4px 8px; border-radius: 16px;
+      border: 2px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color 0.2s, transform 0.2s; }
+    .wr-row :global(.wr-opt:hover) { border-color: rgba(255, 255, 255, 0.3); }
+    .wr-row :global(.wr-opt input) { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
+    .wr-row :global(.wr-opt:has(input:checked)) { border-color: var(--magenta); box-shadow: 0 0 20px rgba(255, 79, 216, 0.3); transform: translateY(-2px); }
+    .wr-row :global(.wr-opt:has(input:focus-visible)) { outline: 3px solid var(--cyan); outline-offset: 3px; }
+    .wr-row :global(.wr-pv) { display: grid; place-items: center; height: 66px; pointer-events: none; }
+    .wr-row :global(.wr-pv svg) { overflow: visible; }
+    .wr-row :global(.wr-name) { font-size: 0.78rem; font-weight: 700; text-align: center; line-height: 1.15; }
+    .wr-row :global(.wr-opt.locked) { cursor: not-allowed; }
+    .wr-row :global(.wr-opt.locked input) { cursor: not-allowed; }
+    .wr-row :global(.wr-opt.locked .wr-pv) { filter: grayscale(1) brightness(0.45); }
+    .wr-row :global(.wr-opt.locked .wr-name) { color: var(--muted); }
+    .wr-row :global(.wr-lock) { position: absolute; top: 6px; right: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.66rem; font-weight: 800; background: var(--bg); border: 1px solid var(--line); color: var(--gold); }
+    .ed-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .ed-actions [hidden] { display: none; }
+    #ed-dirty { color: var(--gold); }
 
     .ac-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 28px; }
     .tile { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); color: var(--text); text-decoration: none; transition: border-color 0.2s; }
@@ -315,8 +441,20 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
     .q-list :global(.q-go) { flex: 0 0 auto; white-space: nowrap; }
     .q-list :global(.q-ok) { flex: 0 0 auto; color: var(--up); font-weight: 800; }
     .q-note { margin: 0; }
-    .q-reward { margin: 0 0 8px; padding: 10px 14px; border-radius: 14px; border: 1px dashed rgba(255, 210, 90, 0.45); background: rgba(255, 210, 90, 0.05); }
-    .q-reward.on { border-style: solid; border-color: rgba(61, 255, 168, 0.55); background: rgba(61, 255, 168, 0.07); }
+    .q-list :global(.q-rw) { align-self: flex-start; margin-top: 4px; padding: 2px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 800; background: rgba(138, 123, 255, 0.16); color: #c9c1ff; }
+    .q-list :global(.q-rw.reroll) { background: rgba(255, 210, 90, 0.14); color: var(--gold); }
+    .q-list :global(.q.claimed) { opacity: 0.75; }
+    .q-list :global(.q-claim) { flex: 0 0 auto; white-space: nowrap; animation: claim-pulse 1.6s ease-in-out infinite; }
+    @keyframes claim-pulse { 50% { box-shadow: 0 0 22px rgba(61, 255, 168, 0.45); } }
+    .chest { display: flex; align-items: center; gap: 14px; padding: 14px; margin: 0 0 12px; border-radius: 16px; border: 1px dashed rgba(255, 210, 90, 0.45); background: rgba(255, 210, 90, 0.04); }
+    .chest.ready { border-style: solid; border-color: var(--gold); box-shadow: 0 0 26px rgba(255, 210, 90, 0.2); }
+    .chest.open { opacity: 0.7; }
+    .chest-ic svg { width: 48px; height: 40px; fill: #6b4a1a; stroke: var(--gold); stroke-width: 2.5; stroke-linejoin: round; }
+    .chest-ic .lock { fill: var(--gold); }
+    .chest.ready .chest-ic { animation: chest-wiggle 1.4s ease-in-out infinite; }
+    @keyframes chest-wiggle { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(0); } }
+    .chest-tx { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .chest [hidden] { display: none; }
 
     .badges { background: linear-gradient(160deg, rgba(255, 210, 90, 0.07), rgba(255, 79, 216, 0.04) 55%, transparent), var(--surface); }
     .bd-head h2 { margin: 0 0 4px; }
@@ -354,17 +492,23 @@ const MOODS = ['happy', 'wink', 'wow', 'think', 'sad'] as const;
     @media (max-width: 720px) {
       .sv-head { flex-direction: column; }
       .sv-cols { grid-template-columns: 1fr; }
-      .ac-hero { flex-direction: column; text-align: center; padding-top: 24px; }
-      .ac-avatar { width: 130px; height: 130px; }
+      .ac-hero { flex-direction: column; text-align: center; padding-top: 18px; }
+      .ac-stage { width: 190px; height: 210px; }
+      .ac-avatar :global(svg) { width: 150px; height: auto; }
+      .xp { margin: 0 auto; }
+      .chips { justify-content: center; }
+      .wr-row :global(.wr-opt) { width: calc((100% - 30px) / 4); min-width: 70px; }
+      .chest { flex-wrap: wrap; }
+      .chest .btn { width: 100%; }
+      .q-list :global(.q-claim) { width: 100%; }
       .ac-stats { grid-template-columns: 1fr 1fr; }
       .quests, .badges { padding: 18px 14px; }
       .q-list :global(.q) { flex-wrap: wrap; }
       .q-list :global(.q-go) { width: 100%; text-align: center; }
-      .mood span { width: 58px; height: 58px; }
-      .mood span :global(svg) { width: 44px; height: auto; }
       #bd-groups :global(.bd-grid) { grid-template-columns: 1fr 1fr; }
       #bd-groups :global(.bd) { flex-direction: column; text-align: center; }
       #bd-groups :global(.bd-bar) { margin-bottom: 14px; }
     }
+    @media (prefers-reduced-motion: reduce) { .ac-avatar, .q-list :global(.q-claim), .chest.ready .chest-ic { animation: none !important; } }
   </style>
 </Base>

@@ -5,8 +5,8 @@ export type Mood = 'happy' | 'wow' | 'sad' | 'think' | 'wink';
 
 let uid = 0;
 
-export function mascotSvg(mood: Mood = 'happy', size = 120, label = 'Coti, la mascotte de HoloCote'): string {
-  const id = `coti${++uid}`;
+/** Expression du visage (yeux, bouche, détails) : partagée avec l'avatar du joueur. */
+export function faceParts(mood: Mood) {
   const eyes = {
     happy: '<path d="M44 66 q6 -7 12 0" /><path d="M68 66 q6 -7 12 0" />',
     wow: '<circle cx="50" cy="64" r="6.5" fill="#0b0918" stroke="none"/><circle cx="74" cy="64" r="6.5" fill="#0b0918" stroke="none"/><circle cx="52" cy="61.5" r="2.2" fill="#fff" stroke="none"/><circle cx="76" cy="61.5" r="2.2" fill="#fff" stroke="none"/>',
@@ -29,6 +29,12 @@ export function mascotSvg(mood: Mood = 'happy', size = 120, label = 'Coti, la ma
         ? '<circle cx="104" cy="36" r="3" fill="#fff" stroke="none" opacity=".7"/><circle cx="111" cy="26" r="4.5" fill="#fff" stroke="none" opacity=".85"/>'
         : '';
   const cheeks = mood === 'sad' ? '' : '<ellipse cx="42" cy="76" rx="5" ry="3" fill="#ff4fd8" opacity=".45" stroke="none"/><ellipse cx="82" cy="76" rx="5" ry="3" fill="#ff4fd8" opacity=".45" stroke="none"/>';
+  return { eyes, mouth, extra, cheeks };
+}
+
+export function mascotSvg(mood: Mood = 'happy', size = 120, label = 'Coti, la mascotte de HoloCote'): string {
+  const id = `coti${++uid}`;
+  const { eyes, mouth, extra, cheeks } = faceParts(mood);
   return `<svg class="coti coti-${mood}" viewBox="0 0 124 140" width="${size}" height="${Math.round(size * 140 / 124)}" role="img" aria-label="${label}">
   <defs>
     <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1">

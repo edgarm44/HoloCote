@@ -160,6 +160,10 @@ import { mascotSvg } from '../lib/mascot';
             <p class="hit-price" id="hit-price"></p>
             <button type="button" class="btn claim-btn" id="bx-claim">Ajouter à mon classeur</button>
             <p class="muted small" id="bx-claim-note">La dixième carte du booster rejoint ta collection (état Near Mint), une fois par jour.</p>
+            <div class="bx-reroll" id="bx-reroll-box" hidden>
+              <button type="button" class="btn btn-primary" id="bx-reroll">Relancer le booster du jour</button>
+              <p class="muted small" id="bx-reroll-note"></p>
+            </div>
           </div>
         </div>
         <p class="bx-rates muted small" id="bx-rates">Chances pour la dixième carte : 3 % carte exceptionnelle (hyper rare, dorée…), 12 % carte « chasse » (numéro au-delà de la série), 30 % rare de la série, 55 % carte ordinaire. Simulation : ce ne sont pas les taux officiels.</p>
@@ -219,7 +223,7 @@ import { mascotSvg } from '../lib/mascot';
     </div>
     <ol class="wk-days" id="wk-days" aria-label="Les 7 derniers jours"></ol>
     <div class="wk-tot" id="wk-tot"></div>
-    <p class="muted small wk-note">Une série compte les jours d'affilée où tu joues au moins un jeu du jour (l'entraînement ne compte pas). Tous les 7 jours d'affilée, et le lendemain d'une journée où tu as fini tes trois quêtes, le booster du jour est boosté.</p>
+    <p class="muted small wk-note">Une série compte les jours d'affilée où tu joues au moins un jeu du jour (l'entraînement ne compte pas). Tous les 7 jours d'affilée, le booster du jour est boosté. Les quêtes du jour (onglet Compte) donnent aussi des relances du booster.</p>
   </section>
 
   <p class="notice">
@@ -551,7 +555,7 @@ import { mascotSvg } from '../lib/mascot';
   <script>
     import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
     import { syncToday, streak as getStreak, week, played } from '../lib/progress';
-    import { questBonusToday } from '../lib/quests';
+    import { rerolls, useReroll } from '../lib/xp';
     import { todayNumber, msToMidnight, getDay } from '../lib/mystery';
     import { loadMarket, type Quote } from '../lib/market';
     import { addItem, hasCard } from '../lib/collection';
@@ -614,16 +618,9 @@ import { mascotSvg } from '../lib/mascot';
       const st = getStreak();
       const daily = !bxTrain;
       const saved = getBooster();
-      const quest = questBonusToday();
-      const boosted = daily && (saved ? !!saved.boost : st.boostToday || quest);
+      const boosted = daily && (saved ? !!saved.boost : st.boostToday);
       $('bx-boost').hidden = !boosted;
-      if (boosted) {
-        const why = [
-          st.boostToday ? `${st.playedToday ? st.current : st.current + 1} jours d'affilée` : '',
-          quest ? 'quêtes d’hier terminées' : '',
-        ].filter(Boolean).join(' et ');
-        $('bx-boost-t').textContent = `${why || 'bonus du jour'} : ton booster du jour a de meilleures chances.`;
-      }
+      if (boosted) $('bx-boost-t').textContent = `${st.playedToday ? st.current : st.current + 1} jours d'affilée : ton booster du jour a de meilleures chances.`;
       $('bx-rates').textContent = rateText(boosted ? BOOST_RATES : RATES);
     }
     const DAYS = ['di', 'lu', 'ma', 'me', 'je', 've', 'sa'];
@@ -728,7 +725,19 @@ import { mascotSvg } from '../lib/mascot';
       btn.disabled = !!bState?.claimed || !c || owned;
       btn.textContent = bState?.claimed ? 'Dans ton classeur' : owned ? 'Déjà dans ton classeur' : 'Ajouter à mon classeur';
       btn.classList.toggle('done', !!bState?.claimed || owned);
-      $('bx-claim-note').textContent = bState?.claimed ? 'Rangée dans ta collection. Reviens demain pour un nouveau booster.' : owned ? "Tu as déjà cette carte dans ton classeur : chaque carte n'y est rangée qu'une fois." : 'La dixième carte du booster rejoint ta collection (état Near Mint), une fois par jour.';
+      const n = rerolls();
+      $('bx-claim-note').textContent = bState?.claimed ? (n ? 'Rangée dans ta collection. Tu peux utiliser une relance pour rouvrir un booster.' : 'Rangée dans ta collection. Reviens demain pour un nouveau booster, ou gagne une relance avec les quêtes du jour.') : owned ? "Tu as déjà cette carte dans ton classeur : chaque carte n'y est rangée qu'une fois." : 'La dixième carte du booster rejoint ta collection (état Near Mint), une fois par booster.';
+      renderReroll();
+    }
+
+    function renderReroll() {
+      const n = rerolls();
+      const box = $('bx-reroll-box');
+      box.hidden = bxTrain || !bState?.opened || n === 0;
+      if (box.hidden) return;
+      $('bx-reroll').textContent = `Relancer le booster du jour (${n} relance${n > 1 ? 's' : ''})`;
+      const lost = !bState?.claimed && !hasCard(pulled[pulled.length - 1]?.card?.id ?? '', 'fr');
+      $('bx-reroll-note').textContent = `Relances gagnées avec les quêtes du jour.${lost ? ' Attention : la dixième carte de ce booster, pas encore rangée, sera perdue.' : ''}`;
     }
 
     function renderSummary() {
@@ -749,9 +758,9 @@ import { mascotSvg } from '../lib/mascot';
       const box = $('hit-card');
       box.classList.add('flipping');
       if (!reduced) await sleep(450);
+      if (bState && !bState.opened && !bxTrain) { bState.opened = true; saveBooster(bState); }
       renderHit(true);
       if (hitLevel(pulled[pulled.length - 1]?.card ?? null) >= 2) navigator.vibrate?.([30, 40, 60]);
-      if (bState && !bState.opened && !bxTrain) { bState.opened = true; saveBooster(bState); }
       refreshStatus();
     }
 
@@ -763,7 +772,7 @@ import { mascotSvg } from '../lib/mascot';
       pack.classList.add('tearing');
       try {
         if (bxTrain) bState = await drawBooster({ save: false, setId: BOOSTER_SETS[Math.floor(Math.random() * BOOSTER_SETS.length)] });
-        else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday || questBonusToday() });
+        else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday });
         if (!bState) throw new Error('booster');
         pulled = await loadPulled(bState.cards);
       } catch {
@@ -840,6 +849,17 @@ import { mascotSvg } from '../lib/mascot';
       }).catch(() => {});
       $('bx-pack').addEventListener('click', openPack);
       $('bx-again').addEventListener('click', () => { bState = null; pulled = []; $('bx-again').hidden = true; resetPack('Extension surprise'); window.scrollTo({ top: $('bx-stage').offsetTop - 90, behavior: 'smooth' }); });
+      $('bx-reroll').addEventListener('click', () => {
+        if (bxTrain || !bState?.opened || !useReroll()) { renderReroll(); return; }
+        try { localStorage.removeItem('holocote.booster.v1'); } catch { /* rien */ }
+        const name = bState.setName;
+        bState = null;
+        pulled = [];
+        resetPack(name || setOfDay());
+        refreshStatus();
+        toast('Relance utilisée : ouvre ton nouveau booster du jour !');
+        window.scrollTo({ top: $('bx-stage').offsetTop - 90, behavior: 'smooth' });
+      });
       $('bx-claim').addEventListener('click', () => {
         if (bxTrain) return; // rien à gagner en entraînement
         const fresh = getBooster();
@@ -1258,6 +1278,8 @@ import { mascotSvg } from '../lib/mascot';
     .tries { text-align: center; font-family: var(--font-display); font-weight: 700; margin: 0; font-size: 0.95rem; }
 
     .console { min-width: 0; }
+    .bx-reroll { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
+    .bx-reroll p { margin: 6px 0 0; }
     .link-btn { background: none; border: 0; padding: 0; color: var(--cyan); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 0.88rem; }
     .guess-label { display: block; font-family: var(--font-display); font-weight: 800; font-size: clamp(1.3rem, 3vw, 2rem); letter-spacing: -0.03em; margin-bottom: 14px; }
     .guess-row { display: flex; gap: 10px; position: relative; z-index: 3; }

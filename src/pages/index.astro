@@ -81,10 +81,10 @@ const TOOLS = [
       </a>
       <a class="day day-quests" href={`${base}/compte/#quetes`}>
         <div class="day-body">
-          <h3>Mes quêtes <span class="muted" id="q-count">0/3</span></h3>
+          <h3>Mes quêtes <span class="muted" id="q-count">0/3</span> <span class="q-lvl" id="q-lvl">Niv. 1</span></h3>
           <p id="q-streak">Trois missions du jour, renouvelées à minuit.</p>
           <ul class="q-mini" id="q-mini"></ul>
-          <span class="day-cta">Voir mes quêtes et mes succès</span>
+          <span class="day-cta">Voir mes quêtes et mon personnage</span>
         </div>
       </a>
       <a class="day day-opp" href={`${base}/opportunites/`}>
@@ -157,7 +157,8 @@ const TOOLS = [
     import { todayNumber, getDay } from '../lib/mystery';
     import { getLog, streak } from '../lib/progress';
     import { getBooster } from '../lib/booster';
-    import { todayQuests, questBonusToday } from '../lib/quests';
+    import { todayQuests, pendingRewards, rewardText } from '../lib/quests';
+    import { levelInfo } from '../lib/level';
     import { holoCard, attachTilt, el, url } from '../lib/ui';
 
     const $ = (id: string) => document.getElementById(id)!;
@@ -193,9 +194,13 @@ const TOOLS = [
       const done = q.filter((x) => x.done).length;
       $('q-count').textContent = `${done}/3`;
       $('q-mini').replaceChildren(...q.map((x) => el('li', { class: x.done ? 'ok' : '' }, [el('i', { 'aria-hidden': 'true' }), el('span', {}, [x.title]), x.goal > 1 && !x.done ? el('b', {}, [`${x.value}/${x.goal}`]) : null])));
-      $('q-streak').textContent = done === 3
-        ? 'Bravo, quêtes terminées ! Demain, ton booster du jour sera boosté.'
-        : questBonusToday() ? 'Bonus actif : ton booster du jour est boosté grâce aux quêtes d’hier.' : 'Termine les trois pour un booster boosté demain.';
+      const pend = pendingRewards();
+      const lv = levelInfo();
+      $('q-lvl').textContent = `Niv. ${lv.level}`;
+      $('q-streak').textContent = pend
+        ? `${pend} récompense${pend > 1 ? 's' : ''} à récupérer dans ton compte !`
+        : done === 3 ? 'Quêtes terminées. Nouvelles quêtes à minuit.' : `Chaque quête rapporte de l’XP ou une relance du booster (${rewardText(q[0].reward)} pour la première).`;
+      $('q-streak').classList.toggle('pend', pend > 0);
     }
     renderToday();
     window.addEventListener('holocote:progress', () => setTimeout(renderToday, 300));
@@ -373,6 +378,8 @@ const TOOLS = [
     .games b, .q-mini :global(b) { font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
     .games li.ok b { color: var(--up); }
     .q-mini :global(li.ok span) { color: var(--muted); text-decoration: line-through; }
+    .q-lvl { margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; color: #0a0812; background: var(--holo); vertical-align: middle; font-family: var(--font-body); }
+    .day p:global(.pend) { color: var(--up); font-weight: 700; }
     .day-quests { background: linear-gradient(160deg, rgba(62, 240, 255, 0.07), transparent 60%), var(--bg-2); }
     .day { display: flex; gap: 20px; align-items: stretch; padding: 22px; border-radius: 22px; text-decoration: none; color: var(--text); border: 1px solid var(--line); background: var(--bg-2); transition: border-color 0.2s; min-width: 0; }
     .day:hover { border-color: rgba(255, 255, 255, 0.3); }

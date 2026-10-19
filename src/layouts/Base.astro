@@ -20,7 +20,7 @@ const NAV = [
   { key: 'collection', href: '/collection/', label: 'Collection', icon: '<rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" />', badge: 'nav-count' },
   { key: 'favorites', href: '/favoris/', label: 'Favoris', icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />', badge: 'fav-count', extra: true },
   { key: 'ranking', href: '/classement/', label: 'Classement', icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />', extra: true },
-  { key: 'account', href: '/compte/', label: 'Compte', icon: '<circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />', extra: true },
+  { key: 'account', href: '/compte/', label: 'Compte', icon: '<circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />', badge: 'acc-count', extra: true },
   { key: 'mystery', href: '/defi/', label: 'Défi', icon: '<rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6v.4M12 16.8v.01" />', extra: true },
 ] as const;
 const extraActive = NAV.some((n) => 'extra' in n && n.extra && n.key === active);
@@ -124,7 +124,10 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
       import { countFavorites, onFavoritesChange } from '../lib/favorites';
       import { checkAlerts, currentAlerts, onAlertsChange, alertText } from '../lib/alerts';
       import { newlyUnlocked } from '../lib/badges';
-      import { recordVisit, checkQuestsDone } from '../lib/quests';
+      import { recordVisit, checkQuestsDone, todayQuests, rewardText, pendingRewards } from '../lib/quests';
+      import { levelInfo } from '../lib/level';
+      import { unlocksAt } from '../lib/avatar';
+      import { todayNumber } from '../lib/mystery';
       // TCGdex n'a pas toutes les images en français : si une image FR manque, on essaie la version anglaise.
       document.addEventListener('error', (e) => {
         const img = e.target as HTMLImageElement;
@@ -225,12 +228,32 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
         badgeTimer = window.setTimeout(() => { pop!.classList.remove('show'); setTimeout(popNext, 400); }, 4200);
       };
       let checkT: number | undefined;
+      const QSEEN = 'holocote.qseen.v1';
+      const LSEEN = 'holocote.level.v1';
+      const accBadge = () => setBadges('acc-count', pendingRewards());
       const checkBadges = () => {
         window.clearTimeout(checkT);
         checkT = window.setTimeout(() => {
           const fresh: typeof queue = [];
-          if (checkQuestsDone()) fresh.push({ icon: '3/3', kicker: 'Quêtes du jour', name: 'Toutes terminées !', hint: 'Récompense : booster du jour boosté demain.', href: `${base}compte/#quetes` });
+          checkQuestsDone();
+          // Quêtes réussies depuis la dernière vérification
+          const day = todayNumber();
+          let seen: { day: number; ids: string[] } = { day, ids: [] };
+          try { const v = JSON.parse(localStorage.getItem(QSEEN) || 'null'); if (v && v.day === day && Array.isArray(v.ids)) seen = v; } catch { /* rien */ }
+          const doneNow = todayQuests().filter((q) => q.done);
+          for (const q of doneNow) if (!seen.ids.includes(q.id) && !q.claimed) fresh.push({ icon: 'Q', kicker: 'Quête réussie', name: q.title, hint: `Récupère ta récompense : ${rewardText(q.reward)}`, href: `${base}compte/#quetes` });
+          try { localStorage.setItem(QSEEN, JSON.stringify({ day, ids: doneNow.map((q) => q.id) })); } catch { /* rien */ }
+          // Passage de niveau
+          const lv = levelInfo();
+          let last = 0;
+          try { last = Number(localStorage.getItem(LSEEN)) || 0; } catch { /* rien */ }
+          if (last && lv.level > last) {
+            const un = unlocksAt(lv.level);
+            fresh.push({ icon: String(lv.level), kicker: 'Niveau supérieur', name: `Niveau ${lv.level} : ${lv.title}`, hint: un.length ? `Débloqué : ${un.join(', ')}` : 'Continue comme ça !', href: `${base}compte/` });
+          }
+          if (lv.level !== last) { try { localStorage.setItem(LSEEN, String(lv.level)); } catch { /* rien */ } }
           fresh.push(...newlyUnlocked());
+          accBadge();
           if (!fresh.length) return;
           const idleNow = !queue.length && !document.querySelector('#badge-pop.show');
           queue.push(...fresh);
@@ -303,6 +326,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
       .links { display: flex; gap: 18px; flex-wrap: wrap; }
       .links a { color: var(--muted); }
       .fav-count { background: var(--gold); }
+      .acc-count { background: var(--up); }
       .alert-dot {
         width: 9px; height: 9px; border-radius: 50%; background: var(--down);
         box-shadow: 0 0 0 2px var(--bg), 0 0 10px var(--down);

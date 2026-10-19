@@ -11,13 +11,14 @@ import Base from '../layouts/Base.astro';
 
   <section class="me-card" id="me-card" hidden>
     <div class="me-left">
+      <a class="me-av" id="me-av" href="../compte/" aria-label="Personnaliser ton personnage"></a>
       <span class="me-rank" id="me-rank">—</span>
       <div class="me-id">
         <div class="me-name-row">
           <span class="me-name" id="me-name">Toi</span>
           <button type="button" class="link-btn" id="edit-pseudo">Changer de pseudo</button>
         </div>
-        <span class="league-badge" id="me-league"></span>
+        <span class="me-tags"><span class="league-badge" id="me-league"></span><span class="lvl-badge" id="me-lvl"></span></span>
         <span class="me-delta" id="me-delta"></span>
       </div>
     </div>
@@ -67,18 +68,27 @@ import Base from '../layouts/Base.astro';
     import { conditionLabel } from '../lib/condition';
     import { formatPrice } from '../lib/tcgdex';
     import { holoCard, el, url, toast } from '../lib/ui';
+    import { myAvatarSvg } from '../lib/avatar';
+    import { levelInfo } from '../lib/level';
+    const myLevel = levelInfo();
 
     const $ = (id: string) => document.getElementById(id)!;
     const eur = (v: number) => formatPrice(v, 'EUR');
     let entries: Entry[] = [];
 
     const avatar = (e: Entry, size = 44) => {
-      const a = el('span', { class: `avatar ${e.isMe ? 'me' : ''}`, 'aria-hidden': 'true' }, [e.name.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '?']);
+      if (e.isMe) {
+        const a = el('span', { class: 'avatar me pic', 'aria-hidden': 'true' });
+        a.innerHTML = myAvatarSvg(Math.round(size * 0.9), myLevel.level);
+        a.style.width = a.style.height = `${size}px`;
+        return a;
+      }
+      const a = el('span', { class: 'avatar', 'aria-hidden': 'true' }, [e.name.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '?']);
       a.style.setProperty('--h', String(e.hue));
       a.style.width = a.style.height = `${size}px`;
       return a;
     };
-    const tag = (e: Entry) => e.isMe ? el('span', { class: 'who me' }, ['Toi']) : el('span', { class: 'who' }, ['Fictif']);
+    const tag = (e: Entry) => e.isMe ? el('span', { class: 'who me' }, [`Toi · Niv. ${myLevel.level}`]) : el('span', { class: 'who' }, ['Fictif']);
 
     function openBinder(e: Entry) {
       $('bd-name').textContent = e.isMe ? `Ton classeur (${e.name})` : `Classeur de ${e.name}`;
@@ -103,6 +113,8 @@ import Base from '../layouts/Base.astro';
       if (i === 0) $('me-rank').textContent = '1ᵉʳ';
       $('me-name').textContent = me.name;
       const lb = $('me-league'); lb.textContent = `Ligue ${me.league.name}`; lb.className = `league-badge l-${me.league.key}`;
+      $('me-lvl').textContent = `Niveau ${myLevel.level} · ${myLevel.title}`;
+      $('me-av').innerHTML = myAvatarSvg(92, myLevel.level, 'Ton personnage');
       $('me-value').textContent = eur(me.value);
       const d = rankDelta(i + 1);
       $('me-delta').textContent = d === undefined ? '' : d > 0 ? `▲ ${d} place${d > 1 ? 's' : ''} depuis ta dernière visite` : d < 0 ? `▼ ${-d} place${d < -1 ? 's' : ''} depuis ta dernière visite` : 'Même place qu\'à ta dernière visite';
@@ -296,6 +308,8 @@ import Base from '../layouts/Base.astro';
       .rk-list :global(.rk-btn) { grid-template-columns: 28px 38px 1fr auto; gap: 10px; padding: 10px; }
       .rk-list :global(.rk-star) { display: none; }
       .rk-list :global(.avatar) { width: 38px !important; height: 38px !important; }
+      .me-av { width: 76px; height: 84px; }
+      .me-av :global(svg) { width: 68px; height: auto; }
     }
 
     :global(.avatar) {
@@ -303,6 +317,14 @@ import Base from '../layouts/Base.astro';
       background: linear-gradient(135deg, hsl(var(--h) 90% 65%), hsl(calc(var(--h) + 50) 90% 60%));
     }
     :global(.avatar.me) { background: var(--holo); box-shadow: 0 0 16px rgba(62, 240, 255, 0.4); }
+    :global(.avatar.pic) { background: radial-gradient(circle at 50% 40%, rgba(138, 123, 255, 0.55), rgba(14, 12, 26, 0.95) 75%); border: 2px solid var(--cyan); overflow: hidden; }
+    :global(.avatar.pic svg) { width: 100%; height: auto; transform: translateY(6%); }
+    .me-av { flex: 0 0 auto; width: 104px; height: 112px; display: grid; place-items: center; border-radius: 22px; text-decoration: none;
+      background: radial-gradient(circle at 50% 45%, rgba(138, 123, 255, 0.4), transparent 70%); border: 1px solid var(--line); transition: border-color 0.2s, transform 0.2s; }
+    .me-av:hover { border-color: var(--cyan); transform: translateY(-2px); }
+    .me-av :global(svg) { overflow: visible; }
+    .me-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .lvl-badge { padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 800; color: #0a0812; background: var(--holo); }
     :global(.who) { display: inline-flex; padding: 1px 7px; border-radius: 999px; font-size: 0.65rem; font-weight: 700; color: var(--muted); border: 1px solid var(--line); letter-spacing: 0.02em; }
     :global(.who.me) { color: #0a0812; background: var(--cyan); border-color: transparent; }
 

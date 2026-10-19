@@ -5,6 +5,7 @@ import { todayNumber } from './mystery';
 import { getLog } from './progress';
 import { getItems } from './collection';
 import { getFavorites } from './favorites';
+import { addXp, addReroll, rerolls, MAX_REROLLS } from './xp';
 
 /* ---------- Pages visitées aujourd'hui (pour les quêtes d'exploration) ---------- */
 const VISITS = 'holocote.visits.v1';
@@ -32,7 +33,8 @@ export function recordVisit(path: string, cardKey?: string) {
 }
 
 /* ---------- Quêtes ---------- */
-export interface Quest { id: string; title: string; hint: string; href: string; goal: number; value: number; done: boolean }
+export interface Reward { xp: number; reroll?: boolean }
+export interface Quest { id: string; title: string; hint: string; href: string; goal: number; value: number; done: boolean; reward: Reward; claimed: boolean }
 type Def = { id: string; title: string; hint: string; href: string; goal: number; value: () => number };
 
 const isToday = (t: number) => todayNumber(new Date(t)) === todayNumber();
@@ -61,6 +63,13 @@ function defs(): Def[] {
 // Toujours une quête de jeu + deux autres, tirées selon le jour.
 const GAME = ['myst', 'box', 'duel', 'play2', 'myst3'];
 
+/** Récompense de chaque quête : la quête de jeu offre une relance du booster du jour, les autres de l'XP. */
+const REWARDS: Record<string, Reward> = {
+  myst: { xp: 20, reroll: true }, myst3: { xp: 40, reroll: true }, box: { xp: 20, reroll: true }, duel: { xp: 30, reroll: true }, play2: { xp: 30, reroll: true },
+  add: { xp: 60 }, fav: { xp: 40 }, cards3: { xp: 40 }, market: { xp: 30 }, deals: { xp: 30 }, rank: { xp: 30 }, scan: { xp: 60 },
+};
+export const CHEST_XP = 50;
+
 function pickIds(n: number): string[] {
   const all = defs().map((d) => d.id);
   const others = all.filter((id) => !GAME.includes(id));
@@ -78,9 +87,60 @@ export function todayQuests(): Quest[] {
   return pickIds(todayNumber()).map((id) => {
     const d = all.find((x) => x.id === id)!;
     const value = Math.min(d.goal, d.value());
-    return { id: d.id, title: d.title, hint: d.hint, href: d.href, goal: d.goal, value, done: value >= d.goal };
+    return { id: d.id, title: d.title, hint: d.hint, href: d.href, goal: d.goal, value, done: value >= d.goal, reward: REWARDS[d.id] ?? { xp: 30 }, claimed: claims().ids.includes(d.id) };
   });
 }
+
+/* ---------- Récompenses à récupérer ---------- */
+const CLAIM = 'holocote.qclaim.v1';
+interface Claims { day: number; ids: string[]; chest: boolean }
+function claims(): Claims {
+  const day = todayNumber();
+  try {
+    const c = JSON.parse(localStorage.getItem(CLAIM) || 'null') as Claims | null;
+    if (c && c.day === day && Array.isArray(c.ids)) return { day, ids: c.ids, chest: !!c.chest };
+  } catch { /* rien */ }
+  return { day, ids: [], chest: false };
+}
+const saveClaims = (c: Claims) => { try { localStorage.setItem(CLAIM, JSON.stringify(c)); } catch { /* rien */ } };
+
+export const rewardText = (r: Reward) => (r.reroll ? `relance du booster + ${r.xp} XP` : `+${r.xp} XP`);
+
+/** Récupère la récompense d'une quête terminée. Renvoie un message, ou null si rien à récupérer. */
+export function claimQuest(id: string): { xp: number; reroll: boolean; full: boolean } | null {
+  const q = todayQuests().find((x) => x.id === id);
+  if (!q || !q.done || q.claimed) return null;
+  const c = claims();
+  c.ids = [...c.ids, id];
+  saveClaims(c);
+  let reroll = false, full = false;
+  if (q.reward.reroll) { reroll = addReroll(); full = !reroll; }
+  // Réserve de relances pleine : la relance est convertie en XP.
+  addXp(q.reward.xp + (full ? 30 : 0));
+  return { xp: q.reward.xp + (full ? 30 : 0), reroll, full };
+}
+
+/** Coffre du jour : disponible quand les 3 récompenses sont récupérées. */
+export function chestState(): 'locked' | 'ready' | 'open' {
+  const c = claims();
+  if (c.chest) return 'open';
+  const q = todayQuests();
+  return q.every((x) => x.claimed) ? 'ready' : 'locked';
+}
+export function openChest(): number {
+  if (chestState() !== 'ready') return 0;
+  const c = claims();
+  c.chest = true;
+  saveClaims(c);
+  addXp(CHEST_XP);
+  return CHEST_XP;
+}
+
+/** Nombre de récompenses à récupérer (quêtes finies non récupérées + coffre prêt). */
+export function pendingRewards(): number {
+  return todayQuests().filter((x) => x.done && !x.claimed).length + (chestState() === 'ready' ? 1 : 0);
+}
+export { rerolls, MAX_REROLLS };
 
 /* ---------- Jours où toutes les quêtes ont été terminées ---------- */
 const DONE = 'holocote.quests.v1';
@@ -96,9 +156,4 @@ export function checkQuestsDone(): boolean {
   if (days.includes(n)) return false;
   try { localStorage.setItem(DONE, JSON.stringify([...days, n].slice(-400))); } catch { /* rien */ }
   return true;
-}
-
-/** Récompense : les 3 quêtes d'hier terminées donnent un booster du jour boosté aujourd'hui. */
-export function questBonusToday(): boolean {
-  return questDays().includes(todayNumber() - 1);
 }
