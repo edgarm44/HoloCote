@@ -16,7 +16,6 @@ import { mascotSvg } from '../lib/mascot';
     <a href="#mystere" class="mode" data-mode="mystery" aria-current="page"><span class="m-name">Carte mystère</span><span class="m-st" id="st-mystery">à jouer</span></a>
     <a href="#booster" class="mode" data-mode="booster"><span class="m-name">Booster du jour</span><span class="m-st" id="st-booster">à ouvrir</span></a>
     <a href="#duel" class="mode" data-mode="duel"><span class="m-name">Duel du jour</span><span class="m-st" id="st-duel">à jouer</span></a>
-    <a href="../evenement/" class="mode mode-event" id="mode-event-link" hidden><span class="m-name">Événement</span><span class="m-st" id="st-event"></span></a>
     <a href="#entrainement" class="mode mode-train" data-mode="train"><span class="m-name">Entraînement</span><span class="m-st">illimité, sans gain</span></a>
   </nav>
 
@@ -621,10 +620,7 @@ import { mascotSvg } from '../lib/mascot';
       renderBoost();
     }
     window.addEventListener('defi:changed', () => refreshStatus());
-    {
-      const ev = activeEvent();
-      if (ev) { $('mode-event-link').hidden = false; $('st-event').textContent = `${packsLeft(ev)}/5 boosters`; }
-    }
+
 
     /* ---------- Série et récap de la semaine ---------- */
     const pct = (x: number) => `${Math.round(x * 100)} %`;
@@ -1129,7 +1125,6 @@ import { mascotSvg } from '../lib/mascot';
     @media (max-width: 720px) { .hero-coti { display: none; } }
     .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 6px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 30px; }
     .mode[hidden] { display: none; }
-    .mode-event { background: linear-gradient(120deg, rgba(255, 210, 90, 0.22), rgba(255, 79, 216, 0.16)); color: var(--gold) !important; border: 1px solid rgba(255, 210, 90, 0.55); animation: ev-glow 2.2s ease-in-out infinite; }
     @keyframes ev-glow { 50% { box-shadow: 0 0 22px rgba(255, 210, 90, 0.45); } }
     .mode { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 10px; border-radius: 14px; text-decoration: none; color: var(--muted); transition: background 0.2s, color 0.2s; text-align: center; }
     .mode:hover { color: var(--text); background: var(--surface-2); }

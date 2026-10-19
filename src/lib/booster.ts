@@ -12,6 +12,8 @@ export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me0
 export const RATES = { top: 0.1, chase: 0.25, upper: 0.35 };
 /** Bonus (7ᵉ jour d'affilée ou quêtes de la veille terminées) : chances augmentées pour la dixième carte. */
 export const BOOST_RATES = { top: 0.18, chase: 0.32, upper: 0.32 };
+/** Boosters d'événement : 5 boosters d'un coup, donc des chances plus faibles par booster. */
+export const EVENT_RATES = { top: 0.02, chase: 0.08, upper: 0.25 };
 
 const regularSet = (n: number) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
 
@@ -25,6 +27,7 @@ export const VINTAGE: Record<string, { name: string; holo: [number, number]; rar
 /** Chances pour la dixième carte d'un booster d'époque (simulation). */
 export const VINTAGE_RATES = { holo: 0.35, rare: 0.35 };
 export const VINTAGE_BOOST = { holo: 0.5, rare: 0.3 };
+export const VINTAGE_EVENT = { holo: 0.12, rare: 0.25 };
 
 export const setOfDay = (n = todayNumber()) => regularSet(n);
 
@@ -54,7 +57,7 @@ async function setDetail(id: string): Promise<SetDetail | null> {
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 
 /** Tire un nouveau booster : 9 cartes de l'extension, puis une 10ᵉ « carte à gagner » plus souvent rare. */
-export async function drawBooster(opts: { save?: boolean; setId?: string; boost?: boolean } = {}): Promise<BoosterState | null> {
+export async function drawBooster(opts: { save?: boolean; setId?: string; boost?: boolean; event?: boolean } = {}): Promise<BoosterState | null> {
   const day = todayNumber();
   const setId = opts.setId ?? setOfDay(day);
   const d = await setDetail(setId);
@@ -70,7 +73,7 @@ export async function drawBooster(opts: { save?: boolean; setId?: string; boost?
     if (rest.length < 10 || !holo.length) return null;
     const nine = new Set<string>();
     while (nine.size < 9) nine.add(pick(rest).id);
-    const R = opts.boost ? VINTAGE_BOOST : VINTAGE_RATES;
+    const R = opts.event ? VINTAGE_EVENT : opts.boost ? VINTAGE_BOOST : VINTAGE_RATES;
     const r = Math.random();
     let last = r < R.holo ? pick(holo) : r < R.holo + R.rare && rare.length ? pick(rare) : pick(rest);
     while (nine.has(last.id)) last = pick(rest);
@@ -84,10 +87,10 @@ export async function drawBooster(opts: { save?: boolean; setId?: string; boost?
   const chosen = new Set<string>();
   // Une carte du haut de la série parmi les 9 premières (comme la carte « reverse » d'un vrai booster).
   const upperPool = main.slice(Math.floor(main.length * 0.6));
-  if (upperPool.length) chosen.add(pick(upperPool).id);
+  if (upperPool.length && !opts.event) chosen.add(pick(upperPool).id);
   while (chosen.size < 9) chosen.add(pick(main).id);
   // Dernière carte, chances proches d'un vrai booster (voir RATES) : les plus belles restent rares.
-  const R = opts.boost ? BOOST_RATES : RATES;
+  const R = opts.event ? EVENT_RATES : opts.boost ? BOOST_RATES : RATES;
   const r = Math.random();
   const top = chase.slice(-Math.max(3, Math.ceil(chase.length / 5)));
   const rest = chase.filter((c) => !top.includes(c));

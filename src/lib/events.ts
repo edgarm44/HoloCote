@@ -134,13 +134,13 @@ function bumpStats(patch: Partial<{ opened: number; claimed: number; theme: stri
  * Tire un booster de l'événement (ou un booster bonus). Le tirage est enregistré tout de suite :
  * recharger la page ne permet pas de retenter sa chance.
  */
-export async function openEventPack(useBonus = false): Promise<{ pack: EventPack; index: number; bonus: boolean } | null> {
+export async function openEventPack(useBonus = false): Promise<{ pack: EventPack; index: number; bonus: boolean; key?: number } | null> {
   const ev = activeEvent();
   const theme = ev?.theme ?? nextEvent()?.theme ?? THEMES[0];
   if (!useBonus) {
     if (!ev || packsLeft(ev) <= 0) return null;
   } else if (bonusTickets() <= 0) return null;
-  const drawn = await drawBooster({ save: false, setId: theme.setId });
+  const drawn = await drawBooster({ save: false, setId: theme.setId, event: true });
   if (!drawn) return null;
   const pack: EventPack = { setId: theme.setId, cards: drawn.cards, revealed: false, claimed: false, bonus: useBonus || undefined, theme: theme.id };
   if (useBonus) {
@@ -154,19 +154,20 @@ export async function openEventPack(useBonus = false): Promise<{ pack: EventPack
   st.packs.push(pack);
   writeState(st);
   bumpStats({ opened: 1, theme: theme.id });
-  return { pack, index: st.packs.length - 1, bonus: false };
+  return { pack, index: st.packs.length - 1, bonus: false, key: ev!.key };
 }
 
-export function updatePack(index: number, bonus: boolean, patch: Partial<EventPack>) {
+export function updatePack(index: number, bonus: boolean, patch: Partial<EventPack>, key?: number) {
   if (bonus) {
     const list = bonusPacks();
     if (!list[index]) return;
     list[index] = { ...list[index], ...patch };
     writeBonusPacks(list);
   } else {
-    const ev = activeEvent();
-    if (!ev) return;
-    const st = readState(ev.key);
+    // La clé de l'événement est gardée à l'ouverture : on peut encore ranger sa carte si l'événement vient de finir.
+    const k = key ?? activeEvent()?.key;
+    if (k === undefined) return;
+    const st = readState(k);
     if (!st.packs[index]) return;
     st.packs[index] = { ...st.packs[index], ...patch };
     writeState(st);

@@ -169,7 +169,8 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
           if (/\/evenement\/?$/.test(location.pathname)) ribbon.classList.add('here');
           // L'accueil a déjà son grand bandeau d'événement.
           const isHome = location.pathname.replace(/\/+$/, '') === (document.querySelector('link[rel="icon"]')?.getAttribute('href') ?? '').replace(/\/favicon\.svg$/, '');
-          ribbon.hidden = isHome;
+          // Ni sur l'accueil (grand bandeau dédié), ni sur la page Événement elle-même.
+          ribbon.hidden = isHome || /\/evenement\/?$/.test(location.pathname);
           const fxBox = document.getElementById('ev-fx')!;
           const fxBtn = document.getElementById('evr-fx')!;
           const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
