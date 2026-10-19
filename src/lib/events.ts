@@ -47,7 +47,19 @@ export const END_HOUR = 23;
 const H = 3.6e6;
 const sinceMidnight = () => 864e5 - msToMidnight();
 
+/** Événements ponctuels en plus des week-ends (dates et heures de Paris). */
+const SPECIALS: { key: number; from: string; to: string; theme: string; name: string }[] = [
+  // Événement de test du lundi 19 octobre 2026, jusqu'à 22 h.
+  { key: 9001, from: '2026-10-19T00:00:00+02:00', to: '2026-10-19T22:00:00+02:00', theme: 'base', name: 'Événement de lancement' },
+];
+
 export function activeEvent(n = todayNumber()): ActiveEvent | null {
+  const now = Date.now();
+  for (const sp of SPECIALS) {
+    const a = Date.parse(sp.from), b = Date.parse(sp.to);
+    const base = THEMES.find((t) => t.id === sp.theme);
+    if (base && now >= a && now < b) return { key: sp.key, theme: { ...base, name: sp.name }, endsIn: b - now, lastDay: true };
+  }
   const w = weekday(n);
   const t = sinceMidnight();
   if (w === 6 && t >= START_HOUR * H) return { key: weekendOf(n), theme: themeOf(n), endsIn: msToMidnight() + END_HOUR * H, lastDay: false };
