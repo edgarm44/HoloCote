@@ -207,6 +207,14 @@ input:focus-visible, select:focus-visible {
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;
 }
+/* Lien d'évitement : visible quand on y arrive au clavier */
+a.skip:focus {
+  position: fixed; top: 10px; left: 10px; z-index: 100; width: auto; height: auto; margin: 0; clip: auto; overflow: visible;
+  padding: 10px 16px; border-radius: 10px; background: var(--bg-2); color: var(--text); border: 2px solid var(--cyan); font-weight: 700;
+}
+/* Repère de focus clavier par défaut, pour tout élément interactif */
+:where(a, button, summary, [tabindex], label.btn):focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+input.sr-only:focus-visible + label, label:has(+ input.sr-only:focus-visible) { outline: 2px solid var(--cyan); outline-offset: 2px; }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
   background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px;

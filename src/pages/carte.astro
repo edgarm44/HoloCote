@@ -17,6 +17,7 @@ import Base from '../layouts/Base.astro';
         <div class="panel price">
           <p class="muted small">Cote estimée (Near Mint, version normale)</p>
           <p class="price-value" data-slot="price"></p>
+          <p class="price-age" data-slot="price-age"></p>
           <p class="muted small" data-slot="price-detail"></p>
           <p class="notice" data-slot="price-note"></p>
         </div>
@@ -33,7 +34,7 @@ import Base from '../layouts/Base.astro';
   </template>
 
   <script>
-    import { getCard, priceFor, hasReverse, formatPrice, formatDate, type Lang } from '../lib/tcgdex';
+    import { getCard, priceFor, hasReverse, formatPrice, formatDate, priceAgeText, type Lang } from '../lib/tcgdex';
     import { rarityTier, tierLabel, valueBadge, USD_TO_EUR } from '../lib/rarity';
     import { holoCard, el, status, url, favInfo } from '../lib/ui';
     import { favButton } from '../lib/favorites';
@@ -61,6 +62,7 @@ import Base from '../layouts/Base.astro';
       }
 
       document.title = `${card.name} · HoloCote`;
+      document.querySelector('meta[name="description"]')?.setAttribute('content', `${card.name} (${card.set.name}) : rareté, cote estimée et versions de la carte Pokémon sur HoloCote.`);
       const node = (document.getElementById('tpl') as HTMLTemplateElement).content.cloneNode(true) as DocumentFragment;
       const slot = (name: string) => node.querySelector(`[data-slot="${name}"]`) as HTMLElement;
 
@@ -87,10 +89,14 @@ import Base from '../layouts/Base.astro';
           reverse ? `Version reverse holo : ${formatPrice(reverse.value, reverse.unit)}` : '',
         ].filter(Boolean).join(' · ');
         const date = formatDate(price.updated);
-        slot('price-note').textContent = `${price.unsure ? 'Cote incertaine : les ventes récentes de cette carte varient beaucoup, compare plusieurs annonces. ' : ''}Cote indicative${date ? ` du ${date}` : ''}, source ${price.source}${price.unit === 'USD' ? ' (marché américain, en dollars)' : ''}. Cardmarket regroupe toutes les langues et tous les états : une carte française ou abîmée se vend souvent moins cher.`;
+        const age = priceAgeText(price.updated);
+        slot('price-age').textContent = `${date ? `Cote du ${date}` : 'Cote'} · ${age.text}${age.stale ? ' : elle peut avoir changé depuis' : ''}`;
+        slot('price-age').classList.toggle('stale', age.stale);
+        slot('price-note').textContent = `${price.unsure ? 'Cote incertaine : les ventes récentes de cette carte varient beaucoup, compare plusieurs annonces. ' : ''}Cote indicative, source ${price.source}${price.unit === 'USD' ? ' (marché américain, en dollars)' : ''}. Cardmarket regroupe toutes les langues et tous les états : une carte française ou abîmée se vend souvent moins cher.`;
       } else {
-        slot('price').textContent = '—';
-        slot('price-note').textContent = "Pas de cote disponible pour cette carte. Essaie la version dans l'autre langue.";
+        slot('price').textContent = 'Cote indisponible';
+        slot('price').classList.add('none');
+        slot('price-note').textContent = "Aucune vente récente connue pour cette carte : HoloCote préfère ne rien afficher plutôt qu'un prix inventé. Essaie la version dans l'autre langue.";
       }
 
       const facts = slot('facts');
@@ -131,6 +137,9 @@ import Base from '../layouts/Base.astro';
     .price p { margin: 0; }
     .price .notice { margin-top: 10px; }
     .price-value { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; }
+    .price-value:global(.none) { font-size: 1.5rem; color: var(--muted); }
+    .price-age { font-size: 0.85rem; font-weight: 700; color: var(--up); }
+    .price-age:global(.stale) { color: var(--gold); }
     .add { display: flex; flex-direction: column; gap: 14px; }
     .add h2 { margin: 0; }
     .add p { margin: 0; }

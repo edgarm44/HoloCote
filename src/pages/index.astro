@@ -70,8 +70,21 @@ const TOOLS = [
         <span class="mini-card" aria-hidden="true"><span>?</span></span>
         <div class="day-body">
           <h3>Défi du jour <span class="muted" id="defi-n"></span></h3>
-          <p id="defi-text">Une carte cachée t'attend. Six essais pour la trouver et la gagner.</p>
+          <p id="defi-text">Une carte mystère, un booster et un duel : des cartes à gagner chaque jour.</p>
+          <ul class="games" id="games">
+            <li data-g="m"><i aria-hidden="true"></i><span>Carte mystère</span><b>à jouer</b></li>
+            <li data-g="b"><i aria-hidden="true"></i><span>Booster</span><b>à ouvrir</b></li>
+            <li data-g="d"><i aria-hidden="true"></i><span>Duel</span><b>à jouer</b></li>
+          </ul>
           <span class="day-cta" id="defi-cta">Jouer</span>
+        </div>
+      </a>
+      <a class="day day-quests" href={`${base}/compte/#quetes`}>
+        <div class="day-body">
+          <h3>Mes quêtes <span class="muted" id="q-count">0/3</span></h3>
+          <p id="q-streak">Trois missions du jour, renouvelées à minuit.</p>
+          <ul class="q-mini" id="q-mini"></ul>
+          <span class="day-cta">Voir mes quêtes et mes succès</span>
         </div>
       </a>
       <a class="day day-opp" href={`${base}/opportunites/`}>
@@ -142,6 +155,9 @@ const TOOLS = [
     import { formatPrice } from '../lib/tcgdex';
     import { countCards } from '../lib/collection';
     import { todayNumber, getDay } from '../lib/mystery';
+    import { getLog, streak } from '../lib/progress';
+    import { getBooster } from '../lib/booster';
+    import { todayQuests, questBonusToday } from '../lib/quests';
     import { holoCard, attachTilt, el, url } from '../lib/ui';
 
     const $ = (id: string) => document.getElementById(id)!;
@@ -149,19 +165,40 @@ const TOOLS = [
     const eur = (v: number) => formatPrice(v, 'EUR');
     document.querySelectorAll<HTMLElement>('.fan-card').forEach(attachTilt);
 
-    /* Défi du jour : état de la partie, sans rien dévoiler de la carte. */
+    /* Défi du jour : état des trois jeux, sans rien dévoiler de la carte. */
     const n = todayNumber();
     const day = getDay(n);
     $('defi-n').textContent = `n° ${n}`;
-    if (day.done) {
-      $('defi-text').textContent = day.won
-        ? `Trouvée en ${day.guesses.length} essai${day.guesses.length > 1 ? 's' : ''}. ${day.claimed ? 'Elle est dans ton classeur.' : 'Pense à l\'ajouter à ton classeur.'}`
-        : 'Raté pour aujourd\'hui. Nouvelle carte à minuit.';
-      $('defi-cta').textContent = day.won && !day.claimed ? 'Récupérer ma carte' : 'Voir le résultat';
-    } else if (day.guesses.length) {
-      $('defi-text').textContent = `Partie en cours : ${6 - day.guesses.length} essai${6 - day.guesses.length > 1 ? 's' : ''} restant${6 - day.guesses.length > 1 ? 's' : ''}.`;
-      $('defi-cta').textContent = 'Continuer';
+    function renderToday() {
+      const log = getLog()[n] ?? {};
+      const st = streak();
+      const set = (g: string, done: boolean, label: string) => {
+        const li = document.querySelector<HTMLElement>(`#games [data-g="${g}"]`)!;
+        li.classList.toggle('ok', done);
+        li.querySelector('b')!.textContent = label;
+      };
+      set('m', !!day.done, day.done ? (day.won ? `trouvée en ${day.guesses.length}` : 'ratée') : day.guesses.length ? `${6 - day.guesses.length} essais restants` : 'à jouer');
+      const b = getBooster();
+      set('b', !!b?.opened, b?.claimed ? 'carte gagnée' : b?.opened ? 'ouvert' : 'à ouvrir');
+      set('d', !!log.d, log.d === 'ok' ? 'gagné' : log.d === 'ko' ? 'perdu' : 'à jouer');
+      const left = [!day.done, !b?.opened, !log.d].filter(Boolean).length;
+      $('defi-text').textContent = left === 0
+        ? 'Tout est joué pour aujourd’hui. Nouveau défi à minuit.'
+        : st.current > 0 && !st.playedToday
+          ? `Ta série de ${st.current} jour${st.current > 1 ? 's' : ''} t’attend : joue un jeu pour la garder.`
+          : `${left} jeu${left > 1 ? 'x' : ''} à jouer aujourd’hui${st.current > 1 ? ` · série de ${st.current} jours` : ''}.`;
+      $('defi-cta').textContent = left === 0 ? 'Voir mes résultats' : left === 3 ? 'Jouer' : 'Continuer';
+
+      const q = todayQuests();
+      const done = q.filter((x) => x.done).length;
+      $('q-count').textContent = `${done}/3`;
+      $('q-mini').replaceChildren(...q.map((x) => el('li', { class: x.done ? 'ok' : '' }, [el('i', { 'aria-hidden': 'true' }), el('span', {}, [x.title]), x.goal > 1 && !x.done ? el('b', {}, [`${x.value}/${x.goal}`]) : null])));
+      $('q-streak').textContent = done === 3
+        ? 'Bravo, quêtes terminées ! Demain, ton booster du jour sera boosté.'
+        : questBonusToday() ? 'Bonus actif : ton booster du jour est boosté grâce aux quêtes d’hier.' : 'Termine les trois pour un booster boosté demain.';
     }
+    renderToday();
+    window.addEventListener('holocote:progress', () => setTimeout(renderToday, 300));
 
     /* Classement : dernier rang connu (calculé sur la page Classement). */
     let rank = 0;
@@ -327,7 +364,16 @@ const TOOLS = [
 
     /* ---------- Aujourd'hui ---------- */
     .today-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
-    @media (min-width: 900px) { .today-grid { grid-template-columns: 1.25fr 1fr 0.8fr; } }
+    @media (min-width: 900px) { .today-grid { grid-template-columns: 1.2fr 1fr; } }
+    .games, .q-mini { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+    .games li, .q-mini :global(li) { display: flex; align-items: center; gap: 10px; font-size: 0.92rem; }
+    .games i, .q-mini :global(i) { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); }
+    .games li.ok i, .q-mini :global(li.ok i) { border-color: var(--up); background: var(--up); box-shadow: inset 0 0 0 3px var(--bg-2); }
+    .games span, .q-mini :global(span) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .games b, .q-mini :global(b) { font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
+    .games li.ok b { color: var(--up); }
+    .q-mini :global(li.ok span) { color: var(--muted); text-decoration: line-through; }
+    .day-quests { background: linear-gradient(160deg, rgba(62, 240, 255, 0.07), transparent 60%), var(--bg-2); }
     .day { display: flex; gap: 20px; align-items: stretch; padding: 22px; border-radius: 22px; text-decoration: none; color: var(--text); border: 1px solid var(--line); background: var(--bg-2); transition: border-color 0.2s; min-width: 0; }
     .day:hover { border-color: rgba(255, 255, 255, 0.3); }
     .day:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }

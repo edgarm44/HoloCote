@@ -6,6 +6,7 @@ import { countFavorites } from './favorites';
 import { getLog, streak } from './progress';
 import { rarityTier } from './rarity';
 import { questDays } from './quests';
+import { bestSetPct } from './sets';
 
 export type BadgeGroup = 'Classeur' | 'Défi' | 'Quêtes' | 'Fidélité' | 'Explorer';
 export interface Badge { id: string; group: BadgeGroup; name: string; hint: string; icon: string; got: boolean; progress?: [number, number] }
@@ -33,6 +34,8 @@ export function computeBadges(): Badge[] {
   let pseudo = '';
   try { pseudo = localStorage.getItem('holocote.pseudo.v1') || ''; } catch { /* rien */ }
   const fullDays = log.filter((l) => l.m && l.b !== undefined && l.d).length;
+  const setPct = Math.round(bestSetPct() * 100);
+  const saved = num('holocote.backup.v1', (v) => (typeof v === 'number' && v > 0 ? 1 : 0));
 
   const B = (id: string, group: BadgeGroup, icon: string, name: string, hint: string, value: number, goal: number): Badge =>
     ({ id, group, icon, name, hint, got: value >= goal, progress: goal > 1 ? [Math.min(value, goal), goal] : undefined });
@@ -46,6 +49,9 @@ export function computeBadges(): Badge[] {
     B('ultra', 'Classeur', 'UR', 'Ultra', 'Une carte ultra rare', tiers.filter((t) => t === 'ultra' || t === 'secret').length, 1),
     B('secret', 'Classeur', 'S', 'Pépite secrète', 'Une carte secrète', tiers.filter((t) => t === 'secret').length, 1),
     B('sets', 'Classeur', 'X', 'Globe-trotteur', 'Des cartes de 5 extensions', sets, 5),
+    B('set10', 'Classeur', '10%', 'Bien parti', '10 % d’une extension au classeur', setPct, 10),
+    B('set50', 'Classeur', '50%', 'À mi-chemin', 'La moitié d’une extension', setPct, 50),
+    B('set100', 'Classeur', '100%', 'Complétiste', 'Une extension complète', setPct, 100),
     B('myst1', 'Défi', '?', 'Détective', 'Trouve une carte mystère', mysteryWins, 1),
     B('myst10', 'Défi', '??', 'Fin limier', '10 cartes mystère trouvées', mysteryWins, 10),
     B('lynx', 'Défi', '1er', 'Œil de lynx', 'Carte mystère trouvée au 1er essai', firstTry ? 1 : 0, 1),
@@ -64,6 +70,7 @@ export function computeBadges(): Badge[] {
     B('pseudo', 'Explorer', '@', 'Enchanté', 'Choisis ton pseudo dans Compte', pseudo.trim() ? 1 : 0, 1),
     B('scan', 'Explorer', 'SC', 'Premier scan', 'Scanne une carte', scans, 1),
     B('fav', 'Explorer', '★', 'Fan', '5 cartes en favoris', favs, 5),
+    B('save', 'Explorer', 'SV', 'Prévoyant', 'Sauvegarde ta progression dans Compte', saved, 1),
   ];
 }
 

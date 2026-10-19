@@ -138,7 +138,7 @@ import { mascotSvg } from '../lib/mascot';
         <p class="muted" id="bx-lead">Aujourd'hui : <strong id="bx-set">…</strong>. Un booster gratuit par jour, dix cartes. La dixième est pour ton classeur.</p>
         <p class="muted" id="bx-lead-train" hidden>Une extension tirée au hasard à chaque ouverture. Entraînement : aucune carte n'est gagnée.</p>
       </div>
-      <p class="bx-boost" id="bx-boost" hidden><strong>Bonus série :</strong> <span id="bx-boost-t"></span></p>
+      <p class="bx-boost" id="bx-boost" hidden><strong>Bonus :</strong> <span id="bx-boost-t"></span></p>
       <div id="bx-state" aria-live="polite"></div>
       <div class="bx-stage" id="bx-stage" hidden>
         <button type="button" class="pack" id="bx-pack" aria-label="Ouvrir le booster du jour">
@@ -219,7 +219,7 @@ import { mascotSvg } from '../lib/mascot';
     </div>
     <ol class="wk-days" id="wk-days" aria-label="Les 7 derniers jours"></ol>
     <div class="wk-tot" id="wk-tot"></div>
-    <p class="muted small wk-note">Une série compte les jours d'affilée où tu joues au moins un jeu du jour (l'entraînement ne compte pas). Tous les 7 jours d'affilée, le booster du jour est boosté.</p>
+    <p class="muted small wk-note">Une série compte les jours d'affilée où tu joues au moins un jeu du jour (l'entraînement ne compte pas). Tous les 7 jours d'affilée, et le lendemain d'une journée où tu as fini tes trois quêtes, le booster du jour est boosté.</p>
   </section>
 
   <p class="notice">
@@ -289,7 +289,7 @@ import { mascotSvg } from '../lib/mascot';
         return el('li', { class: ok ? 'ok' : 'ko' }, [
           el('span', { class: 'g-n' }, [String(i + 1)]),
           el('span', { class: 'g-t' }, [g || 'Passé']),
-          el('span', { class: 'g-i', 'aria-label': ok ? 'Bonne réponse' : 'Raté' }, [ok ? '✓' : '✕']),
+          el('span', { class: 'g-i', role: 'img', 'aria-label': ok ? 'Bonne réponse' : 'Raté' }, [ok ? '✓' : '✕']),
         ]);
       }));
 
@@ -551,10 +551,11 @@ import { mascotSvg } from '../lib/mascot';
   <script>
     import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
     import { syncToday, streak as getStreak, week, played } from '../lib/progress';
+    import { questBonusToday } from '../lib/quests';
     import { todayNumber, msToMidnight, getDay } from '../lib/mystery';
     import { loadMarket, type Quote } from '../lib/market';
     import { addItem, hasCard } from '../lib/collection';
-    import { formatPrice } from '../lib/tcgdex';
+    import { formatPrice, getSet } from '../lib/tcgdex';
     import { mascotSvg } from '../lib/mascot';
     import { el, url, holoCard, toast, status } from '../lib/ui';
 
@@ -613,9 +614,16 @@ import { mascotSvg } from '../lib/mascot';
       const st = getStreak();
       const daily = !bxTrain;
       const saved = getBooster();
-      const boosted = daily && (saved ? !!saved.boost : st.boostToday);
+      const quest = questBonusToday();
+      const boosted = daily && (saved ? !!saved.boost : st.boostToday || quest);
       $('bx-boost').hidden = !boosted;
-      if (boosted) $('bx-boost-t').textContent = `${st.playedToday ? st.current : st.current + 1} jours d'affilée, ton booster du jour a de meilleures chances.`;
+      if (boosted) {
+        const why = [
+          st.boostToday ? `${st.playedToday ? st.current : st.current + 1} jours d'affilée` : '',
+          quest ? 'quêtes d’hier terminées' : '',
+        ].filter(Boolean).join(' et ');
+        $('bx-boost-t').textContent = `${why || 'bonus du jour'} : ton booster du jour a de meilleures chances.`;
+      }
       $('bx-rates').textContent = rateText(boosted ? BOOST_RATES : RATES);
     }
     const DAYS = ['di', 'lu', 'ma', 'me', 'je', 've', 'sa'];
@@ -631,7 +639,7 @@ import { mascotSvg } from '../lib/mascot';
       $('wk-days').replaceChildren(...w.map((d) => {
         const l = d.log;
         const dot = (on: boolean | undefined, ok: boolean | undefined, label: string, short: string) =>
-          el('span', { class: `wk-g ${on ? (ok ? 'ok' : 'ko') : ''}`, title: label }, [short]);
+          el('span', { class: `wk-g ${on ? (ok ? 'ok' : 'ko') : ''}`, title: label }, [el('span', { 'aria-hidden': 'true' }, [short]), el('span', { class: 'sr-only' }, [label])]);
         return el('li', { class: `wk-day ${played(l) ? 'on' : ''} ${d.n === today ? 'today' : ''}` }, [
           el('span', { class: 'wk-d' }, [d.n === today ? 'auj.' : DAYS[d.date.getDay()]]),
           el('span', { class: 'wk-n' }, [String(d.date.getDate())]),
@@ -755,7 +763,7 @@ import { mascotSvg } from '../lib/mascot';
       pack.classList.add('tearing');
       try {
         if (bxTrain) bState = await drawBooster({ save: false, setId: BOOSTER_SETS[Math.floor(Math.random() * BOOSTER_SETS.length)] });
-        else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday });
+        else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday || questBonusToday() });
         if (!bState) throw new Error('booster');
         pulled = await loadPulled(bState.cards);
       } catch {
@@ -827,7 +835,7 @@ import { mascotSvg } from '../lib/mascot';
       $('bx-pack-set').textContent = setId;
       $('bx-stage').hidden = false;
       // Nom lisible de l'extension du jour
-      fetch(`https://api.tcgdex.net/v2/fr/sets/${encodeURIComponent(setId)}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      getSet(setId, 'fr').then((d) => {
         if (d?.name) { $('bx-set').textContent = d.name; $('bx-pack-set').textContent = d.name; }
       }).catch(() => {});
       $('bx-pack').addEventListener('click', openPack);

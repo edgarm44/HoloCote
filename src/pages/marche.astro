@@ -123,15 +123,15 @@ import Base from '../layouts/Base.astro';
       </select>
       </div>
     </div>
-    <div class="table" role="table" aria-label="Cours des cartes">
-      <div class="tr th" role="row">
-        <span role="columnheader">Carte</span>
-        <span role="columnheader" class="num">Cours</span>
-        <span role="columnheader" class="num">Moy. 30 j</span>
-        <span role="columnheader" class="num">7 j</span>
-        <span role="columnheader" class="chart-col">Tendance</span>
+    <div class="table" role="region" aria-label="Cours des cartes">
+      <div class="tr th" aria-hidden="true">
+        <span>Carte</span>
+        <span class="num">Cours</span>
+        <span class="num">Moy. 30 j</span>
+        <span class="num">7 j</span>
+        <span class="chart-col">Tendance</span>
       </div>
-      <div id="rows"></div>
+      <div id="rows" role="list"></div>
       <p class="rows-empty muted" id="rows-empty" hidden>Aucune carte ne correspond à ce filtre.</p>
     </div>
     <button type="button" class="btn more-rows" id="more-rows" hidden></button>
@@ -147,7 +147,7 @@ import Base from '../layouts/Base.astro';
   <script>
     import { loadMarket, sparkline, bigChart, ticker, formatChange, changeClass, toQuote, eraOf, type Quote, type Era } from '../lib/market';
     import { normalize } from '../lib/cardindex';
-    import { formatPrice, formatDate, getCard, type Card } from '../lib/tcgdex';
+    import { formatPrice, formatDate, priceAgeText, getCard, type Card } from '../lib/tcgdex';
     import { getItems } from '../lib/collection';
     import { conditionFactor } from '../lib/condition';
     import { el, url, favForBrief } from '../lib/ui';
@@ -189,17 +189,17 @@ import Base from '../layouts/Base.astro';
       more.hidden = all.length <= shown;
       more.textContent = `Voir ${Math.min(PAGE, all.length - shown)} cartes de plus (${all.length - shown} restantes)`;
       $('rows-empty').hidden = all.length > 0;
-      $('rows').replaceChildren(...list.map((q, i) => el('div', { class: 'row-wrap' }, [
-        el('a', { class: 'tr', role: 'row', href: href(q) }, [
-          el('span', { class: 'card-cell', role: 'cell' }, [
+      $('rows').replaceChildren(...list.map((q, i) => el('div', { class: 'row-wrap', role: 'listitem' }, [
+        el('a', { class: 'tr', href: href(q) }, [
+          el('span', { class: 'card-cell' }, [
             el('span', { class: 'rank' }, [String(i + 1)]),
             thumb(q),
             el('span', { class: 'mv-name' }, [q.name, el('small', {}, [[q.setName, q.group === 'new' ? 'Nouveauté' : ''].filter(Boolean).join(' · ')])]),
           ]),
-          el('span', { class: 'num price', role: 'cell', title: q.unsure ? 'Cote incertaine : ventes récentes très variables' : '' }, [eur(q.price), q.unsure ? el('sup', { class: 'unsure' }, ['?']) : null]),
-          el('span', { class: 'num muted', role: 'cell' }, [q.avg30 ? eur(q.avg30) : '—']),
-          el('span', { class: 'num', role: 'cell' }, [chg(q.change7)]),
-          el('span', { class: 'chart-col', role: 'cell' }, [sparkline(q.points, 110, 34)]),
+          el('span', { class: 'num price', title: q.unsure ? 'Cote incertaine : ventes récentes très variables' : '' }, [eur(q.price), q.unsure ? el('sup', { class: 'unsure' }, ['?']) : null]),
+          el('span', { class: 'num muted' }, [q.avg30 ? eur(q.avg30) : '—']),
+          el('span', { class: 'num' }, [chg(q.change7)]),
+          el('span', { class: 'chart-col' }, [sparkline(q.points, 110, 34)]),
         ]),
         graphBtn(q),
         favForBrief({ id: q.id, localId: '', name: q.name, image: q.image }, q.lang, 'row-fav'),
@@ -369,7 +369,7 @@ import Base from '../layouts/Base.astro';
         $('index-chart').replaceChildren(sparkline(pts, 320, 70));
       }
       const updated = quotes.map((q) => q.updated).filter(Boolean).sort().pop();
-      if (updated) { $('live-text').textContent = `Cotes du ${formatDate(updated)}`; $('cb-date').textContent = `Cotes Cardmarket du ${formatDate(updated)}`; }
+      if (updated) { const age = priceAgeText(updated); $('live-text').textContent = `Cotes du ${formatDate(updated)}`; $('cb-date').textContent = `Cotes Cardmarket du ${formatDate(updated)} · ${age.text}`; }
       loadedAt = market.loadedAt;
       $('cb-ago').textContent = agoText();
 

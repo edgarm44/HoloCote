@@ -7,7 +7,7 @@ import { mascotSvg } from '../lib/mascot';
     <div class="hero-text">
       <p class="eyebrow">Mon classeur</p>
       <h1>Ma <span class="holo-text">collection</span></h1>
-      <p class="muted">Tes cartes scannées ou gagnées au Défi. Elles restent dans ce navigateur : exporte-les pour les sauvegarder.</p>
+      <p class="muted">Tes cartes scannées ou gagnées au Défi. Elles restent dans ce navigateur : pense à les sauvegarder depuis l'onglet Compte.</p>
       <div class="stats">
         <div class="stat stat-main">
           <span class="stat-label">Valeur estimée</span>
@@ -60,6 +60,15 @@ import { mascotSvg } from '../lib/mascot';
     </div>
   </div>
 
+  <section class="sets-goal" id="sets-goal" hidden aria-labelledby="sg-h">
+    <div class="sg-head">
+      <h2 id="sg-h">Mes extensions</h2>
+      <p class="muted small">Cartes différentes de chaque extension dans ton classeur, sur le nombre de cartes de la série (hors cartes secrètes, comptées à part).</p>
+    </div>
+    <ul class="sg-list" id="sg-list"></ul>
+    <button type="button" class="link-btn" id="sg-more" hidden>Voir toutes mes extensions</button>
+  </section>
+
   <div id="binder" class="binder"></div>
   <p id="no-match" class="muted" hidden>Aucune carte ne correspond à ce filtre.</p>
 
@@ -73,7 +82,7 @@ import { mascotSvg } from '../lib/mascot';
   <section class="panel backup">
     <div>
       <h2>Sauvegarde</h2>
-      <p class="muted small">Exporte ta collection dans un fichier pour la garder en sécurité ou la retrouver sur un autre appareil. Une sauvegarde se restaure sur une collection vide (par exemple sur un nouvel appareil). Les cartes rangées restent dans ton classeur : on ne peut ni les supprimer, ni les dupliquer, ni changer leur état.</p>
+      <p class="muted small">Pour tout sauvegarder d'un coup (classeur, favoris, Défi, quêtes, succès), utilise la <a href="../compte/#sauvegarde">sauvegarde complète de l'onglet Compte</a>. Ici, tu peux exporter seulement ta collection. Une collection se restaure sur un classeur vide (par exemple sur un nouvel appareil). Les cartes rangées restent dans ton classeur : on ne peut ni les supprimer, ni les dupliquer, ni changer leur état.</p>
     </div>
     <div class="backup-actions">
       <button class="btn" id="export" type="button">Exporter</button>
@@ -111,6 +120,7 @@ import { mascotSvg } from '../lib/mascot';
     import { getCard, priceFor, formatPrice, type Card, type PriceInfo } from '../lib/tcgdex';
     import { rarityTier, USD_TO_EUR, type Tier } from '../lib/rarity';
     import { holoCard, el, toast, url } from '../lib/ui';
+    import { loadTotals, computeRows, cachedTotals, type SetRow } from '../lib/sets';
 
     const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
     const binder = $('binder');
@@ -264,11 +274,67 @@ import { mascotSvg } from '../lib/mascot';
     });
 
 
+    /* ---------- Objectifs par extension ---------- */
+    let showAllSets = false;
+    let setLogos = new Map<string, string>();
+    const STEPS = [0.1, 0.25, 0.5, 0.75, 1];
+    function setRowEl(r: SetRow): HTMLElement {
+      const pct = Math.round(r.pct * 100);
+      const next = STEPS.find((s) => s > r.pct + 1e-9);
+      const need = r.official && next ? Math.ceil(next * r.official) - r.inSet : 0;
+      const logo = setLogos.get(r.id);
+      return el('li', { class: `sg-row ${r.pct >= 1 ? 'full' : ''}` }, [
+        el('span', { class: 'sg-logo', 'aria-hidden': 'true' }, [logo ? el('img', { src: `${logo}.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }) : r.id.toUpperCase()]),
+        el('div', { class: 'sg-tx' }, [
+          el('div', { class: 'sg-top' }, [
+            el('strong', {}, [r.name]),
+            el('span', { class: 'sg-n' }, [r.official ? `${r.inSet}/${r.official}` : `${r.owned} carte${r.owned > 1 ? 's' : ''}`, r.extra ? el('small', {}, [` +${r.extra} secrète${r.extra > 1 ? 's' : ''}`]) : null]),
+          ]),
+          el('span', { class: 'sg-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct), 'aria-label': `${r.name} : ${pct} %` }, [el('i', { style: `width:${Math.max(r.pct * 100, r.inSet ? 1.5 : 0)}%` })]),
+          el('span', { class: 'muted small' }, [r.pct >= 1 ? 'Extension complète, bravo !' : r.official && next ? `${pct} % · encore ${need} carte${need > 1 ? 's' : ''} pour ${Math.round(next * 100)} %` : r.official ? `${pct} %` : 'Total de la série inconnu']),
+        ]),
+      ]);
+    }
+    function renderSets(totals = cachedTotals()) {
+      const rows = computeRows(totals);
+      $('sets-goal').hidden = rows.length === 0;
+      const shown = showAllSets ? rows : rows.slice(0, 6);
+      $('sg-list').replaceChildren(...shown.map(setRowEl));
+      $('sg-more').hidden = rows.length <= 6;
+      $('sg-more').textContent = showAllSets ? 'Réduire' : `Voir mes ${rows.length} extensions`;
+    }
+    $('sg-more').addEventListener('click', () => { showAllSets = !showAllSets; renderSets(); });
+    renderSets();
+    if (getItems().length) loadTotals('fr').then(({ totals, logos }) => {
+      setLogos = logos;
+      renderSets(totals);
+      window.dispatchEvent(new CustomEvent('holocote:progress'));
+    }).catch(() => {});
+    window.addEventListener('holocote:collection', () => renderSets());
+
     render();
     loadCards();
   </script>
 
   <style>
+    .sets-goal { margin: 0 0 24px; padding: 20px; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); }
+    .sg-head h2 { margin: 0 0 4px; }
+    .sg-head p { margin: 0 0 14px; }
+    .sg-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px 18px; }
+    .sg-list :global(.sg-row) { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--line); }
+    .sg-list :global(.sg-row.full) { border-color: rgba(255, 210, 90, 0.55); box-shadow: 0 0 18px rgba(255, 210, 90, 0.12); }
+    .sg-list :global(.sg-logo) { flex: 0 0 64px; height: 36px; display: grid; place-items: center; font-weight: 800; font-size: 0.72rem; color: var(--muted); }
+    .sg-list :global(.sg-logo img) { max-width: 64px; max-height: 36px; object-fit: contain; }
+    .sg-list :global(.sg-tx) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .sg-list :global(.sg-top) { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .sg-list :global(.sg-top) { flex-wrap: wrap; }
+    .sg-list :global(.sg-top strong) { min-width: 0; overflow-wrap: anywhere; }
+    .sg-list :global(.sg-n) { font-family: var(--font-display); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .sg-list :global(.sg-n small) { font-family: var(--font-body); color: var(--gold); font-weight: 700; }
+    .sg-list :global(.sg-bar) { position: relative; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+    .sg-list :global(.sg-bar i) { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--holo); }
+    #sg-more { margin-top: 12px; border: 0; background: none; padding: 0; color: var(--cyan); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font: inherit; font-weight: 700; }
+    @media (max-width: 720px) { .sets-goal { padding: 16px 12px; } .sg-list { grid-template-columns: 1fr; } }
     .hero { display: grid; gap: 28px; grid-template-columns: 1fr; padding: 20px 0 28px; align-items: center; }
     @media (min-width: 860px) { .hero { grid-template-columns: 1fr 260px; } }
     .eyebrow { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.75rem; color: var(--cyan); margin: 0 0 6px; font-weight: 700; }

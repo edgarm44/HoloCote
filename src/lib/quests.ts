@@ -97,3 +97,8 @@ export function checkQuestsDone(): boolean {
   try { localStorage.setItem(DONE, JSON.stringify([...days, n].slice(-400))); } catch { /* rien */ }
   return true;
 }
+
+/** Récompense : les 3 quêtes d'hier terminées donnent un booster du jour boosté aujourd'hui. */
+export function questBonusToday(): boolean {
+  return questDays().includes(todayNumber() - 1);
+}

@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://edgarm44.github.io/HoloCote/sitemap.xml

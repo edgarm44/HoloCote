@@ -14,6 +14,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <p><strong>Des repères, pas des conseils.</strong> Ces signaux décrivent l'évolution récente des cotes Cardmarket ; ils ne prédisent pas l'avenir et ne sont pas un conseil d'achat ou d'investissement. Une carte peut continuer de baisser. Avant d'acheter, compare plusieurs vendeurs et vérifie l'état de la carte. Si tu es mineur, parles-en à un adulte avant tout achat.</p>
   </aside>
 
+  <p class="op-date" id="op-date" hidden></p>
+
   <div id="op-state" aria-live="polite">
     <div class="status" role="status"><div class="spinner"></div>Analyse des cotes en cours…</div>
   </div>
@@ -135,7 +137,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   <script>
     import { loadMarket, toQuote, sparkline, type Quote } from '../lib/market';
     import { analyse, climate, VERDICTS, type Analysis, type Verdict } from '../lib/opportunity';
-    import { getCard, formatPrice, type Lang } from '../lib/tcgdex';
+    import { getCard, formatPrice, formatDate, priceAgeText, type Lang } from '../lib/tcgdex';
     import { getFavorites, addFavorite, setTargets, isFavorite, favButton, onFavoritesChange } from '../lib/favorites';
     import { currentAlerts, checkAlerts, alertText, recheckSoon, onAlertsChange } from '../lib/alerts';
     import { getItems } from '../lib/collection';
@@ -331,6 +333,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         }));
         all = [...quotes.values()].map(analyse);
         if (!all.length) throw new Error('vide');
+        const updated = [...quotes.values()].map((q) => q.updated).filter(Boolean).sort().pop();
+        if (updated) {
+          const age = priceAgeText(updated);
+          $('op-date').textContent = `Analyse des cotes Cardmarket du ${formatDate(updated)} · ${age.text}${age.stale ? ' : les signaux peuvent être dépassés' : ''}`;
+          $('op-date').classList.toggle('stale', age.stale);
+          $('op-date').hidden = false;
+        }
       } catch {
         const retry = el('button', { type: 'button', class: 'btn' }, ['Réessayer']);
         retry.addEventListener('click', () => { $('op-state').replaceChildren(el('div', { class: 'status', role: 'status' }, [el('div', { class: 'spinner' }), 'Analyse des cotes en cours…'])); main(); });
@@ -348,6 +357,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   </script>
 
   <style>
+    .op-date { margin: -6px 0 18px; font-size: 0.85rem; font-weight: 700; color: var(--up); }
+    .op-date:global(.stale) { color: var(--gold); }
     .op-hero { padding: clamp(24px, 5vw, 56px) 0 20px; }
     .op-hero h1 { font-size: clamp(2.3rem, 11vw, 7.2rem); line-height: 0.88; letter-spacing: -0.05em; font-weight: 800; margin: 0 0 14px; }
     .op-slogan { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.2rem, 3vw, 1.9rem); letter-spacing: -0.02em; margin: 0 0 12px; }

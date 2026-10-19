@@ -5,9 +5,10 @@ import Logo from '../components/Logo.astro';
 interface Props {
   title: string;
   description?: string;
+  noindex?: boolean;
   active?: 'home' | 'search' | 'market' | 'scanner' | 'favorites' | 'ranking' | 'collection' | 'mystery' | 'deals' | 'account' | 'legal';
 }
-const { title, description = 'Cote et rareté de tes cartes à collectionner, scanner gratuit et collection privée.', active } = Astro.props;
+const { title, description = 'Cote et rareté de tes cartes Pokémon, scanner gratuit, marché du jour et collection privée. Site de fan non officiel.', active, noindex = false } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 // Onglets. « extra » : rangés dans le menu « Plus » de la barre du bas sur téléphone.
 const NAV = [
@@ -23,7 +24,9 @@ const NAV = [
   { key: 'mystery', href: '/defi/', label: 'Défi', icon: '<rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6v.4M12 16.8v.01" />', extra: true },
 ] as const;
 const extraActive = NAV.some((n) => 'extra' in n && n.extra && n.key === active);
-const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : `${title} · HoloCote`;
+const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes Pokémon' : `${title} · HoloCote`;
+const canonical = new URL(Astro.url.pathname.replace(/\/?$/, '/').replace(/\/index\.html\/$/, '/'), Astro.site).href;
+const ogImage = new URL(`${base}/og.png`, Astro.site).href;
 ---
 <!doctype html>
 <html lang="fr">
@@ -32,12 +35,25 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
+    {!/\/carte\/?$/.test(Astro.url.pathname) && <link rel="canonical" href={canonical} />}
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="HoloCote" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="HoloCote, la cote de tes cartes Pokémon" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#07060d" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
   </head>
   <body>
-    <a class="sr-only" href="#contenu">Aller au contenu</a>
+    <a class="sr-only skip" href="#contenu">Aller au contenu</a>
     <header class="site-header">
       <div class="bar">
         <a class="logo" href={`${base}/`} aria-label="HoloCote, accueil">
@@ -71,6 +87,12 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         <div class="more-backdrop" id="more-backdrop" hidden></div>
       </div>
     </header>
+
+    <div class="net-banner" id="net-banner" hidden role="status">
+      <span id="net-text">La base de cartes TCGdex ne répond pas pour l'instant. Tu vois les dernières données gardées par ton navigateur ; certaines cartes ou cotes peuvent manquer.</span>
+      <button type="button" class="net-retry" id="net-retry">Réessayer</button>
+      <button type="button" class="ab-close" id="net-close" aria-label="Masquer ce message">✕</button>
+    </div>
 
     <main id="contenu">
       <slot />
@@ -109,6 +131,20 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         if (!(img instanceof HTMLImageElement) || img.dataset.fbk) return;
         if (/assets\.tcgdex\.net\/fr\//.test(img.src)) { img.dataset.fbk = '1'; img.src = img.src.replace('/fr/', '/en/'); }
       }, true);
+      // Base de cartes injoignable : bandeau discret au lieu de pages vides.
+      const net = document.getElementById('net-banner')!;
+      const showNet = (offline: boolean) => {
+        document.getElementById('net-text')!.textContent = offline
+          ? 'Pas de connexion Internet. Tu vois les dernières données gardées par ton navigateur ; ton classeur, tes quêtes et tes succès restent disponibles.'
+          : 'La base de cartes TCGdex ne répond pas pour l’instant. Tu vois les dernières données gardées par ton navigateur ; certaines cartes ou cotes peuvent manquer.';
+        net.hidden = false;
+      };
+      window.addEventListener('holocote:offline', () => showNet(!navigator.onLine));
+      window.addEventListener('offline', () => showNet(true));
+      window.addEventListener('online', () => { net.hidden = true; });
+      if (!navigator.onLine || document.documentElement.dataset.apiDown) showNet(!navigator.onLine);
+      document.getElementById('net-close')!.addEventListener('click', () => { net.hidden = true; });
+      document.getElementById('net-retry')!.addEventListener('click', () => location.reload());
       // Onglet actif visible quand la barre défile (tablette)
       const navEl = document.querySelector<HTMLElement>('header nav');
       const cur = navEl?.querySelector<HTMLElement>('a[aria-current="page"]');
@@ -193,7 +229,7 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         window.clearTimeout(checkT);
         checkT = window.setTimeout(() => {
           const fresh: typeof queue = [];
-          if (checkQuestsDone()) fresh.push({ icon: '3/3', kicker: 'Quêtes du jour', name: 'Toutes terminées !', hint: 'Bravo. Trois nouvelles quêtes demain.', href: `${base}compte/#quetes` });
+          if (checkQuestsDone()) fresh.push({ icon: '3/3', kicker: 'Quêtes du jour', name: 'Toutes terminées !', hint: 'Récompense : booster du jour boosté demain.', href: `${base}compte/#quetes` });
           fresh.push(...newlyUnlocked());
           if (!fresh.length) return;
           const idleNow = !queue.length && !document.querySelector('#badge-pop.show');
@@ -271,6 +307,14 @@ const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes' : 
         width: 9px; height: 9px; border-radius: 50%; background: var(--down);
         box-shadow: 0 0 0 2px var(--bg), 0 0 10px var(--down);
       }
+      .net-banner {
+        display: flex; align-items: center; gap: 12px; max-width: 1180px; margin: 12px auto 0; padding: 10px 12px 10px 16px;
+        border-radius: 14px; border: 1px solid rgba(255, 210, 90, 0.5); background: rgba(255, 210, 90, 0.08); font-size: 0.9rem;
+      }
+      .net-banner[hidden] { display: none; }
+      .net-banner span { flex: 1; }
+      .net-retry { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 10px; padding: 6px 12px; font-weight: 700; cursor: pointer; }
+      @media (max-width: 1212px) { .net-banner { margin-inline: 16px; } }
       .alert-banner {
         position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 40;
         display: flex; align-items: center; gap: 12px; width: min(560px, calc(100vw - 24px));

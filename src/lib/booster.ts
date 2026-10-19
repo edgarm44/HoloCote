@@ -2,7 +2,7 @@
 // Jeu gratuit, sans achat ni gain réel : seule la dernière carte peut être rangée dans le classeur.
 // Les cartes sont tirées au hasard dans la liste de l'extension (TCGdex) ; la dernière a plus de chances d'être rare.
 
-import { getCard, priceFor, type Card, type CardBrief } from './tcgdex';
+import { getCard, getSet, priceFor, type Card, type CardBrief } from './tcgdex';
 import { todayNumber } from './mystery';
 
 /** Extensions proposées, une par jour à tour de rôle. */
@@ -10,7 +10,7 @@ export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me0
 
 /** Chances pour la dixième carte (affichées sur la page). */
 export const RATES = { top: 0.03, chase: 0.12, upper: 0.3 };
-/** Bonus de série (7ᵉ jour d'affilée) : chances augmentées pour la dixième carte. */
+/** Bonus (7ᵉ jour d'affilée ou quêtes de la veille terminées) : chances augmentées pour la dixième carte. */
 export const BOOST_RATES = { top: 0.08, chase: 0.22, upper: 0.35 };
 
 export const setOfDay = (n = todayNumber()) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
@@ -32,7 +32,7 @@ interface SetDetail { id: string; name: string; cardCount?: { official?: number;
 
 async function setDetail(id: string): Promise<SetDetail | null> {
   for (const lang of ['fr', 'en']) {
-    const d = await fetch(`https://api.tcgdex.net/v2/${lang}/sets/${encodeURIComponent(id)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const d = await getSet(id, lang as 'fr' | 'en').catch(() => null);
     if (d?.cards?.length) return d;
   }
   return null;

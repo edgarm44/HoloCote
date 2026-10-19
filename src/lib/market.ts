@@ -4,7 +4,7 @@
 // La moyenne de la veille n'est pas utilisée : sur données réelles elle varie du simple
 // au triple d'un jour à l'autre (une seule vente suffit).
 
-import { getCard, listSets, priceFor, clearApiCache, type Card, type CardBrief, type Lang } from './tcgdex';
+import { getCard, getSet, listSets, priceFor, clearApiCache, type Card, type CardBrief, type Lang } from './tcgdex';
 
 export interface Quote {
   id: string;
@@ -398,8 +398,7 @@ async function newestChase(max = 16): Promise<string[]> {
     .reverse();
   const ids: string[] = [];
   for (const s of recent) {
-    const d: SetDetail | null = await fetch(`https://api.tcgdex.net/v2/fr/sets/${encodeURIComponent(s.id)}`)
-      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const d: SetDetail | null = await getSet(s.id, 'fr').catch(() => null);
     const official = d?.cardCount?.official ?? s.cardCount?.official ?? 0;
     const chase = (d?.cards ?? []).filter((c) => /^\d+$/.test(c.localId) && Number(c.localId) > official);
     // Les cartes les plus rares sont en fin de liste : on en garde les 14 dernières.

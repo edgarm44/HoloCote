@@ -67,23 +67,75 @@ export function clearApiCache() {
   fresh = true;
 }
 
-async function get<T>(path: string): Promise<T> {
+/* ---------- Copie de secours dans le navigateur ----------
+   Les fiches de cartes et d'extensions déjà vues sont gardées : si TCGdex ne répond pas,
+   on affiche la dernière version connue au lieu d'une page vide. */
+const STORE = 'holocote.api.';
+const STORE_IDX = 'holocote.api.idx';
+const STORE_BUDGET = 1_500_000; // caractères au total : le classeur garde toujours de la place
+
+type Idx = { p: string; n: number }[];
+function readIdx(): Idx {
+  try { const v = JSON.parse(localStorage.getItem(STORE_IDX) || '[]'); return Array.isArray(v) ? v.filter((x) => x && typeof x.p === 'string') : []; } catch { return []; }
+}
+const keep = (path: string) => /^\/(fr|en)\/(cards\/[^?]+|sets(\/[^?]+)?)$/.test(path);
+
+function storeRead(path: string): unknown {
+  try { const v = localStorage.getItem(STORE + path); return v ? (JSON.parse(v) as { d: unknown }).d : undefined; } catch { return undefined; }
+}
+function storeWrite(path: string, d: unknown) {
+  if (d == null) return;
+  try {
+    const raw = JSON.stringify({ t: Date.now(), d });
+    if (raw.length > STORE_BUDGET / 4) return;
+    let idx = [{ p: path, n: raw.length }, ...readIdx().filter((x) => x.p !== path)];
+    let total = 0;
+    const kept: Idx = [];
+    for (const x of idx) {
+      if (total + x.n <= STORE_BUDGET) { kept.push(x); total += x.n; } else localStorage.removeItem(STORE + x.p);
+    }
+    idx = kept;
+    localStorage.setItem(STORE + path, raw);
+    localStorage.setItem(STORE_IDX, JSON.stringify(idx));
+  } catch {
+    // Stockage plein : on retire toute la copie de secours plutôt que de gêner le reste du site.
+    try { for (const x of readIdx()) localStorage.removeItem(STORE + x.p); localStorage.removeItem(STORE + path); localStorage.removeItem(STORE_IDX); } catch { /* rien */ }
+  }
+}
+
+let offlineSignaled = false;
+function signalOffline() {
+  if (offlineSignaled) return;
+  offlineSignaled = true;
+  document.documentElement.dataset.apiDown = '1'; // lu par la mise en page si elle n'écoutait pas encore
+  window.dispatchEvent(new CustomEvent('holocote:offline'));
+}
+
+/** Requête JSON vers TCGdex, avec copie de secours si le serveur ne répond pas. */
+export async function apiGet<T>(path: string): Promise<T> {
   const url = `${API}${path}`;
   if (!cache.has(url)) {
+    const persist = keep(path);
     cache.set(
       url,
       fetch(url, fresh ? { cache: 'no-cache' } : undefined).then(async (r) => {
         if (r.status === 404) return null;
         if (!r.ok) throw new Error(`TCGdex ${r.status}`);
-        return r.json();
+        const d = await r.json();
+        if (persist) storeWrite(path, d);
+        return d;
       }).catch((e) => {
         cache.delete(url);
+        const backup = persist ? storeRead(path) : undefined;
+        if (backup !== undefined) { signalOffline(); return backup; }
+        if (!navigator.onLine || e instanceof TypeError) signalOffline();
         throw e;
       }),
     );
   }
   return cache.get(url) as Promise<T>;
 }
+const get = apiGet;
 
 /** Recherche par nom (correspondance partielle, insensible à la casse côté TCGdex). */
 export async function searchCards(name: string, lang: Lang, limit = 36): Promise<CardBrief[]> {
@@ -102,6 +154,13 @@ export async function getCard(id: string, lang: Lang): Promise<Card | null> {
 
 export async function listSets(lang: Lang): Promise<SetBrief[]> {
   return (await get<SetBrief[] | null>(`/${lang}/sets`)) ?? [];
+}
+
+export interface SetDetail extends SetBrief { cards?: CardBrief[]; releaseDate?: string }
+
+/** Détail d'une extension avec la liste de ses cartes (null si elle n'existe pas dans cette langue). */
+export function getSet(id: string, lang: Lang): Promise<SetDetail | null> {
+  return get<SetDetail | null>(`/${lang}/sets/${encodeURIComponent(id)}`);
 }
 
 /** URL d'image TCGdex (qualité basse pour les grilles, haute pour la fiche). */
@@ -194,6 +253,21 @@ export const bestPrice = (card: Card) => priceFor(card, 'normal');
 
 export function formatPrice(value: number, unit: 'EUR' | 'USD'): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: unit, maximumFractionDigits: value < 100 ? 2 : 0 }).format(value);
+}
+
+/** Âge d'une cote en jours (undefined si la date est inconnue). */
+export function priceAgeDays(iso?: string): number | undefined {
+  if (!iso) return undefined;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? undefined : Math.max(0, Math.floor((Date.now() - t) / 864e5));
+}
+
+/** « mise à jour aujourd'hui / hier / il y a 5 jours », avec un avertissement au-delà de 10 jours. */
+export function priceAgeText(iso?: string): { text: string; stale: boolean } {
+  const d = priceAgeDays(iso);
+  if (d === undefined) return { text: 'date de mise à jour inconnue', stale: true };
+  const text = d === 0 ? 'mise à jour aujourd’hui' : d === 1 ? 'mise à jour hier' : `mise à jour il y a ${d} jours`;
+  return { text, stale: d > 10 };
 }
 
 export function formatDate(iso?: string): string {

@@ -52,8 +52,8 @@ import { CONDITIONS } from '../lib/condition';
         <button class="btn btn-primary" id="shoot-btn" type="button" hidden>Scanner</button>
         <label class="btn snap-btn" for="snap">Prendre une photo</label>
         <label class="btn" for="photo">Choisir une photo</label>
-        <input id="snap" type="file" accept="image/*" capture="environment" class="sr-only" />
-        <input id="photo" type="file" accept="image/*" class="sr-only" />
+        <input id="snap" type="file" accept="image/*" capture="environment" class="sr-only" aria-label="Prendre une photo avec l'appareil" />
+        <input id="photo" type="file" accept="image/*" class="sr-only" aria-label="Choisir une photo de ta carte" />
       </div>
       <div class="cam-pick" id="cam-pick" hidden>
         <label for="cam-select">Caméra</label>
@@ -163,7 +163,7 @@ import { CONDITIONS } from '../lib/condition';
 
   <script>
     import { readCard, findCandidates, parseNumber, loadImage, warmUp, preloadIndexes, detectCard, type Rect, type Candidate, type ScanReading } from '../lib/scan';
-    import { getCard, priceFor, hasReverse, formatPrice, formatDate, type Card, type Finish } from '../lib/tcgdex';
+    import { getCard, priceFor, hasReverse, formatPrice, formatDate, priceAgeText, searchCards, type Card, type Finish } from '../lib/tcgdex';
     import { rarityTier, tierLabel, valueBadge, USD_TO_EUR } from '../lib/rarity';
     import { conditionFactor, type Condition } from '../lib/condition';
     import { addItem, hasCard } from '../lib/collection';
@@ -228,11 +228,12 @@ import { CONDITIONS } from '../lib/condition';
       if (p) {
         slot('price').textContent = formatPrice(p.value, p.unit);
         const d = formatDate(p.updated);
-        slot('price-note').textContent = `Cote ${finish === 'reverse' ? 'reverse holo ' : ''}indicative${d ? ` du ${d}` : ''}, source ${p.source}${p.unit === 'USD' ? ' (marché américain)' : ''}.`;
+        const age = priceAgeText(p.updated);
+        slot('price-note').textContent = `Cote ${finish === 'reverse' ? 'reverse holo ' : ''}indicative${d ? ` du ${d}` : ''} (${age.text}${age.stale ? ', elle peut avoir changé' : ''}), source ${p.source}${p.unit === 'USD' ? ' (marché américain)' : ''}.`;
         slot('estimate').textContent = `Valeur estimée dans cet état : ${formatPrice(p.value * conditionFactor(condSel.value as Condition), p.unit)}`;
       } else {
-        slot('price').textContent = 'Pas de cote';
-        slot('price-note').textContent = "Aucune vente récente connue pour cette carte.";
+        slot('price').textContent = 'Cote indisponible';
+        slot('price-note').textContent = "Aucune vente récente connue pour cette carte : mieux vaut pas de prix qu'un prix inventé.";
         slot('estimate').textContent = '';
       }
     }
@@ -313,14 +314,45 @@ import { CONDITIONS } from '../lib/condition';
 
     /* ---------- Recherche des candidats ---------- */
 
-    function candidateTile(c: Candidate): HTMLElement {
+    function candidateTile(c: Candidate, manual = false): HTMLElement {
       const btn = el('button', { type: 'button', class: 'tile tile-btn' }, [
         holoCard(c.image, c.name),
         el('span', { class: 'tile-name' }, [c.name]),
-        el('span', { class: 'tile-meta' }, [`${quality(c.score)} · ${c.lang.toUpperCase()} · N° ${c.localId}${c.setName ? ` · ${c.setName}` : ''}`]),
+        el('span', { class: 'tile-meta' }, [`${manual ? 'Recherche par nom' : quality(c.score)} · ${c.lang.toUpperCase()} · N° ${c.localId}${c.setName ? ` · ${c.setName}` : ''}`]),
       ]);
       btn.addEventListener('click', () => openConfirm(c));
       return btn;
+    }
+
+    /** Secours : chercher sa carte par son nom quand le scan se trompe. */
+    function manualFinder(prefill: string, lead: string): HTMLElement {
+      const id = `mf-${Math.random().toString(36).slice(2, 7)}`;
+      const input = el('input', { id, type: 'text', value: prefill, placeholder: 'Ex. : Pikachu, Dracaufeu ex…', autocomplete: 'off' }) as HTMLInputElement;
+      const results = el('div', { class: 'grid mf-grid', 'aria-live': 'polite' });
+      const form = el('form', { class: 'mf-form' }, [
+        el('label', { for: id, class: 'sr-only' }, ['Nom de la carte']),
+        input,
+        el('button', { type: 'submit', class: 'btn btn-primary' }, ['Chercher']),
+      ]);
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const q = input.value.trim();
+        if (q.length < 2) { toast('Tape au moins 2 lettres.'); return; }
+        results.replaceChildren(status('Recherche…'));
+        try {
+          const fr = await searchCards(q, 'fr', 18);
+          const en = fr.length < 6 ? await searchCards(q, 'en', 18) : [];
+          const list = [...fr.map((c) => ({ ...c, lang: 'fr' as const, score: 0 })), ...en.map((c) => ({ ...c, lang: 'en' as const, score: 0 }))].slice(0, 24);
+          results.replaceChildren(...(list.length ? list.map((c) => candidateTile(c, true)) : [el('p', { class: 'muted' }, ['Aucune carte avec ce nom. Vérifie l’orthographe ou essaie le nom anglais.'])]));
+        } catch {
+          results.replaceChildren(status('Impossible de joindre la base de cartes. Réessaie dans un instant.', false));
+        }
+      });
+      return el('div', { class: 'panel mf' }, [
+        el('p', { class: 'mf-lead' }, [el('strong', {}, [lead]), ' Tape le nom écrit en haut de ta carte, puis touche la bonne image.']),
+        form,
+        results,
+      ]);
     }
 
     async function search(name: string, numberText: string) {
@@ -333,12 +365,7 @@ import { CONDITIONS } from '../lib/condition';
         const list = await findCandidates({ name, number, total, ...lastReading });
         candState.replaceChildren();
         if (!list.length) {
-          candState.replaceChildren(
-            el('div', { class: 'panel' }, [
-              el('p', {}, ['Aucune carte trouvée.']),
-              el('p', { class: 'muted small' }, ['Corrige le nom ou le numéro ci-dessus, ou recommence avec plus de lumière.']),
-            ]),
-          );
+          candState.replaceChildren(manualFinder(name, 'Aucune carte trouvée avec cette lecture.'));
           return;
         }
         if (list[0].score >= 0.85) {
@@ -346,7 +373,17 @@ import { CONDITIONS } from '../lib/condition';
           if (!numIn.value && number) numIn.value = number;
         }
         candTitle.hidden = candNote.hidden = false;
-        cand.replaceChildren(...list.map(candidateTile));
+        candTitle.textContent = list.length > 1 ? `Est-ce une de ces ${Math.min(3, list.length)} cartes ?` : 'Est-ce cette carte ?';
+        const top = list.slice(0, 3).map((c) => candidateTile(c));
+        const rest = list.slice(3);
+        cand.replaceChildren(...top);
+        if (rest.length) {
+          candState.append(el('details', { class: 'more-cand' }, [
+            el('summary', {}, [`Voir ${rest.length} autre${rest.length > 1 ? 's' : ''} possibilité${rest.length > 1 ? 's' : ''}`]),
+            el('div', { class: 'grid' }, rest.map((c) => candidateTile(c))),
+          ]));
+        }
+        candState.append(manualFinder(list[0].score >= 0.6 ? list[0].name : name, list[0].score >= 0.6 ? 'Aucune n’est la bonne ?' : 'Lecture incertaine.'));
         // Correspondance nette : on propose directement l'ajout de la meilleure carte.
         if (list[0].score >= 0.85 && (list.length === 1 || list[0].score - list[1].score >= 0.08)) openConfirm(list[0]);
       } catch {
@@ -372,18 +409,13 @@ import { CONDITIONS } from '../lib/condition';
         numIn.value = r.number ? `${r.number}${r.total ? `/${r.total}` : ''}` : '';
         hpLine.textContent = r.hp ? `PV lus : ${r.hp}` : '';
         if (!r.name && !r.number) {
-          candState.replaceChildren(
-            el('div', { class: 'panel' }, [
-              el('p', {}, ["Je n'arrive pas à lire la carte."]),
-              el('p', { class: 'muted small' }, ['Rapproche-toi pour que la carte remplisse le cadre, évite les reflets, ou tape le nom ci-dessus.']),
-            ]),
-          );
+          candState.replaceChildren(manualFinder('', 'Je n’arrive pas à lire la carte. Rapproche-toi et évite les reflets, ou cherche-la toi-même.'));
           return;
         }
         await search(r.name, numIn.value);
       } catch {
         progress.hidden = true;
-        candState.replaceChildren(status("Le scanner n'a pas pu démarrer. Tape le nom à la place.", false));
+        candState.replaceChildren(manualFinder(nameIn.value, 'Le scanner n’a pas pu lire la photo.'));
       } finally {
         busy = false;
         shootBtn.disabled = false;
@@ -924,6 +956,13 @@ import { CONDITIONS } from '../lib/condition';
     .h-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
     .h-head h2 { margin: 0; font-size: 1.3rem; }
     .link-btn { border: 0; background: none; color: var(--muted); cursor: pointer; text-decoration: underline; font: inherit; }
+    .candidates :global(.more-cand) { margin: 14px 0; }
+    .candidates :global(.more-cand summary) { cursor: pointer; font-weight: 700; color: var(--cyan); padding: 6px 0; }
+    .candidates :global(.more-cand .grid) { margin-top: 10px; }
+    .candidates :global(.mf) { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .candidates :global(.mf-lead) { margin: 0; }
+    .candidates :global(.mf-form) { display: flex; gap: 10px; flex-wrap: wrap; }
+    .candidates :global(.mf-form input) { flex: 1 1 240px; }
     .h-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
     .h-strip :global(.h-item) { flex: 0 0 96px; display: flex; flex-direction: column; gap: 6px; border: 0; background: none; color: var(--text); cursor: pointer; padding: 0; text-align: left; scroll-snap-align: start; font: inherit; }
     .h-strip :global(.h-item img), .h-strip :global(.h-ph) { width: 96px; aspect-ratio: 245 / 342; border-radius: 6px; object-fit: cover; background: var(--surface-2); display: block; transition: transform 0.2s; }
