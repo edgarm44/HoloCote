@@ -338,7 +338,7 @@ html[data-event] .panel, html[data-event] .tile { border-color: color-mix(in srg
 html[data-event] .btn-primary { box-shadow: 0 0 22px color-mix(in srgb, var(--ev1) 35%, transparent); }
 @keyframes ev-shine { to { background-position: -200% 0; } }
 
-.ev-ribbon { position: relative; z-index: 18; display: flex; align-items: stretch; gap: 8px; max-width: 1180px; margin: 10px auto 0; padding: 0 16px; }
+.ev-ribbon { position: relative; z-index: 18; display: flex; align-items: stretch; gap: 8px; max-width: 1180px; width: 100%; min-width: 0; box-sizing: border-box; overflow: hidden; margin: 10px auto 0; padding: 0 16px; }
 .ev-ribbon[hidden] { display: none; }
 .evr-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-radius: 14px; text-decoration: none; color: var(--text);
   background: linear-gradient(110deg, color-mix(in srgb, var(--ev3) 90%, #000), color-mix(in srgb, var(--ev2) 35%, transparent) 50%, color-mix(in srgb, var(--ev3) 90%, #000)); background-size: 220% 100%;
@@ -351,7 +351,16 @@ html[data-event] .btn-primary { box-shadow: 0 0 22px color-mix(in srgb, var(--ev
 .ev-ribbon.here .evr-go { display: none; }
 .evr-fx { flex: 0 0 auto; padding: 0 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
 .evr-fx[aria-pressed='true'] { color: var(--ev1); border-color: color-mix(in srgb, var(--ev1) 50%, transparent); }
-@media (max-width: 720px) { .evr-txt { white-space: normal; font-size: 0.82rem; } .evr-go { display: none; } .ev-ribbon { margin-top: 8px; } }
+@media (max-width: 720px) {
+  .ev-ribbon { margin-top: 8px; gap: 6px; }
+  .evr-main { padding: 8px 10px; gap: 8px; }
+  .evr-tag { padding: 2px 8px; font-size: 0.65rem; }
+  .evr-txt { white-space: nowrap; font-size: 0.8rem; }
+  .evr-go { display: none; }
+  .evr-fx { padding: 0 10px; font-size: 0; width: 40px; position: relative; }
+  .evr-fx::before { content: '✦'; font-size: 1rem; }
+  .evr-fx[aria-pressed='false']::after { content: ''; position: absolute; left: 10px; right: 10px; top: 50%; height: 2px; background: currentColor; transform: rotate(-35deg); }
+}
 
 /* Particules qui tombent depuis les onglets */
 .ev-fx { position: fixed; left: 0; right: 0; top: 56px; bottom: 0; z-index: 15; pointer-events: none; overflow: hidden; }

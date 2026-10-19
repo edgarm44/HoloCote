@@ -55,12 +55,12 @@ import Base from '../layouts/Base.astro';
   <p class="notice">Chances pour la dernière carte d'un booster événement : 2 % carte exceptionnelle, 8 % carte « chasse », 25 % rare (boosters d'époque : 12 % holo, 25 % rare). Simulation de jeu : les boosters sont virtuels, gratuits, sans achat ni gain réel, et ces taux ne sont pas les taux officiels.</p>
 
   <script>
-    import { activeEvent, nextEvent, THEMES, EVENT_BOOSTERS, eventPacks, packsLeft, bonusTickets, bonusPacks, openEventPack, updatePack, fmtDuration, themeOf, isEventDay, type EventPack, type EventTheme } from '../lib/events';
+    import { activeEvent, nextEvent, EVENT_BOOSTERS, eventPacks, packsLeft, bonusTickets, bonusPacks, openEventPack, updatePack, fmtDuration, themeOf, isEventDay, type EventPack, type EventTheme } from '../lib/events';
     import { loadPulled, hitLevel, type Pulled } from '../lib/booster';
     import { addItem, hasCard } from '../lib/collection';
     import { formatPrice } from '../lib/tcgdex';
     import { todayNumber } from '../lib/mystery';
-    import { el, holoCard, toast, url, status } from '../lib/ui';
+    import { el, holoCard, toast, status } from '../lib/ui';
 
     const $ = (id: string) => document.getElementById(id)!;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

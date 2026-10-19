@@ -386,7 +386,7 @@ const TOOLS = [
     .evb-packs :global(i.used) { opacity: 0.25; animation: none; }
     @keyframes pack-bob { 50% { transform: translateY(-5px) rotate(-4deg); } }
     .evb-cta { flex: 0 0 auto; padding: 10px 16px; border-radius: 14px; background: #fff; color: #0a0812; font-weight: 800; }
-    @media (max-width: 720px) { .ev-band { flex-wrap: wrap; } .evb-packs { display: none; } .evb-cta { width: 100%; text-align: center; } }
+    @media (max-width: 720px) { .ev-band { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 16px; } .evb-main { width: 100%; } .evb-packs { display: none; } .evb-cta { width: 100%; text-align: center; } }
 
     /* Apparitions */
     [data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(.2,.8,.2,1); }

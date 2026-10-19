@@ -164,7 +164,9 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
           const left = ev ? packsLeft(ev) : 5;
           document.getElementById('evr-tag')!.textContent = ev ? (ev.lastDay ? 'Dernier jour' : 'Événement') : 'Aperçu';
           document.getElementById('evr-txt')!.textContent = ev
-            ? `${theme.name} · ${left ? `${left} booster${left > 1 ? 's' : ''} ${theme.setName} à ouvrir` : 'tous tes boosters sont ouverts'} · fin dans ${fmtDuration(ev.endsIn)}`
+            ? (innerWidth < 720
+              ? `${left ? `${left} booster${left > 1 ? 's' : ''} à ouvrir` : 'Boosters ouverts'} · fin ${fmtDuration(ev.endsIn)}`
+              : `${theme.name} · ${left ? `${left} booster${left > 1 ? 's' : ''} ${theme.setName} à ouvrir` : 'tous tes boosters sont ouverts'} · fin dans ${fmtDuration(ev.endsIn)}`)
             : `${theme.name} · aperçu du thème (l'événement a lieu du samedi 1 h au dimanche 23 h)`;
           if (/\/evenement\/?$/.test(location.pathname)) ribbon.classList.add('here');
           // L'accueil a déjà son grand bandeau d'événement.
@@ -193,6 +195,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
           const apply = () => {
             fxBtn.setAttribute('aria-pressed', String(on));
             fxBtn.textContent = on ? 'Animations : oui' : 'Animations : non';
+            fxBtn.setAttribute('aria-label', on ? 'Couper les animations de l’événement' : 'Activer les animations de l’événement');
             root.classList.toggle('ev-still', !on);
             if (on) spawn(); else fxBox.replaceChildren();
           };
