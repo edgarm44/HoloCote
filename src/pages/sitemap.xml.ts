@@ -1,7 +1,7 @@
 // Plan du site pour les moteurs de recherche (pages publiques uniquement).
 import type { APIRoute } from 'astro';
 
-const PAGES = ['', 'recherche/', 'marche/', 'opportunites/', 'scanner/', 'defi/', 'collection/', 'favoris/', 'classement/', 'compte/', 'mentions-legales/', 'confidentialite/'];
+const PAGES = ['', 'recherche/', 'marche/', 'opportunites/', 'scanner/', 'defi/', 'collection/', 'favoris/', 'classement/', 'compte/', 'evenement/', 'boutique/', 'mentions-legales/', 'confidentialite/'];
 
 export const GET: APIRoute = ({ site }) => {
   const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');

@@ -6,24 +6,28 @@ interface Props {
   title: string;
   description?: string;
   noindex?: boolean;
-  active?: 'home' | 'search' | 'market' | 'scanner' | 'favorites' | 'ranking' | 'collection' | 'mystery' | 'deals' | 'account' | 'legal';
+  active?: 'home' | 'search' | 'market' | 'scanner' | 'favorites' | 'ranking' | 'collection' | 'mystery' | 'deals' | 'account' | 'event' | 'shop' | 'legal';
 }
 const { title, description = 'Cote et rareté de tes cartes Pokémon, scanner gratuit, marché du jour et collection privée. Site de fan non officiel.', active, noindex = false } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 // Onglets. « extra » : rangés dans le menu « Plus » de la barre du bas sur téléphone.
+// « dmore » : rangés dans le menu « Plus » sur ordinateur (la barre reste sur une ligne).
 const NAV = [
   { key: 'home', href: '/', label: 'Accueil', icon: '<path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" />' },
   { key: 'search', href: '/recherche/', label: 'Recherche', icon: '<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />' },
   { key: 'market', href: '/marche/', label: 'Marché', icon: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />' },
-  { key: 'deals', href: '/opportunites/', label: 'Opportunités', icon: '<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" />', extra: true },
+  { key: 'deals', href: '/opportunites/', label: 'Opportunités', icon: '<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" />', extra: true, dmore: true },
   { key: 'scanner', href: '/scanner/', label: 'Scanner', icon: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" />' },
   { key: 'collection', href: '/collection/', label: 'Collection', icon: '<rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" />', badge: 'nav-count' },
-  { key: 'favorites', href: '/favoris/', label: 'Favoris', icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />', badge: 'fav-count', extra: true },
-  { key: 'ranking', href: '/classement/', label: 'Classement', icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />', extra: true },
+  { key: 'favorites', href: '/favoris/', label: 'Favoris', icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />', badge: 'fav-count', extra: true, dmore: true },
+  { key: 'ranking', href: '/classement/', label: 'Classement', icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />', extra: true, dmore: true },
   { key: 'account', href: '/compte/', label: 'Compte', icon: '<circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />', badge: 'acc-count', extra: true },
+  { key: 'event', href: '/evenement/', label: 'Événement', icon: '<path d="M12 2l2.4 5.6L20 8.3l-4.3 3.9 1.2 5.8L12 15l-4.9 3 1.2-5.8L4 8.3l5.6-.7z" /><path d="M5 21h14" />', extra: true },
+  { key: 'shop', href: '/boutique/', label: 'Boutique', icon: '<path d="M5 8h14l-1.2 12H6.2z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" />', extra: true, dmore: true },
   { key: 'mystery', href: '/defi/', label: 'Défi', icon: '<rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6v.4M12 16.8v.01" />', extra: true },
 ] as const;
 const extraActive = NAV.some((n) => 'extra' in n && n.extra && n.key === active);
+const dmoreActive = NAV.some((n) => 'dmore' in n && n.dmore && n.key === active);
 const fullTitle = title === 'HoloCote' ? 'HoloCote — la cote de tes cartes Pokémon' : `${title} · HoloCote`;
 const canonical = new URL(Astro.url.pathname.replace(/\/?$/, '/').replace(/\/index\.html\/$/, '/'), Astro.site).href;
 const ogImage = new URL(`${base}/og.png`, Astro.site).href;
@@ -61,13 +65,13 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
         </a>
         <nav aria-label="Navigation principale">
           {NAV.map((n) => (
-            <a href={`${base}${n.href}`} class={'extra' in n && n.extra ? 'x' : undefined} aria-current={active === n.key ? 'page' : undefined}>
+            <a href={`${base}${n.href}`} class={[('extra' in n && n.extra) ? 'x' : '', ('dmore' in n && n.dmore) ? 'dm' : ''].join(' ').trim() || undefined} aria-current={active === n.key ? 'page' : undefined}>
               <svg viewBox="0 0 24 24" aria-hidden="true" set:html={n.icon} /><span class="lbl">{n.label}</span>
               {'badge' in n && n.badge && <span class={`count ${n.badge}`} hidden></span>}
               {n.key === 'favorites' && <span class="alert-dot" hidden title="Alerte de prix"></span>}
             </a>
           ))}
-          <button type="button" class="more-btn" id="more-btn" aria-expanded="false" aria-controls="more-sheet" aria-current={extraActive ? 'page' : undefined}>
+          <button type="button" class={`more-btn ${dmoreActive ? 'd-act' : ''}`} id="more-btn" aria-expanded="false" aria-controls="more-sheet" aria-current={extraActive ? 'page' : undefined}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg><span class="lbl">Plus</span>
             <span class="alert-dot" hidden></span>
           </button>
@@ -75,8 +79,8 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
         <div class="more-sheet" id="more-sheet" hidden>
           <p class="ms-title">Plus d'onglets</p>
           <div class="ms-grid">
-            {NAV.filter((n) => 'extra' in n && n.extra).map((n) => (
-              <a href={`${base}${n.href}`} aria-current={active === n.key ? 'page' : undefined}>
+            {NAV.filter((n) => ('extra' in n && n.extra) || ('dmore' in n && n.dmore)).map((n) => (
+              <a href={`${base}${n.href}`} class={[('extra' in n && n.extra) ? 'm' : '', ('dmore' in n && n.dmore) ? 'd' : ''].join(' ')} aria-current={active === n.key ? 'page' : undefined}>
                 <svg viewBox="0 0 24 24" aria-hidden="true" set:html={n.icon} /><span>{n.label}</span>
                 {'badge' in n && n.badge && <span class={`count ${n.badge}`} hidden></span>}
                 {n.key === 'favorites' && <span class="alert-dot" hidden></span>}
@@ -115,7 +119,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
       <p class="links">
         <a href={`${base}/mentions-legales/`}>Mentions légales</a>
         <a href={`${base}/confidentialite/`}>Confidentialité</a>
-        <span>Données : <a href="https://tcgdex.dev" rel="noopener">TCGdex</a></span>
+        <span>Données : <a href="https://tcgdex.dev" rel="noopener">TCGdex</a>, <a href="https://pokemontcg.io" rel="noopener">pokemontcg.io</a> (cotes Cardmarket et TCGplayer)</span>
       </p>
     </footer>
 
@@ -128,6 +132,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
       import { levelInfo } from '../lib/level';
       import { unlocksAt } from '../lib/avatar';
       import { todayNumber } from '../lib/mystery';
+      import { addCoins } from '../lib/wallet';
       // TCGdex n'a pas toutes les images en français : si une image FR manque, on essaie la version anglaise.
       document.addEventListener('error', (e) => {
         const img = e.target as HTMLImageElement;
@@ -168,6 +173,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
       backdrop.addEventListener('click', () => setMore(false));
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMore(false); });
       window.matchMedia('(min-width: 721px)').addEventListener('change', () => setMore(false));
+      document.addEventListener('click', (e) => { if (!sheet.hidden && !(e.target as HTMLElement).closest('#more-sheet, #more-btn')) setMore(false); });
       refreshFav();
       onFavoritesChange(refreshFav);
 
@@ -250,8 +256,9 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
           let last = 0;
           try { last = Number(localStorage.getItem(LSEEN)) || 0; } catch { /* rien */ }
           if (last && lv.level > last) {
+            addCoins(30 * (lv.level - last), `Niveau ${lv.level} atteint`);
             const un = unlocksAt(lv.level);
-            fresh.push({ icon: String(lv.level), kicker: 'Niveau supérieur', name: `Niveau ${lv.level} : ${lv.title}`, hint: un.length ? `Débloqué : ${un.join(', ')}` : 'Continue comme ça !', href: `${base}compte/` });
+            fresh.push({ icon: String(lv.level), kicker: 'Niveau supérieur', name: `Niveau ${lv.level} : ${lv.title}`, hint: `+${30 * (lv.level - last)} Éclats${un.length ? ` · Débloqué : ${un.join(', ')}` : ''}`, href: `${base}compte/` });
           }
           if (lv.level !== last) { try { localStorage.setItem(LSEEN, String(lv.level)); } catch { /* rien */ } }
           fresh.push(...newlyUnlocked());
@@ -305,6 +312,24 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
         nav a { padding: 8px 6px; font-size: 0.86rem; }
       }
       @media (min-width: 721px) {
+        .bar { position: relative; }
+        nav a.dm { display: none; }
+        .more-btn { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; position: relative; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--muted); font: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer; }
+        .more-btn:hover, .more-btn[aria-expanded='true'] { color: var(--text); background: var(--surface); }
+        .more-btn.d-act { color: var(--text); background: var(--surface-2); }
+        .more-btn svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
+        .more-btn .alert-dot { position: absolute; top: 4px; right: 4px; }
+        .more-sheet:not([hidden]) { display: block; position: absolute; right: 16px; top: calc(100% + 6px); z-index: 40; width: 320px; padding: 12px; border-radius: 18px;
+          background: rgba(16, 13, 30, 0.98); border: 1px solid var(--line); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); animation: sheet-d 0.18s ease-out; }
+        @keyframes sheet-d { from { opacity: 0; transform: translateY(-6px); } }
+        .ms-title { margin: 0 4px 8px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
+        .ms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .ms-grid a { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; text-decoration: none; color: var(--text); font-weight: 700; font-size: 0.9rem; background: var(--surface); border: 1px solid var(--line); }
+        .ms-grid a:hover { border-color: rgba(62, 240, 255, 0.5); }
+        .ms-grid a:not(.d) { display: none; }
+        .ms-grid a[aria-current='page'] { border-color: rgba(62, 240, 255, 0.6); color: var(--cyan); }
+        .ms-grid svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 18px; }
+        .ms-grid .count { margin-left: auto; }
         nav { gap: 0; }
         nav a { flex: 0 0 auto; }
         .bar { flex-wrap: nowrap; }
@@ -381,6 +406,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
         .more-backdrop:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 29; background: rgba(0, 0, 0, 0.5); }
         .ms-title { margin: 0 4px 10px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; }
         .ms-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .ms-grid a:not(.m) { display: none; }
         .ms-grid a { position: relative; display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 16px; text-decoration: none; color: var(--text);
           font-weight: 700; background: var(--surface); border: 1px solid var(--line); }
         .ms-grid a[aria-current='page'] { border-color: rgba(62, 240, 255, 0.6); color: var(--cyan); }

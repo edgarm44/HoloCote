@@ -252,6 +252,7 @@ import Base from '../layouts/Base.astro';
         $('cp-facts').replaceChildren(
           fact('Cours', eur(q.price)),
           fact('Moyenne 30 j', q.avg30 ? eur(q.avg30) : '—'),
+          fact('Sources', q.sources ? `${q.sources} sources recoupées` : 'Cardmarket'),
           fact('Variation 7 j', formatChange(q.change7), changeClass(q.change7)),
           fact('Écart au mois', formatChange(spread), changeClass(spread)),
         );
@@ -372,7 +373,8 @@ import Base from '../layouts/Base.astro';
         indexSeries().then((hs) => { if (hs.length >= 4) { $('index-chart').replaceChildren(sparkline(hs.slice(-90).map((p) => p.price), 320, 70)); $('index-chart').title = `Indice relevé chaque matin depuis ${hs.length} jours`; } });
       }
       const updated = quotes.map((q) => q.updated).filter(Boolean).sort().pop();
-      if (updated) { const age = priceAgeText(updated); $('live-text').textContent = `Cotes du ${formatDate(updated)}`; $('cb-date').textContent = `Cotes Cardmarket du ${formatDate(updated)} · ${age.text}`; }
+      const multi = quotes.filter((q) => q.sources).length;
+      if (updated) { const age = priceAgeText(updated); $('live-text').textContent = `Cotes du ${formatDate(updated)}`; $('cb-date').textContent = multi ? `Cotes multi-sources (Cardmarket et TCGplayer) pour ${multi} cartes · ${age.text}` : `Cotes Cardmarket du ${formatDate(updated)} · ${age.text}`; }
       loadedAt = market.loadedAt;
       $('cb-ago').textContent = agoText();
 

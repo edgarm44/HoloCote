@@ -1,0 +1,475 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Événement" active="event" description="Chaque week-end, un événement HoloCote : 5 boosters d'une extension à thème à ouvrir, et la dernière carte de chacun rejoint ton classeur.">
+  <section class="ev" id="ev" data-decor="vintage">
+    <div class="ev-bg" aria-hidden="true"></div>
+    <div class="ev-decor" id="ev-decor" aria-hidden="true"></div>
+    <div class="ev-hero">
+      <p class="ev-kicker"><span class="live-dot" aria-hidden="true"></span><span id="ev-kicker">Événement du week-end</span></p>
+      <h1 class="ev-title"><span class="ev-big">Booster événement</span><span class="ev-name" id="ev-name">…</span></h1>
+      <p class="ev-tagline" id="ev-tagline"></p>
+      <div class="ev-meta">
+        <div class="ev-count"><strong id="ev-left">5</strong><span id="ev-left-l">boosters à ouvrir</span></div>
+        <div class="ev-timer"><span id="ev-timer-l">Fin dans</span><strong id="ev-timer">--</strong></div>
+        <div class="ev-set"><span>Extension</span><strong id="ev-set">…</strong></div>
+      </div>
+    </div>
+    <div class="shelf" id="shelf" role="list" aria-label="Boosters de l'événement"></div>
+    <p class="shelf-help" id="shelf-help"></p>
+  </section>
+
+  <section class="opening" id="opening" hidden aria-live="polite">
+    <div class="op-head">
+      <h2 id="op-title">Booster 1 / 5</h2>
+      <button type="button" class="btn" id="op-close">Revenir aux boosters</button>
+    </div>
+    <div class="op-cards" id="op-cards"></div>
+    <div class="op-hit">
+      <div class="hit-wrap" id="hit-wrap"></div>
+      <div class="hit-info">
+        <p class="hit-k" id="hit-k">Dernière carte du booster</p>
+        <h3 class="hit-name" id="hit-name">Encore face cachée</h3>
+        <p class="muted small" id="hit-meta">Retourne-la : c'est cette carte que tu peux ranger dans ton classeur.</p>
+        <p class="hit-price" id="hit-price"></p>
+        <div class="hit-actions">
+          <button type="button" class="btn btn-primary" id="hit-claim" hidden>Ranger dans mon classeur</button>
+          <button type="button" class="btn" id="hit-next" hidden>Booster suivant</button>
+        </div>
+        <p class="muted small" id="hit-note"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ev-mine" id="ev-mine" hidden aria-labelledby="mine-h">
+    <h2 id="mine-h">Tes cartes d'événement</h2>
+    <div class="mine-grid" id="mine-grid"></div>
+  </section>
+
+  <section class="ev-cal" aria-labelledby="cal-h">
+    <h2 id="cal-h">Calendrier des événements</h2>
+    <p class="muted">Un nouveau thème chaque week-end. 5 boosters à ouvrir entre samedi 0 h et dimanche minuit : passé ce délai, les boosters non ouverts sont perdus.</p>
+    <ol class="cal" id="cal"></ol>
+  </section>
+
+  <p class="notice">Simulation de jeu : les boosters sont virtuels, gratuits, sans achat ni gain réel. Les chances de tirage sont celles de HoloCote, pas les taux officiels.</p>
+
+  <script>
+    import { activeEvent, nextEvent, THEMES, EVENT_BOOSTERS, eventPacks, packsLeft, bonusTickets, bonusPacks, openEventPack, updatePack, fmtDuration, themeOf, isEventDay, type EventPack, type EventTheme } from '../lib/events';
+    import { loadPulled, hitLevel, type Pulled } from '../lib/booster';
+    import { addItem, hasCard } from '../lib/collection';
+    import { formatPrice } from '../lib/tcgdex';
+    import { todayNumber } from '../lib/mystery';
+    import { el, holoCard, toast, url, status } from '../lib/ui';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, reduced ? 0 : ms));
+    const fmt = (v?: number, u: 'EUR' | 'USD' = 'EUR') => (v === undefined ? '' : formatPrice(v, u));
+
+    let ev = activeEvent();
+    const theme: EventTheme = ev?.theme ?? nextEvent()!.theme;
+    const root = $('ev');
+
+    /* ---------- Décor ---------- */
+    function decor(t: EventTheme) {
+      root.dataset.decor = t.decor;
+      root.style.setProperty('--c1', t.colors[0]);
+      root.style.setProperty('--c2', t.colors[1]);
+      root.style.setProperty('--c3', t.colors[2]);
+      const box = $('ev-decor');
+      const n = reduced ? 8 : 26;
+      const parts: HTMLElement[] = [];
+      for (let i = 0; i < n; i++) {
+        const p = el('span', { class: `dp dp-${t.decor}` });
+        p.style.setProperty('--x', `${Math.round(Math.random() * 100)}%`);
+        p.style.setProperty('--y', `${Math.round(Math.random() * 100)}%`);
+        p.style.setProperty('--d', `${(6 + Math.random() * 9).toFixed(1)}s`);
+        p.style.setProperty('--delay', `${(-Math.random() * 12).toFixed(1)}s`);
+        p.style.setProperty('--s', (0.5 + Math.random() * 1.1).toFixed(2));
+        p.style.setProperty('--r', `${Math.round(Math.random() * 360)}deg`);
+        if (t.decor === 'vintage' && i % 4 === 0) p.textContent = t.year;
+        parts.push(p);
+      }
+      if (t.decor === 'mega' || t.decor === 'prism') for (let i = 0; i < 3; i++) parts.push(el('span', { class: `ring ring-${i}` }));
+      box.replaceChildren(...parts);
+    }
+
+    /* ---------- En-tête et étagère ---------- */
+    function packEl(i: number, state: 'open' | 'done' | 'pending' | 'locked' | 'bonus', p?: EventPack, label?: string): HTMLElement {
+      const b = el(state === 'locked' ? 'div' : 'button', { class: `epack ${state}`, role: 'listitem', ...(state === 'locked' ? {} : { type: 'button' }) }) as HTMLElement;
+      b.style.setProperty('--i', String(i));
+      b.append(
+        el('span', { class: 'ep-foil', 'aria-hidden': 'true' }),
+        el('span', { class: 'ep-top', 'aria-hidden': 'true' }),
+        el('span', { class: 'ep-brand' }, ['HoloCote']),
+        el('span', { class: 'ep-set' }, [theme.setName]),
+        el('span', { class: 'ep-year' }, [theme.year]),
+        el('span', { class: 'ep-n' }, [label ?? (state === 'bonus' ? 'Bonus' : `${i + 1} / ${EVENT_BOOSTERS}`)]),
+      );
+      if (state === 'done' && p?.hitImage) b.append(el('img', { class: 'ep-hit', src: `${p.hitImage}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
+      const cta = { open: 'Ouvrir', done: p?.claimed ? 'Carte rangée' : 'Ouvert', pending: 'À retourner', locked: 'Samedi', bonus: 'Ouvrir' }[state];
+      b.append(el('span', { class: 'ep-cta' }, [cta]));
+      b.setAttribute('aria-label', state === 'locked' ? `Booster ${i + 1}, disponible à l'événement` : `Booster ${i + 1} : ${cta}`);
+      return b;
+    }
+
+    function renderHeader() {
+      ev = activeEvent();
+      $('ev-name').textContent = `${theme.name} · ${theme.setName}`;
+      $('ev-tagline').textContent = theme.tagline;
+      $('ev-set').textContent = `${theme.setName} (${theme.year})`;
+      if (ev) {
+        const left = packsLeft(ev);
+        $('ev-kicker').textContent = ev.lastDay ? 'Dernier jour de l’événement !' : 'Événement en cours';
+        $('ev-left').textContent = String(left);
+        $('ev-left-l').textContent = left > 1 ? 'boosters à ouvrir' : left === 1 ? 'booster à ouvrir' : 'tous ouverts !';
+        $('ev-timer-l').textContent = 'Fin dans';
+        $('ev-timer').textContent = fmtDuration(ev.endsIn);
+      } else {
+        const ne = nextEvent()!;
+        root.classList.add('soon');
+        $('ev-kicker').textContent = 'Prochain événement';
+        $('ev-left').textContent = String(EVENT_BOOSTERS);
+        $('ev-left-l').textContent = 'boosters ce week-end';
+        $('ev-timer-l').textContent = 'Début dans';
+        $('ev-timer').textContent = fmtDuration(ne.startsIn);
+      }
+    }
+
+    function renderShelf() {
+      const items: HTMLElement[] = [];
+      if (ev) {
+        const packs = eventPacks(ev);
+        for (let i = 0; i < EVENT_BOOSTERS; i++) {
+          const p = packs[i];
+          const node = p ? packEl(i, p.revealed ? 'done' : 'pending', p) : packEl(i, 'open');
+          node.addEventListener('click', () => (p ? showPack(p, i, false) : openNew(false)));
+          items.push(node);
+        }
+      } else {
+        for (let i = 0; i < EVENT_BOOSTERS; i++) items.push(packEl(i, 'locked'));
+      }
+      const tickets = bonusTickets();
+      const pendingBonus = bonusPacks().map((p, i) => ({ p, i })).filter((x) => !x.p.revealed);
+      for (const { p, i } of pendingBonus) {
+        const node = packEl(i, 'pending', p, 'Bonus');
+        node.addEventListener('click', () => showPack(p, i, true));
+        items.push(node);
+      }
+      if (tickets > 0) {
+        const node = packEl(0, 'bonus', undefined, `Bonus ×${tickets}`);
+        node.addEventListener('click', () => openNew(true));
+        items.push(node);
+      }
+      $('shelf').replaceChildren(...items);
+      $('shelf-help').textContent = ev
+        ? (packsLeft(ev) ? 'Touche un booster pour l’ouvrir. Tu as jusqu’à dimanche minuit pour ouvrir les 5.' : 'Bravo, tu as ouvert les 5 boosters de l’événement. Rendez-vous le week-end prochain !')
+        : `Les 5 boosters ${theme.setName} s’ouvriront samedi.${tickets ? ' Tes boosters bonus de la boutique, eux, s’ouvrent dès maintenant.' : ' Tu peux acheter des boosters bonus dans la boutique.'}`;
+    }
+
+    /* ---------- Ouverture ---------- */
+    let current: { pack: EventPack; index: number; bonus: boolean; pulled: Pulled[] } | null = null;
+
+    async function openNew(bonus: boolean) {
+      const shelf = $('shelf');
+      shelf.classList.add('busy');
+      const r = await openEventPack(bonus).catch(() => null);
+      shelf.classList.remove('busy');
+      if (!r) { toast('Le booster n’a pas pu être préparé : vérifie ta connexion et réessaie.'); renderAll(); return; }
+      renderAll();
+      await showPack(r.pack, r.index, r.bonus, true);
+    }
+
+    function mini(p: Pulled, i: number) {
+      const c = p.card;
+      const box = el('div', { class: 'oc', style: `--i:${i}` }, [
+        c?.image ? el('img', { src: `${c.image}/low.webp`, alt: c.name, loading: 'lazy', referrerpolicy: 'no-referrer' }) : el('span', { class: 'oc-ph' }, [c?.name ?? 'Carte']),
+        p.value !== undefined ? el('span', { class: 'oc-v' }, [fmt(p.value, p.unit)]) : null,
+      ]);
+      const img = box.querySelector('img');
+      img?.addEventListener('error', () => {
+        if (img.src.includes('/fr/')) { img.src = img.src.replace('/fr/', '/en/'); return; }
+        img.replaceWith(el('span', { class: 'oc-ph' }, [c?.name ?? 'Carte']));
+      });
+      return box;
+    }
+
+    async function showPack(pack: EventPack, index: number, bonus: boolean, fresh = false) {
+      $('opening').hidden = false;
+      $('op-title').textContent = bonus ? 'Booster bonus' : `Booster ${index + 1} / ${EVENT_BOOSTERS}`;
+      $('op-cards').replaceChildren(status('On ouvre le booster…'));
+      $('hit-wrap').replaceChildren();
+      $('opening').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+      const pulled = await loadPulled(pack.cards);
+      current = { pack, index, bonus, pulled };
+      $('op-cards').replaceChildren();
+      for (let i = 0; i < 9; i++) {
+        $('op-cards').append(mini(pulled[i], i));
+        if (fresh) await sleep(110);
+      }
+      if (pack.revealed) renderHit(true); else renderHit(false);
+    }
+
+    function renderHit(revealed: boolean) {
+      if (!current) return;
+      const last = current.pulled[current.pulled.length - 1];
+      const c = last?.card;
+      const wrap = $('hit-wrap');
+      const claim = $('hit-claim') as HTMLButtonElement;
+      const next = $('hit-next') as HTMLButtonElement;
+      if (!revealed) {
+        const back = el('button', { type: 'button', class: 'hit-back' }, [el('span', {}, ['10']), el('small', {}, ['Retourne-moi'])]);
+        back.addEventListener('click', reveal);
+        wrap.className = 'hit-wrap hidden-card';
+        wrap.replaceChildren(back);
+        $('hit-k').textContent = 'Dernière carte du booster';
+        $('hit-name').textContent = 'Encore face cachée';
+        $('hit-meta').textContent = 'Retourne-la : c’est cette carte que tu peux ranger dans ton classeur.';
+        $('hit-price').textContent = '';
+        claim.hidden = true; next.hidden = true; $('hit-note').textContent = '';
+        return;
+      }
+      const lvl = hitLevel(c ?? null);
+      wrap.className = `hit-wrap lvl-${lvl}`;
+      wrap.replaceChildren(holoCard(c?.image, c?.name ?? 'Carte', 'high'));
+      if (lvl >= 2 && !reduced) burst(wrap, lvl);
+      $('hit-k').textContent = ['Dernière carte', 'Belle prise !', 'Superbe carte !', 'Carte exceptionnelle !'][lvl];
+      $('hit-name').textContent = c?.name ?? 'Carte inconnue';
+      $('hit-meta').textContent = [c?.set?.name, c?.rarity].filter(Boolean).join(' · ');
+      $('hit-price').textContent = last?.value !== undefined ? `Cote du jour : ${fmt(last.value, last.unit)}` : '';
+      const owned = !current.pack.claimed && !!c && hasCard(c.id, 'fr');
+      claim.hidden = false;
+      claim.disabled = current.pack.claimed || owned || !c;
+      claim.textContent = current.pack.claimed ? 'Dans ton classeur' : owned ? 'Déjà dans ton classeur' : 'Ranger dans mon classeur';
+      $('hit-note').textContent = owned ? 'Tu as déjà cette carte : chaque carte n’est rangée qu’une fois.' : current.pack.claimed ? 'Rangée en état Near Mint.' : 'La dernière carte de chaque booster événement peut rejoindre ton classeur (état Near Mint).';
+      const more = (ev && packsLeft(ev) > 0) || bonusTickets() > 0;
+      next.hidden = !more;
+    }
+
+    function burst(host: HTMLElement, lvl: number) {
+      const box = el('div', { class: 'burst', 'aria-hidden': 'true' });
+      for (let i = 0; i < (lvl === 3 ? 40 : 24); i++) {
+        const s = el('i');
+        s.style.setProperty('--a', `${Math.random() * 360}deg`);
+        s.style.setProperty('--dist', `${80 + Math.random() * 120}px`);
+        s.style.setProperty('--hue', String(Math.floor(Math.random() * 360)));
+        box.append(s);
+      }
+      host.append(box);
+      setTimeout(() => box.remove(), 1400);
+    }
+
+    let revealing = false;
+    async function reveal() {
+      if (!current || revealing) return;
+      revealing = true;
+      $('hit-wrap').classList.add('flipping');
+      await sleep(420);
+      current.pack.revealed = true;
+      const c = current.pulled.at(-1)?.card;
+      updatePack(current.index, current.bonus, { revealed: true, hitName: c?.name, hitImage: c?.image });
+      current.pack.hitName = c?.name; current.pack.hitImage = c?.image;
+      renderHit(true);
+      if (hitLevel(c ?? null) >= 2) navigator.vibrate?.([30, 40, 60]);
+      renderShelf();
+      revealing = false;
+    }
+
+    $('hit-claim').addEventListener('click', () => {
+      if (!current || current.pack.claimed) return;
+      const c = current.pulled.at(-1)?.card;
+      if (!c) return;
+      if (!addItem({ cardId: c.id, lang: 'fr', name: c.name, image: c.image, setName: c.set?.name, rarity: c.rarity, condition: 'NM', finish: 'normal', quantity: 1 })) { toast('Cette carte est déjà dans ton classeur.'); renderHit(true); return; }
+      current.pack.claimed = true;
+      updatePack(current.index, current.bonus, { claimed: true });
+      toast(`${c.name} rejoint ton classeur !`);
+      renderHit(true);
+      renderAll();
+    });
+    $('hit-next').addEventListener('click', () => openNew(!(ev && packsLeft(ev) > 0)));
+    $('op-close').addEventListener('click', () => { $('opening').hidden = true; current = null; $('ev').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' }); });
+
+    /* ---------- Mes cartes et calendrier ---------- */
+    function renderMine() {
+      const all = [...eventPacks(ev), ...bonusPacks()].filter((p) => p.revealed && p.hitName);
+      $('ev-mine').hidden = !all.length;
+      $('mine-grid').replaceChildren(...all.slice(-15).reverse().map((p) => el('div', { class: `mine ${p.claimed ? 'claimed' : ''}` }, [
+        holoCard(p.hitImage, p.hitName ?? 'Carte'),
+        el('span', { class: 'mine-n' }, [p.hitName ?? '']),
+        el('span', { class: 'mine-s' }, [p.claimed ? 'Rangée' : p.bonus ? 'Booster bonus' : 'Non rangée']),
+      ])));
+    }
+    function renderCal() {
+      const n = todayNumber();
+      const items: HTMLElement[] = [];
+      for (let k = 0, found = 0; k < 50 && found < 6; k++) {
+        const d = n + k;
+        if (!isEventDay(d) || (isEventDay(d - 1) && k > 0)) continue;
+        found++;
+        const t = themeOf(d);
+        const date = new Date(Date.now() + k * 864e5);
+        const cur = ev && k === 0;
+        items.push(el('li', { class: `cal-i ${cur ? 'now' : ''}`, style: `--c1:${t.colors[0]};--c2:${t.colors[1]}` }, [
+          el('span', { class: 'cal-d' }, [cur ? 'En cours' : date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })]),
+          el('strong', {}, [t.name]),
+          el('span', { class: 'muted small' }, [`${t.setName} (${t.year})`]),
+        ]));
+      }
+      $('cal').replaceChildren(...items);
+    }
+
+    function renderAll() { renderHeader(); renderShelf(); renderMine(); }
+    decor(theme);
+    renderAll();
+    renderCal();
+    setInterval(renderHeader, 30000);
+    // Reprend un booster ouvert mais pas encore retourné.
+    if (location.hash === '#ouvrir' && ev && packsLeft(ev) > 0) openNew(false);
+  </script>
+
+  <style>
+    .ev { --c1: #ffd25a; --c2: #ff8a3d; --c3: #2a1a08; position: relative; overflow: hidden; margin: 16px 0 28px; padding: clamp(24px, 5vw, 48px); border-radius: 32px;
+      border: 1px solid color-mix(in srgb, var(--c1) 50%, transparent); isolation: isolate; min-height: 520px; }
+    .ev-bg { position: absolute; inset: 0; z-index: -2; background:
+      radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--c1) 35%, transparent), transparent 45%),
+      radial-gradient(circle at 85% 90%, color-mix(in srgb, var(--c2) 35%, transparent), transparent 50%),
+      linear-gradient(160deg, var(--c3), #07060d 80%); }
+    .ev[data-decor='vintage'] .ev-bg { background:
+      repeating-linear-gradient(0deg, rgba(255, 230, 180, 0.03) 0 2px, transparent 2px 6px),
+      radial-gradient(circle at 20% 10%, rgba(255, 210, 90, 0.35), transparent 45%),
+      radial-gradient(circle at 80% 100%, rgba(255, 138, 61, 0.3), transparent 50%),
+      linear-gradient(160deg, #3a250c, #0d0904 85%); }
+    .ev-decor { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+    .ev-hero { position: relative; max-width: 760px; }
+    .ev-kicker { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 6px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); border: 1px solid color-mix(in srgb, var(--c1) 60%, transparent);
+      color: var(--c1); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.78rem; }
+    .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c1); box-shadow: 0 0 12px var(--c1); animation: live 1.4s ease-in-out infinite; }
+    .ev.soon .live-dot { animation: none; opacity: 0.6; }
+    @keyframes live { 50% { transform: scale(1.6); opacity: 0.5; } }
+    .ev-title { margin: 0 0 12px; line-height: 0.95; }
+    .ev-big { display: block; font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; font-size: clamp(2.6rem, 9vw, 5.4rem); text-transform: uppercase;
+      background: linear-gradient(100deg, var(--c1), #fff 40%, var(--c2) 60%, var(--c1)); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+      animation: shine 5s linear infinite; filter: drop-shadow(0 4px 30px color-mix(in srgb, var(--c1) 45%, transparent)); }
+    @keyframes shine { to { background-position: -250% 0; } }
+    .ev-name { display: block; margin-top: 10px; font-family: var(--font-display); font-size: clamp(1.3rem, 3.6vw, 2rem); color: var(--text); }
+    .ev-tagline { margin: 0 0 22px; color: #e9e4ff; font-size: 1.05rem; max-width: 40em; }
+    .ev-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+    .ev-meta > div { display: flex; flex-direction: column; gap: 2px; padding: 12px 18px; border-radius: 18px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(6px); }
+    .ev-meta span { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+    .ev-meta strong { font-family: var(--font-display); font-size: 1.35rem; }
+    .ev-count strong { font-size: 2.4rem; line-height: 1; color: var(--c1); }
+
+    /* Étagère de boosters */
+    .shelf { position: relative; display: flex; gap: clamp(10px, 2vw, 22px); flex-wrap: wrap; margin-top: 34px; perspective: 900px; }
+    .shelf.busy { pointer-events: none; opacity: 0.7; }
+    .shelf :global(.epack) { position: relative; width: clamp(118px, 15vw, 156px); aspect-ratio: 5 / 8; border-radius: 16px; border: 0; padding: 0; cursor: pointer; overflow: hidden; color: #fff;
+      background: linear-gradient(160deg, var(--c1), var(--c2) 55%, var(--c3)); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: inherit; text-align: center;
+      animation: pack-in 0.6s cubic-bezier(.2,.9,.3,1.3) both, pack-float 4s ease-in-out infinite; animation-delay: calc(var(--i) * 0.08s), calc(var(--i) * -0.6s); transition: transform 0.25s; }
+    .shelf :global(.epack:hover), .shelf :global(.epack:focus-visible) { transform: translateY(-10px) rotate(-2deg) scale(1.04); }
+    .shelf :global(.epack:focus-visible) { outline: 3px solid #fff; outline-offset: 4px; }
+    @keyframes pack-in { from { opacity: 0; transform: translateY(40px) rotateX(30deg); } }
+    @keyframes pack-float { 50% { translate: 0 -6px; } }
+    .shelf :global(.ep-foil) { position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.45) 45%, transparent 60%); background-size: 250% 100%; animation: shine 3.5s linear infinite; mix-blend-mode: overlay; }
+    .shelf :global(.ep-top) { position: absolute; top: 0; left: 0; right: 0; height: 12%; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0 6px, transparent 6px 12px); }
+    .shelf :global(.ep-brand) { position: relative; font-family: var(--font-display); font-weight: 800; font-size: 0.95rem; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+    .shelf :global(.ep-set) { position: relative; font-weight: 800; font-size: 0.82rem; padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.35); max-width: 90%; }
+    .shelf :global(.ep-year) { position: relative; font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; opacity: 0.85; }
+    .shelf :global(.ep-n) { position: relative; font-size: 0.72rem; font-weight: 700; opacity: 0.9; }
+    .shelf :global(.ep-cta) { position: absolute; bottom: 10px; left: 10px; right: 10px; padding: 6px 0; border-radius: 10px; background: rgba(0, 0, 0, 0.55); font-weight: 800; font-size: 0.85rem; }
+    .shelf :global(.epack.open .ep-cta), .shelf :global(.epack.bonus .ep-cta) { background: #fff; color: #0a0812; animation: cta-pulse 1.6s ease-in-out infinite; }
+    @keyframes cta-pulse { 50% { box-shadow: 0 0 18px #fff; } }
+    .shelf :global(.epack.pending) { outline: 3px solid var(--c1); }
+    .shelf :global(.epack.pending .ep-cta) { background: var(--c1); color: #0a0812; }
+    .shelf :global(.epack.done) { filter: saturate(0.5) brightness(0.75); animation: pack-in 0.6s both; }
+    .shelf :global(.epack.done:hover) { filter: none; }
+    .shelf :global(.ep-hit) { position: absolute; inset: 14% 14% 24%; width: 72%; height: 62%; object-fit: cover; border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6); }
+    .shelf :global(.epack.locked) { cursor: default; filter: grayscale(0.6) brightness(0.6); animation: pack-in 0.6s both; animation-delay: calc(var(--i) * 0.08s); }
+    .shelf :global(.epack.bonus) { background: linear-gradient(160deg, #fff3b0, #ffd25a 50%, #b67d10); color: #2a1a08; }
+    .shelf-help { position: relative; margin: 16px 0 0; color: #e9e4ff; }
+
+    /* Décors */
+    .ev-decor :global(.dp) { position: absolute; left: var(--x); top: var(--y); transform: scale(var(--s)) rotate(var(--r)); }
+    .ev-decor :global(.dp-vintage) { width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(#fff3b0, #ffd25a 40%, transparent 70%); animation: twinkle var(--d) ease-in-out infinite var(--delay); }
+    .ev-decor :global(.dp-vintage:not(:empty)) { width: auto; height: auto; padding: 6px 12px; border-radius: 10px; background: none; border: 2px dashed rgba(255, 210, 90, 0.35); color: rgba(255, 210, 90, 0.45);
+      font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; animation: drift var(--d) ease-in-out infinite alternate var(--delay); }
+    .ev-decor :global(.dp-jungle) { width: 26px; height: 14px; border-radius: 0 100% 0 100%; background: linear-gradient(135deg, #3dffa8, #14a37f); opacity: 0.55; top: -10%; animation: leaf var(--d) linear infinite var(--delay); }
+    .ev-decor :global(.dp-fossil) { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe2a8, #ff9a2e 55%, rgba(201, 123, 42, 0.2)); opacity: 0.55; top: 105%; animation: rise var(--d) ease-in infinite var(--delay); }
+    .ev-decor :global(.dp-mega) { width: 4px; height: 40px; border-radius: 2px; background: linear-gradient(transparent, #ff4fd8, transparent); opacity: 0.6; animation: streak var(--d) linear infinite var(--delay); }
+    .ev-decor :global(.dp-kanto) { width: 10px; height: 10px; background: #ffd25a; clip-path: polygon(50% 0, 61% 35%, 100% 35%, 68% 57%, 79% 100%, 50% 72%, 21% 100%, 32% 57%, 0 35%, 39% 35%); opacity: 0.7; animation: twinkle var(--d) ease-in-out infinite var(--delay); }
+    .ev-decor :global(.dp-kanto:nth-child(3n)) { background: #ff4f6d; }
+    .ev-decor :global(.dp-prism) { width: 8px; height: 8px; transform: rotate(45deg) scale(var(--s)); background: linear-gradient(135deg, #3ef0ff, #ff4fd8, #ffd25a); opacity: 0.75; animation: twinkle var(--d) ease-in-out infinite var(--delay); }
+    .ev-decor :global(.ring) { position: absolute; left: 70%; top: 40%; width: 220px; height: 220px; margin: -110px; border-radius: 50%; border: 3px solid var(--c1); opacity: 0; animation: ring 4.5s ease-out infinite; }
+    .ev-decor :global(.ring-1) { animation-delay: 1.5s; border-color: var(--c2); }
+    .ev-decor :global(.ring-2) { animation-delay: 3s; }
+    .ev[data-decor='prism'] .ev-decor::before { content: ''; position: absolute; inset: -50%; background: conic-gradient(from 0deg, transparent, rgba(62, 240, 255, 0.12), transparent 20%, rgba(255, 79, 216, 0.12), transparent 40%, rgba(255, 210, 90, 0.1), transparent 60%); animation: spin 20s linear infinite; }
+    .ev[data-decor='jungle'] .ev-decor::after { content: ''; position: absolute; right: -40px; top: -40px; width: 260px; height: 260px; border-radius: 0 100% 0 100%; background: linear-gradient(135deg, rgba(61, 255, 168, 0.25), rgba(20, 163, 127, 0.05)); transform: rotate(20deg); }
+    @keyframes twinkle { 50% { opacity: 0.15; transform: scale(calc(var(--s) * 1.6)) rotate(var(--r)); } }
+    @keyframes drift { to { transform: translate(30px, -20px) rotate(calc(var(--r) + 25deg)) scale(var(--s)); } }
+    @keyframes leaf { to { top: 110%; transform: translateX(80px) rotate(calc(var(--r) + 540deg)) scale(var(--s)); } }
+    @keyframes rise { to { top: -10%; transform: translateX(-30px) scale(var(--s)); } }
+    @keyframes streak { from { transform: translateY(-60vh) rotate(20deg); } to { transform: translateY(60vh) rotate(20deg); } }
+    @keyframes ring { 0% { transform: scale(0.3); opacity: 0.8; } 100% { transform: scale(2.4); opacity: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Ouverture */
+    .opening { margin-bottom: 28px; padding: 24px; border-radius: 24px; border: 1px solid var(--line); background: var(--surface); scroll-margin-top: 80px; }
+    .op-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .op-head h2 { margin: 0; }
+    .op-cards { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; margin-bottom: 22px; }
+    @media (max-width: 900px) { .op-cards { grid-template-columns: repeat(5, 1fr); } }
+    .op-cards :global(.oc) { position: relative; aspect-ratio: 245 / 342; border-radius: 6px; overflow: hidden; background: var(--surface-2); animation: card-in 0.45s cubic-bezier(.2,.9,.3,1.3) both; }
+    .op-cards :global(.oc img) { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .op-cards :global(.oc-ph) { display: grid; place-items: center; height: 100%; padding: 4px; font-size: 0.7rem; text-align: center; }
+    .op-cards :global(.oc-v) { position: absolute; left: 3px; right: 3px; bottom: 3px; padding: 1px 0; border-radius: 4px; background: rgba(0, 0, 0, 0.7); font-size: 0.66rem; font-weight: 700; text-align: center; color: var(--gold); }
+    @keyframes card-in { from { opacity: 0; transform: translateY(20px) rotateY(80deg); } }
+    .op-hit { display: grid; grid-template-columns: minmax(200px, 300px) 1fr; gap: 28px; align-items: center; }
+    @media (max-width: 720px) { .op-hit { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+    .hit-wrap { position: relative; width: 100%; max-width: 300px; aspect-ratio: 245 / 342; }
+    .hit-wrap :global(.hit-back) { width: 100%; height: 100%; border-radius: 14px; border: 3px solid var(--gold); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 8px, transparent 8px 16px), linear-gradient(160deg, #2a1f55, #120f26); color: var(--gold); font: inherit;
+      animation: back-glow 1.8s ease-in-out infinite; }
+    .hit-wrap :global(.hit-back span) { font-family: var(--font-display); font-size: 4rem; font-weight: 800; line-height: 1; }
+    .hit-wrap :global(.hit-back small) { font-weight: 800; color: var(--text); }
+    @keyframes back-glow { 50% { box-shadow: 0 0 40px rgba(255, 210, 90, 0.55); transform: translateY(-4px); } }
+    .hit-wrap:global(.flipping) { animation: flip 0.42s ease-in; }
+    @keyframes flip { to { transform: rotateY(90deg) scale(1.05); } }
+    .hit-wrap:global(.lvl-1) { filter: drop-shadow(0 0 16px rgba(62, 240, 255, 0.5)); }
+    .hit-wrap:global(.lvl-2) { filter: drop-shadow(0 0 26px rgba(255, 79, 216, 0.65)); animation: pop 0.6s ease-out; }
+    .hit-wrap:global(.lvl-3) { filter: drop-shadow(0 0 36px rgba(255, 210, 90, 0.85)); animation: pop 0.8s ease-out; }
+    @keyframes pop { 0% { transform: scale(0.7) rotateY(-90deg); } 60% { transform: scale(1.08); } 100% { transform: none; } }
+    .hit-wrap :global(.burst) { position: absolute; left: 50%; top: 50%; pointer-events: none; }
+    .hit-wrap :global(.burst i) { position: absolute; width: 8px; height: 8px; border-radius: 2px; background: hsl(var(--hue) 95% 65%); animation: burst 1.3s ease-out forwards; }
+    @keyframes burst { from { transform: rotate(var(--a)) translateX(0); opacity: 1; } to { transform: rotate(var(--a)) translateX(var(--dist)) rotate(200deg); opacity: 0; } }
+    .hit-k { margin: 0 0 4px; color: var(--gold); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.85rem; }
+    .hit-name { margin: 0 0 6px; font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    .hit-info p { margin: 0 0 8px; }
+    .hit-price { font-weight: 800; }
+    .hit-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 8px; }
+    @media (max-width: 720px) { .hit-actions { justify-content: center; } }
+    .hit-actions [hidden] { display: none; }
+
+    .ev-mine, .ev-cal { margin-bottom: 28px; }
+    .mine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; }
+    .mine-grid :global(.mine) { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .mine-grid :global(.mine-n) { font-weight: 700; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mine-grid :global(.mine-s) { font-size: 0.75rem; color: var(--muted); }
+    .mine-grid :global(.mine.claimed .mine-s) { color: var(--up); }
+    .cal { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+    .cal :global(.cal-i) { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; border: 1px solid var(--line);
+      background: linear-gradient(150deg, color-mix(in srgb, var(--c1) 18%, transparent), color-mix(in srgb, var(--c2) 8%, transparent)), var(--surface); }
+    .cal :global(.cal-i.now) { border-color: var(--c1); box-shadow: 0 0 20px color-mix(in srgb, var(--c1) 35%, transparent); }
+    .cal :global(.cal-d) { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c1); }
+
+    @media (max-width: 720px) {
+      .ev { padding: 22px 16px; border-radius: 24px; }
+      .shelf { justify-content: center; }
+      .shelf :global(.epack) { width: calc((100% - 30px) / 3); min-width: 96px; }
+      .opening { padding: 16px 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ev :global(*), .ev *, .opening :global(*) { animation: none !important; }
+    }
+  </style>
+</Base>

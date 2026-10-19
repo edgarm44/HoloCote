@@ -16,6 +16,7 @@ import { mascotSvg } from '../lib/mascot';
     <a href="#mystere" class="mode" data-mode="mystery" aria-current="page"><span class="m-name">Carte mystère</span><span class="m-st" id="st-mystery">à jouer</span></a>
     <a href="#booster" class="mode" data-mode="booster"><span class="m-name">Booster du jour</span><span class="m-st" id="st-booster">à ouvrir</span></a>
     <a href="#duel" class="mode" data-mode="duel"><span class="m-name">Duel du jour</span><span class="m-st" id="st-duel">à jouer</span></a>
+    <a href="../evenement/" class="mode mode-event" id="mode-event-link" hidden><span class="m-name">Événement</span><span class="m-st" id="st-event"></span></a>
     <a href="#entrainement" class="mode mode-train" data-mode="train"><span class="m-name">Entraînement</span><span class="m-st">illimité, sans gain</span></a>
   </nav>
 
@@ -138,10 +139,11 @@ import { mascotSvg } from '../lib/mascot';
         <p class="muted" id="bx-lead">Aujourd'hui : <strong id="bx-set">…</strong>. Un booster gratuit par jour, dix cartes. La dixième est pour ton classeur.</p>
         <p class="muted" id="bx-lead-train" hidden>Une extension tirée au hasard à chaque ouverture. Entraînement : aucune carte n'est gagnée.</p>
       </div>
-      <div class="bx-event" id="bx-event" hidden>
+      <a class="bx-event" id="bx-event" href="../evenement/" hidden>
         <span class="ev-tag">Événement</span>
-        <div><strong id="bx-event-name">Week-end rétro</strong><p id="bx-event-t"></p></div>
-      </div>
+        <div><strong id="bx-event-name">Événement</strong><p id="bx-event-t"></p></div>
+        <span class="ev-go">Ouvrir</span>
+      </a>
       <p class="bx-next-ev muted small" id="bx-next-ev" hidden></p>
       <p class="bx-boost" id="bx-boost" hidden><strong>Bonus :</strong> <span id="bx-boost-t"></span></p>
       <div id="bx-state" aria-live="polite"></div>
@@ -237,6 +239,7 @@ import { mascotSvg } from '../lib/mascot';
   </p>
 
   <script>
+    import { mysteryExtra } from '../lib/wallet';
     import { POOL_NAMES, MAX_TRIES, todayNumber, msToMidnight, dayCandidates, cardById, randomCard, species, isRight, typeFr, getDay, saveDay, stats, type MysteryCard, type DayRecord } from '../lib/mystery';
     import { suggestNames } from '../lib/smartsearch';
     import { normalize } from '../lib/cardindex';
@@ -255,6 +258,7 @@ import { mascotSvg } from '../lib/mascot';
     ];
 
     let mode: 'daily' | 'train' = 'daily';
+    const maxTries = () => MAX_TRIES + (mode === 'daily' ? mysteryExtra() : 0);
     let mc: MysteryCard;
     let card: Card | null = null;
     let rec: DayRecord = { guesses: [], won: false, done: false };
@@ -284,14 +288,14 @@ import { mascotSvg } from '../lib/mascot';
       $('stage').classList.toggle('won', over && rec.won);
       $('stage').classList.toggle('lost', over && !rec.won);
 
-      $('pips').replaceChildren(...Array.from({ length: MAX_TRIES }, (_, i) => {
+      $('pips').replaceChildren(...Array.from({ length: maxTries() }, (_, i) => {
         const g = rec.guesses[i];
         const cls = g === undefined ? (i === used && !over ? 'now' : '') : isRight(g, mc.answer) ? 'ok' : 'ko';
         return el('span', { class: `pip ${cls}` });
       }));
       $('tries').textContent = over
-        ? rec.won ? `Trouvé en ${used} essai${used > 1 ? 's' : ''}` : 'Six essais, pas de chance'
-        : `Essai ${used + 1} sur ${MAX_TRIES}`;
+        ? rec.won ? `Trouvé en ${used} essai${used > 1 ? 's' : ''}` : `${maxTries()} essais, pas de chance`
+        : `Essai ${used + 1} sur ${maxTries()}${maxTries() > MAX_TRIES ? ' (seconde chance)' : ''}`;
 
       $('guesses').replaceChildren(...rec.guesses.map((g, i) => {
         const ok = isRight(g, mc.answer);
@@ -388,7 +392,7 @@ import { mascotSvg } from '../lib/mascot';
       rec.cardId = mc.id;
       const ok = !!g && isRight(g, mc.answer);
       if (ok) rec.won = true;
-      if (ok || rec.guesses.length >= MAX_TRIES) rec.done = true;
+      if (ok || rec.guesses.length >= maxTries()) rec.done = true;
       if (mode === 'daily') { saveDay(today, rec); window.dispatchEvent(new CustomEvent('defi:changed')); }
       ($('guess') as HTMLInputElement).value = '';
       closeList();
@@ -558,9 +562,11 @@ import { mascotSvg } from '../lib/mascot';
   </script>
 
   <script>
-    import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, eventOfDay, nextEvent, BOOSTER_SETS, VINTAGE, VINTAGE_RATES, VINTAGE_BOOST, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
+    import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, VINTAGE, VINTAGE_RATES, VINTAGE_BOOST, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
+    import { activeEvent, nextEvent, packsLeft, fmtDuration } from '../lib/events';
     import { syncToday, streak as getStreak, week, played } from '../lib/progress';
     import { rerolls, useReroll } from '../lib/xp';
+    import { duelSalt, skins } from '../lib/wallet';
     import { todayNumber, msToMidnight, getDay } from '../lib/mystery';
     import { loadMarket, type Quote } from '../lib/market';
     import { addItem, hasCard } from '../lib/collection';
@@ -615,6 +621,10 @@ import { mascotSvg } from '../lib/mascot';
       renderBoost();
     }
     window.addEventListener('defi:changed', () => refreshStatus());
+    {
+      const ev = activeEvent();
+      if (ev) { $('mode-event-link').hidden = false; $('st-event').textContent = `${packsLeft(ev)}/5 boosters`; }
+    }
 
     /* ---------- Série et récap de la semaine ---------- */
     const pct = (x: number) => `${Math.round(x * 100)} %`;
@@ -626,12 +636,12 @@ import { mascotSvg } from '../lib/mascot';
       const boosted = daily && (saved ? !!saved.boost : st.boostToday);
       $('bx-boost').hidden = !boosted;
       if (boosted) $('bx-boost-t').textContent = `${st.playedToday ? st.current : st.current + 1} jours d'affilée : ton booster du jour a de meilleures chances.`;
-      const ev = daily ? eventOfDay() : null;
+      const ev = daily ? activeEvent() : null;
       $('bx-event').hidden = !ev;
-      if (ev) { $('bx-event-name').textContent = `${ev.name} : ${ev.setName}`; $('bx-event-t').textContent = ev.text; }
+      if (ev) { $('bx-event-name').textContent = packsLeft(ev) ? `${ev.theme.name} : ${packsLeft(ev)} booster${packsLeft(ev) > 1 ? 's' : ''} ${ev.theme.setName} à ouvrir` : `${ev.theme.name} : tes 5 boosters sont ouverts`; $('bx-event-t').textContent = `En plus de ton booster du jour. Fin dans ${fmtDuration(ev.endsIn)}.`; }
       const ne = daily && !ev ? nextEvent() : null;
       $('bx-next-ev').hidden = !ne;
-      if (ne) $('bx-next-ev').textContent = `Prochain événement : ${ne.ev.name} (booster ${ne.ev.setName}) ${ne.inDays === 1 ? 'demain' : `dans ${ne.inDays} jours`}.`;
+      if (ne) $('bx-next-ev').textContent = `Prochain événement : ${ne.theme.name}, 5 boosters ${ne.theme.setName} à ouvrir, ${ne.inDays === 1 ? 'demain' : `dans ${ne.inDays} jours`}.`;
       const vintageSet = daily ? !!VINTAGE[setOfDay()] : !!(bState && VINTAGE[bState.setId]);
       if (vintageSet) {
         const R = boosted ? VINTAGE_BOOST : VINTAGE_RATES;
@@ -862,7 +872,7 @@ import { mascotSvg } from '../lib/mascot';
       getSet(setId, 'fr').then((d) => {
         if (d?.name) { $('bx-set').textContent = d.name; $('bx-pack-set').textContent = d.name; }
       }).catch(() => {});
-      if (eventOfDay()) { $('bx-pack').classList.add('retro'); $('bx-pack').setAttribute('aria-label', 'Ouvrir le booster rétro du jour'); }
+      { const pk = skins().pack; if (pk) $('bx-pack').dataset.skin = pk; }
       $('bx-pack').addEventListener('click', openPack);
       $('bx-again').addEventListener('click', () => { bState = null; pulled = []; $('bx-again').hidden = true; resetPack('Extension surprise'); window.scrollTo({ top: $('bx-stage').offsetTop - 90, behavior: 'smooth' }); });
       $('bx-reroll').addEventListener('click', () => {
@@ -937,7 +947,7 @@ import { mascotSvg } from '../lib/mascot';
     function dailyPair(): [Quote, Quote] | null {
       const legends = pool.filter((q) => q.group === 'legend').sort((x, y) => x.id.localeCompare(y.id));
       const list = legends.length >= 4 ? legends : [...pool].sort((x, y) => x.id.localeCompare(y.id));
-      let seed = todayNumber() * 7919 + 17;
+      let seed = todayNumber() * 7919 + 17 + duelSalt() * 104729;
       const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
       for (let k = 0; k < 400; k++) {
         const a = list[Math.floor(rnd() * list.length)], b = list[Math.floor(rnd() * list.length)];
@@ -1117,7 +1127,10 @@ import { mascotSvg } from '../lib/mascot';
     .hero-coti { flex: 0 0 auto; filter: drop-shadow(0 18px 30px rgba(138, 123, 255, 0.35)); animation: coti 5s ease-in-out infinite; }
     @keyframes coti { 50% { transform: translateY(-10px) rotate(-3deg); } }
     @media (max-width: 720px) { .hero-coti { display: none; } }
-    .modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 6px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 30px; }
+    .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 6px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 30px; }
+    .mode[hidden] { display: none; }
+    .mode-event { background: linear-gradient(120deg, rgba(255, 210, 90, 0.22), rgba(255, 79, 216, 0.16)); color: var(--gold) !important; border: 1px solid rgba(255, 210, 90, 0.55); animation: ev-glow 2.2s ease-in-out infinite; }
+    @keyframes ev-glow { 50% { box-shadow: 0 0 22px rgba(255, 210, 90, 0.45); } }
     .mode { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 10px; border-radius: 14px; text-decoration: none; color: var(--muted); transition: background 0.2s, color 0.2s; text-align: center; }
     .mode:hover { color: var(--text); background: var(--surface-2); }
     .mode[aria-current='page'] { color: var(--text); background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, var(--holo) border-box; border: 1px solid transparent; }
@@ -1294,10 +1307,13 @@ import { mascotSvg } from '../lib/mascot';
     .tries { text-align: center; font-family: var(--font-display); font-weight: 700; margin: 0; font-size: 0.95rem; }
 
     .console { min-width: 0; }
-    .pack:global(.retro) { filter: sepia(0.55) saturate(1.4) hue-rotate(-12deg); box-shadow: 0 0 40px rgba(255, 210, 90, 0.45); }
     .bx-event { display: flex; gap: 14px; align-items: center; margin: 0 0 14px; padding: 14px 16px; border-radius: 18px;
       background: linear-gradient(120deg, rgba(255, 210, 90, 0.16), rgba(255, 138, 61, 0.08)); border: 1px solid rgba(255, 210, 90, 0.55); }
+    .bx-event { text-decoration: none; color: var(--text); }
+    .bx-event[hidden] { display: none; }
+    .bx-event > div { flex: 1; }
     .bx-event p { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
+    .ev-go { flex: 0 0 auto; padding: 8px 14px; border-radius: 12px; background: var(--gold); color: #0a0812; font-weight: 800; }
     .ev-tag { flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; background: var(--gold); color: #0a0812; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
     .bx-next-ev { margin: 0 0 12px; }
     .bx-reroll { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }

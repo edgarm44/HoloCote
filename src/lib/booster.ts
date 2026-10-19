@@ -26,24 +26,9 @@ export const VINTAGE: Record<string, { name: string; holo: [number, number]; rar
 export const VINTAGE_RATES = { holo: 0.2, rare: 0.35 };
 export const VINTAGE_BOOST = { holo: 0.33, rare: 0.4 };
 
-export interface BoosterEvent { id: 'retro'; name: string; setId: string; setName: string; text: string }
-/** Le n° 1 (18 octobre 2026) est un dimanche : samedi et dimanche, c'est le « Week-end rétro ». */
-export const isWeekend = (n: number) => { const w = (((n - 1) % 7) + 7) % 7; return w === 0 || w === 6; };
-export function eventOfDay(n = todayNumber()): BoosterEvent | null {
-  if (!isWeekend(n)) return null;
-  const ids = Object.keys(VINTAGE);
-  const setId = ids[Math.floor(n / 7) % ids.length];
-  return { id: 'retro', name: 'Week-end rétro', setId, setName: VINTAGE[setId].name, text: `Ce week-end, le booster du jour vient de l'extension ${VINTAGE[setId].name} de 1999-2000 : une carte holo d'époque dans un booster sur cinq.` };
-}
-/** Prochain événement (pour l'annoncer). */
-export function nextEvent(n = todayNumber()): { inDays: number; ev: BoosterEvent } | null {
-  for (let k = 0; k < 8; k++) { const ev = eventOfDay(n + k); if (ev) return { inDays: k, ev }; }
-  return null;
-}
+export const setOfDay = (n = todayNumber()) => regularSet(n);
 
-export const setOfDay = (n = todayNumber()) => eventOfDay(n)?.setId ?? regularSet(n);
-
-export interface BoosterState { day: number; setId: string; setName: string; cards: string[]; opened: boolean; claimed: boolean; boost?: boolean; event?: 'retro' }
+export interface BoosterState { day: number; setId: string; setName: string; cards: string[]; opened: boolean; claimed: boolean; boost?: boolean }
 const KEY = 'holocote.booster.v1';
 
 export function getBooster(): BoosterState | null {
@@ -89,7 +74,7 @@ export async function drawBooster(opts: { save?: boolean; setId?: string; boost?
     const r = Math.random();
     let last = r < R.holo ? pick(holo) : r < R.holo + R.rare && rare.length ? pick(rare) : pick(rest);
     while (nine.has(last.id)) last = pick(rest);
-    const s: BoosterState = { day, setId, setName: d.name || vintage.name, cards: [...nine, last.id], opened: false, claimed: false, boost: !!opts.boost, event: eventOfDay(day)?.setId === setId ? 'retro' : undefined };
+    const s: BoosterState = { day, setId, setName: d.name || vintage.name, cards: [...nine, last.id], opened: false, claimed: false, boost: !!opts.boost };
     if (opts.save !== false) saveBooster(s);
     return s;
   }

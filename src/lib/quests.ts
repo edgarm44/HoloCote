@@ -6,6 +6,7 @@ import { getLog } from './progress';
 import { getItems } from './collection';
 import { getFavorites } from './favorites';
 import { addXp, addReroll, rerolls, MAX_REROLLS } from './xp';
+import { addCoins, potionActive, COIN } from './wallet';
 
 /* ---------- Pages visitées aujourd'hui (pour les quêtes d'exploration) ---------- */
 const VISITS = 'holocote.visits.v1';
@@ -33,7 +34,7 @@ export function recordVisit(path: string, cardKey?: string) {
 }
 
 /* ---------- Quêtes ---------- */
-export interface Reward { xp: number; reroll?: boolean }
+export interface Reward { xp: number; coins: number; reroll?: boolean }
 export interface Quest { id: string; title: string; hint: string; href: string; goal: number; value: number; done: boolean; reward: Reward; claimed: boolean }
 type Def = { id: string; title: string; hint: string; href: string; goal: number; value: () => number };
 
@@ -65,10 +66,11 @@ const GAME = ['myst', 'box', 'duel', 'play2', 'myst3'];
 
 /** Récompense de chaque quête : la quête de jeu offre une relance du booster du jour, les autres de l'XP. */
 const REWARDS: Record<string, Reward> = {
-  myst: { xp: 20, reroll: true }, myst3: { xp: 40, reroll: true }, box: { xp: 20, reroll: true }, duel: { xp: 30, reroll: true }, play2: { xp: 30, reroll: true },
-  add: { xp: 60 }, fav: { xp: 40 }, cards3: { xp: 40 }, market: { xp: 30 }, deals: { xp: 30 }, rank: { xp: 30 }, scan: { xp: 60 },
+  myst: { xp: 20, coins: 15, reroll: true }, myst3: { xp: 40, coins: 25, reroll: true }, box: { xp: 20, coins: 15, reroll: true }, duel: { xp: 30, coins: 15, reroll: true }, play2: { xp: 30, coins: 20, reroll: true },
+  add: { xp: 60, coins: 25 }, fav: { xp: 40, coins: 20 }, cards3: { xp: 40, coins: 20 }, market: { xp: 30, coins: 15 }, deals: { xp: 30, coins: 15 }, rank: { xp: 30, coins: 15 }, scan: { xp: 60, coins: 25 },
 };
 export const CHEST_XP = 50;
+export const CHEST_COINS = 40;
 
 function pickIds(n: number): string[] {
   const all = defs().map((d) => d.id);
@@ -87,7 +89,7 @@ export function todayQuests(): Quest[] {
   return pickIds(todayNumber()).map((id) => {
     const d = all.find((x) => x.id === id)!;
     const value = Math.min(d.goal, d.value());
-    return { id: d.id, title: d.title, hint: d.hint, href: d.href, goal: d.goal, value, done: value >= d.goal, reward: REWARDS[d.id] ?? { xp: 30 }, claimed: claims().ids.includes(d.id) };
+    return { id: d.id, title: d.title, hint: d.hint, href: d.href, goal: d.goal, value, done: value >= d.goal, reward: REWARDS[d.id] ?? { xp: 30, coins: 15 }, claimed: claims().ids.includes(d.id) };
   });
 }
 
@@ -104,10 +106,10 @@ function claims(): Claims {
 }
 const saveClaims = (c: Claims) => { try { localStorage.setItem(CLAIM, JSON.stringify(c)); } catch { /* rien */ } };
 
-export const rewardText = (r: Reward) => (r.reroll ? `relance du booster + ${r.xp} XP` : `+${r.xp} XP`);
+export const rewardText = (r: Reward) => `${r.reroll ? 'relance du booster + ' : '+'}${potionActive() ? r.xp * 2 : r.xp} XP + ${r.coins} ${COIN}`;
 
 /** Récupère la récompense d'une quête terminée. Renvoie un message, ou null si rien à récupérer. */
-export function claimQuest(id: string): { xp: number; reroll: boolean; full: boolean } | null {
+export function claimQuest(id: string): { xp: number; coins: number; reroll: boolean; full: boolean } | null {
   const q = todayQuests().find((x) => x.id === id);
   if (!q || !q.done || q.claimed) return null;
   const c = claims();
@@ -115,9 +117,11 @@ export function claimQuest(id: string): { xp: number; reroll: boolean; full: boo
   saveClaims(c);
   let reroll = false, full = false;
   if (q.reward.reroll) { reroll = addReroll(); full = !reroll; }
-  // Réserve de relances pleine : la relance est convertie en XP.
-  addXp(q.reward.xp + (full ? 30 : 0));
-  return { xp: q.reward.xp + (full ? 30 : 0), reroll, full };
+  // Réserve de relances pleine : la relance est convertie en XP. Potion d'XP : XP doublée.
+  const xp = (q.reward.xp + (full ? 30 : 0)) * (potionActive() ? 2 : 1);
+  addXp(xp);
+  addCoins(q.reward.coins, `Quête : ${q.title}`);
+  return { xp, coins: q.reward.coins, reroll, full };
 }
 
 /** Coffre du jour : disponible quand les 3 récompenses sont récupérées. */
@@ -127,14 +131,17 @@ export function chestState(): 'locked' | 'ready' | 'open' {
   const q = todayQuests();
   return q.every((x) => x.claimed) ? 'ready' : 'locked';
 }
-export function openChest(): number {
-  if (chestState() !== 'ready') return 0;
+export function openChest(): { xp: number; coins: number } | null {
+  if (chestState() !== 'ready') return null;
   const c = claims();
   c.chest = true;
   saveClaims(c);
-  addXp(CHEST_XP);
-  return CHEST_XP;
+  const xp = CHEST_XP * (potionActive() ? 2 : 1);
+  addXp(xp);
+  addCoins(CHEST_COINS, 'Coffre du jour');
+  return { xp, coins: CHEST_COINS };
 }
+export function claimedCount(): number { return claims().ids.length; }
 
 /** Nombre de récompenses à récupérer (quêtes finies non récupérées + coffre prêt). */
 export function pendingRewards(): number {

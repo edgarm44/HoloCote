@@ -19,9 +19,17 @@ const TOOLS = [
 <Base title="HoloCote" active="home">
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 
+  <a class="ev-band" id="ev-band" href={`${base}/evenement/`} hidden>
+    <span class="evb-fx" aria-hidden="true"></span>
+    <span class="evb-tag" id="evb-tag">Événement</span>
+    <span class="evb-main"><strong id="evb-title">Événement du week-end</strong><span id="evb-sub"></span></span>
+    <span class="evb-packs" id="evb-packs" aria-hidden="true"></span>
+    <span class="evb-cta" id="evb-cta">Ouvrir</span>
+  </a>
+
   <section class="hero">
     <div class="hero-text">
-      <h1 class="mega">Sors tes cartes.<br />On s'occupe de&nbsp;la&nbsp;cote.</h1>
+      <h1 class="mega"><span class="w">Sors</span> <span class="w">tes</span> <span class="w">cartes.</span><br /><span class="w">On</span> <span class="w">s'occupe</span> <span class="w">de&nbsp;la&nbsp;cote.</span></h1>
       <p class="lead">Scanne une carte Pokémon et découvre sa rareté et sa cote du jour. Suis le marché, guette le bon prix et range tout dans ton classeur.</p>
 
       <form class="hero-search" action={`${base}/recherche/`} method="get" role="search">
@@ -63,7 +71,7 @@ const TOOLS = [
 
   <div class="ticker-slot" id="ticker-slot"></div>
 
-  <section class="today" aria-labelledby="today-h">
+  <section class="today" data-reveal aria-labelledby="today-h">
     <h2 id="today-h" class="sec-title">Aujourd'hui</h2>
     <div class="today-grid">
       <a class="day day-defi" href={`${base}/defi/`}>
@@ -111,7 +119,7 @@ const TOOLS = [
     </div>
   </section>
 
-  <section class="risers" id="risers" hidden aria-labelledby="risers-h">
+  <section class="risers" data-reveal id="risers" hidden aria-labelledby="risers-h">
     <div class="sec-head">
       <h2 id="risers-h" class="sec-title">Ça grimpe cette semaine</h2>
       <a class="text-link" href={`${base}/marche/`}>Tout le marché</a>
@@ -119,7 +127,7 @@ const TOOLS = [
     <div class="riser-grid" id="riser-grid"></div>
   </section>
 
-  <section class="tools" aria-labelledby="tools-h">
+  <section class="tools" data-reveal aria-labelledby="tools-h">
     <h2 id="tools-h" class="sec-title">Tout HoloCote</h2>
     <ul class="tool-list">
       {TOOLS.map((t) => (
@@ -134,7 +142,7 @@ const TOOLS = [
     </ul>
   </section>
 
-  <section class="how" aria-labelledby="how-h">
+  <section class="how" data-reveal aria-labelledby="how-h">
     <h2 id="how-h" class="sec-title">Ta première carte en trois gestes</h2>
     <ol class="how-steps">
       <li><h3>Vise</h3><p>Ouvre le scanner et pose ta carte bien à plat dans le cadre.</p></li>
@@ -143,7 +151,7 @@ const TOOLS = [
     </ol>
   </section>
 
-  <section class="final">
+  <section class="final" data-reveal>
     <div class="final-coti" set:html={mascotSvg('happy', 120, 'Coti, la mascotte de HoloCote, te salue')} />
     <h2>Zéro compte. Zéro pub.<br />Tes cartes restent chez toi.</h2>
     <p>Ton classeur, tes favoris et tes scans sont gardés dans ton navigateur. Personne d'autre ne les voit.</p>
@@ -157,7 +165,8 @@ const TOOLS = [
     import { countCards } from '../lib/collection';
     import { todayNumber, getDay } from '../lib/mystery';
     import { getLog, streak } from '../lib/progress';
-    import { getBooster, eventOfDay, nextEvent } from '../lib/booster';
+    import { getBooster } from '../lib/booster';
+    import { activeEvent, nextEvent, packsLeft, fmtDuration } from '../lib/events';
     import { todayQuests, pendingRewards, rewardText } from '../lib/quests';
     import { levelInfo } from '../lib/level';
     import { holoCard, attachTilt, el, url } from '../lib/ui';
@@ -171,10 +180,36 @@ const TOOLS = [
     const n = todayNumber();
     const day = getDay(n);
     $('defi-n').textContent = `n° ${n}`;
-    const ev = eventOfDay();
+    const ev = activeEvent();
     const ne = ev ? null : nextEvent();
+    /* Bandeau d'événement animé en haut de l'accueil */
+    {
+      const band = $('ev-band') as HTMLAnchorElement;
+      const t = ev?.theme ?? ne?.theme;
+      if (t) {
+        band.style.setProperty('--c1', t.colors[0]); band.style.setProperty('--c2', t.colors[1]); band.style.setProperty('--c3', t.colors[2]);
+        band.dataset.decor = t.decor;
+        if (ev) {
+          const left = packsLeft(ev);
+          $('evb-tag').textContent = ev.lastDay ? 'Dernier jour' : 'Événement en cours';
+          $('evb-title').textContent = `${t.name} : ${left ? `${left} booster${left > 1 ? 's' : ''} ${t.setName} à ouvrir` : 'tous tes boosters sont ouverts'}`;
+          $('evb-sub').textContent = `${t.tagline} Fin dans ${fmtDuration(ev.endsIn)}.`;
+          $('evb-cta').textContent = left ? 'Ouvrir mes boosters' : 'Voir mes cartes';
+          $('evb-packs').replaceChildren(...Array.from({ length: 5 }, (_, i) => el('i', { class: i < 5 - left ? 'used' : '', style: `--i:${i}` })));
+          band.classList.add('live');
+        } else if (ne) {
+          $('evb-tag').textContent = 'Bientôt';
+          $('evb-title').textContent = `${t.name} ${ne.inDays === 1 ? 'demain' : `dans ${ne.inDays} jours`}`;
+          $('evb-sub').textContent = `5 boosters ${t.setName} (${t.year}) à ouvrir samedi et dimanche. Début dans ${fmtDuration(ne.startsIn)}.`;
+          $('evb-cta').textContent = 'Voir l’événement';
+        }
+        const fx = band.querySelector('.evb-fx')!;
+        for (let i = 0; i < 18; i++) { const sp = el('i', { style: `--x:${Math.random() * 100}%;--d:${(3 + Math.random() * 4).toFixed(1)}s;--delay:${(-Math.random() * 6).toFixed(1)}s` }); fx.append(sp); }
+        band.hidden = false;
+      }
+    }
     if (ev || (ne && ne.inDays <= 2)) {
-      $('ev-chip').textContent = ev ? `Événement : ${ev.name}, booster ${ev.setName} !` : `${ne!.ev.name} ${ne!.inDays === 1 ? 'demain' : `dans ${ne!.inDays} jours`}`;
+      $('ev-chip').textContent = ev ? (packsLeft(ev) ? `Événement : ${packsLeft(ev)} booster${packsLeft(ev) > 1 ? 's' : ''} ${ev.theme.setName} à ouvrir !` : `Événement ${ev.theme.name} : tous tes boosters sont ouverts`) : `${ne!.theme.name} ${ne!.inDays === 1 ? 'demain' : `dans ${ne!.inDays} jours`}`;
       $('ev-chip').hidden = false;
     }
     function renderToday() {
@@ -222,6 +257,19 @@ const TOOLS = [
       $('rank-text').textContent = 'Scanne tes premières cartes et découvre ta place face aux quatorze rivaux.';
     }
 
+    /* Apparition des sections au défilement */
+    const io = 'IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? new IntersectionObserver((entries) => entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('in'); io!.unobserve(en.target); } }), { rootMargin: '0px 0px -8% 0px' })
+      : null;
+    document.querySelectorAll<HTMLElement>('[data-reveal]').forEach((sct) => { if (io) io.observe(sct); else sct.classList.add('in'); });
+    /* Compteurs qui défilent */
+    function countUp(node: HTMLElement, to: number, fmtN: (v: number) => string, ms = 1200) {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { node.textContent = fmtN(to); return; }
+      const t0 = performance.now();
+      const step = (t: number) => { const k = Math.min(1, (t - t0) / ms); const e = 1 - Math.pow(1 - k, 3); node.textContent = fmtN(to * e); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    }
+
     loadMarket().then((m) => {
       const qs = m.quotes;
       if (!qs.length) return;
@@ -246,8 +294,8 @@ const TOOLS = [
 
       // Chiffres du jour
       const topUp = [...qs].filter((q) => q.change7 !== undefined).sort((a, b) => b.change7! - a.change7!)[0];
-      $('ls-n').textContent = String(qs.length);
-      if (m.index) $('ls-index').textContent = m.index.value.toFixed(1).replace('.', ',');
+      countUp($('ls-n'), qs.length, (v) => String(Math.round(v)));
+      if (m.index) countUp($('ls-index'), m.index.value, (v) => v.toFixed(1).replace('.', ','));
       if (topUp) {
         $('ls-top').textContent = formatChange(topUp.change7);
         $('ls-top').className = changeClass(topUp.change7);
@@ -290,6 +338,52 @@ const TOOLS = [
     .aurora span:nth-child(2) { background: #ff4fd8; top: -10vmax; right: -30vmax; animation-delay: -9s; }
     .aurora span:nth-child(3) { background: #8a7bff; bottom: -40vmax; left: 20vmax; animation-delay: -17s; opacity: 0.12; }
     @keyframes drift { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
+
+    /* ---------- Bandeau d'événement ---------- */
+    .ev-band { --c1: #ffd25a; --c2: #ff8a3d; --c3: #2a1a08; position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px; margin: 16px 0 0; padding: 16px 20px; border-radius: 22px;
+      text-decoration: none; color: var(--text); border: 1px solid color-mix(in srgb, var(--c1) 60%, transparent);
+      background: linear-gradient(110deg, color-mix(in srgb, var(--c3) 92%, transparent), color-mix(in srgb, var(--c2) 30%, transparent) 50%, color-mix(in srgb, var(--c3) 92%, transparent)); background-size: 220% 100%;
+      animation: band-in 0.7s cubic-bezier(.2,.9,.3,1.2) both; transition: transform 0.25s, box-shadow 0.25s; isolation: isolate; }
+    .ev-band[hidden] { display: none; }
+    .ev-band.live { animation: band-in 0.7s cubic-bezier(.2,.9,.3,1.2) both, band-flow 6s linear infinite, band-glow 2.4s ease-in-out infinite; }
+    .ev-band:hover { transform: translateY(-2px); box-shadow: 0 12px 40px color-mix(in srgb, var(--c1) 35%, transparent); }
+    @keyframes band-in { from { opacity: 0; transform: translateY(-14px) scale(0.98); } }
+    @keyframes band-flow { to { background-position: -220% 0; } }
+    @keyframes band-glow { 50% { box-shadow: 0 0 34px color-mix(in srgb, var(--c1) 40%, transparent); } }
+    .evb-fx { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+    .evb-fx :global(i) { position: absolute; left: var(--x); bottom: -10px; width: 6px; height: 6px; border-radius: 50%; background: var(--c1); opacity: 0.7; box-shadow: 0 0 8px var(--c1); animation: evb-rise var(--d) linear infinite var(--delay); }
+    .ev-band[data-decor='jungle'] .evb-fx :global(i) { border-radius: 0 100% 0 100%; width: 12px; height: 7px; }
+    .ev-band[data-decor='kanto'] .evb-fx :global(i), .ev-band[data-decor='vintage'] .evb-fx :global(i) { clip-path: polygon(50% 0, 61% 35%, 100% 35%, 68% 57%, 79% 100%, 50% 72%, 21% 100%, 32% 57%, 0 35%, 39% 35%); width: 10px; height: 10px; border-radius: 0; }
+    @keyframes evb-rise { to { transform: translateY(-110px) rotate(200deg); opacity: 0; } }
+    .evb-tag { flex: 0 0 auto; padding: 5px 12px; border-radius: 999px; background: var(--c1); color: #0a0812; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .ev-band.live .evb-tag { animation: tag-pulse 1.4s ease-in-out infinite; }
+    @keyframes tag-pulse { 50% { transform: scale(1.06); } }
+    .evb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .evb-main strong { font-family: var(--font-display); font-size: clamp(1rem, 2.4vw, 1.3rem); }
+    .evb-main span { color: #e9e4ff; font-size: 0.88rem; }
+    .evb-packs { display: flex; gap: 5px; }
+    .evb-packs :global(i) { width: 18px; height: 28px; border-radius: 4px; background: linear-gradient(160deg, var(--c1), var(--c2)); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); animation: pack-bob 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * 0.15s); }
+    .evb-packs :global(i.used) { opacity: 0.25; animation: none; }
+    @keyframes pack-bob { 50% { transform: translateY(-5px) rotate(-4deg); } }
+    .evb-cta { flex: 0 0 auto; padding: 10px 16px; border-radius: 14px; background: #fff; color: #0a0812; font-weight: 800; }
+    @media (max-width: 720px) { .ev-band { flex-wrap: wrap; } .evb-packs { display: none; } .evb-cta { width: 100%; text-align: center; } }
+
+    /* Apparitions */
+    [data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(.2,.8,.2,1); }
+    [data-reveal]:global(.in) { opacity: 1; transform: none; }
+    .mega .w { display: inline-block; animation: word-in 0.7s cubic-bezier(.2,.9,.3,1.2) both; }
+    .mega .w:nth-child(1) { animation-delay: 0.05s; } .mega .w:nth-child(2) { animation-delay: 0.12s; } .mega .w:nth-child(3) { animation-delay: 0.19s; }
+    .mega .w:nth-child(5) { animation-delay: 0.3s; } .mega .w:nth-child(6) { animation-delay: 0.37s; } .mega .w:nth-child(7) { animation-delay: 0.44s; background: var(--holo); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: word-in 0.7s cubic-bezier(.2,.9,.3,1.2) 0.44s both, shimmer-t 6s linear infinite; }
+    @keyframes word-in { from { opacity: 0; transform: translateY(0.5em) rotate(4deg); filter: blur(6px); } }
+    @keyframes shimmer-t { to { background-position: -200% 0; } }
+    .lead, .hero-search, .cta { animation: word-in 0.8s ease both; }
+    .lead { animation-delay: 0.5s; } .hero-search { animation-delay: 0.6s; } .cta { animation-delay: 0.7s; }
+    .tool-list a:hover .tool-ic { animation: ic-wiggle 0.5s ease; background: var(--holo); color: #0a0812; }
+    @keyframes ic-wiggle { 30% { transform: rotate(-10deg) scale(1.1); } 60% { transform: rotate(8deg) scale(1.1); } }
+    .day { transition: border-color 0.2s, transform 0.25s; }
+    .day:hover { transform: translateY(-4px); }
+    .how-steps li { transition: transform 0.25s; }
+    .how-steps li:hover { transform: translateY(-4px) rotate(-0.5deg); }
 
     /* ---------- Hero ---------- */
     .hero { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: center; padding: clamp(20px, 5vw, 56px) 0 clamp(28px, 5vw, 48px); min-height: min(80vh, 760px); }
@@ -462,7 +556,8 @@ const TOOLS = [
     .final p { color: var(--muted); max-width: 34em; margin: 0 auto 26px; }
 
     @media (prefers-reduced-motion: reduce) {
-      .halo, .aurora span { animation: none !important; }
+      .halo, .aurora span, .ev-band, .ev-band *, .mega .w, .lead, .hero-search, .cta { animation: none !important; }
+      [data-reveal] { opacity: 1; transform: none; transition: none; }
     }
   </style>
 </Base>

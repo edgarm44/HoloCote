@@ -2,8 +2,9 @@
 // Dessin 100 % original. Tout est gardé dans le navigateur.
 
 import { faceParts, type Mood } from './mascot';
+import { owns } from './wallet';
 
-export interface Item { id: string; name: string; lvl: number }
+export interface Item { id: string; name: string; lvl: number; shop?: number } // shop : prix en Éclats (objet exclusif de la boutique)
 export interface Palette extends Item { stops: string[]; feet: string; spin?: boolean }
 
 export const PALETTES: Palette[] = [
@@ -18,6 +19,7 @@ export const PALETTES: Palette[] = [
   { id: 'prisme', name: 'Prisme', lvl: 20, stops: ['#ff4f6d', '#ffd25a', '#3dffa8', '#3ef0ff', '#8a7bff', '#ff4fd8'], feet: '#8a7bff', spin: true },
   { id: 'lave', name: 'Lave', lvl: 25, stops: ['#ffd25a', '#ff3d00', '#5a0f0f', '#ff8a3d'], feet: '#5a0f0f', spin: true },
   { id: 'diamant', name: 'Diamant', lvl: 40, stops: ['#ffffff', '#bfe9ff', '#e6d4ff', '#ffffff', '#c8fff0'], feet: '#8fa8ff', spin: true },
+  { id: 'neon', name: 'Néon', lvl: 999, shop: 220, stops: ['#00ffe1', '#00b3ff', '#ff00d4', '#fff200'], feet: '#ff00d4', spin: true },
 ];
 export const ACCESSORIES: Item[] = [
   { id: 'none', name: 'Aucun', lvl: 1 },
@@ -31,6 +33,7 @@ export const ACCESSORIES: Item[] = [
   { id: 'wizard', name: 'Chapeau de mage', lvl: 22 },
   { id: 'mask', name: 'Masque de héros', lvl: 26 },
   { id: 'tophat', name: 'Haut-de-forme', lvl: 30 },
+  { id: 'shades', name: 'Lunettes de star', lvl: 999, shop: 150 },
 ];
 export const AURAS: Item[] = [
   { id: 'none', name: 'Aucune', lvl: 1 },
@@ -41,6 +44,7 @@ export const AURAS: Item[] = [
   { id: 'thunder', name: 'Foudre', lvl: 21 },
   { id: 'rainbow', name: 'Arc-en-ciel', lvl: 28 },
   { id: 'petals', name: 'Pétales', lvl: 34 },
+  { id: 'hearts', name: 'Cœurs', lvl: 999, shop: 160 },
 ];
 export const POSES: Item[] = [
   { id: 'wave', name: 'Salut', lvl: 1 },
@@ -56,6 +60,7 @@ export const BACKGROUNDS: Item[] = [
   { id: 'arena', name: 'Arène', lvl: 17 },
   { id: 'space', name: 'Cosmos', lvl: 24 },
   { id: 'aurora', name: 'Aurore', lvl: 32 },
+  { id: 'castle', name: 'Château', lvl: 999, shop: 180 },
 ];
 export const PETS: Item[] = [
   { id: 'none', name: 'Aucun', lvl: 1 },
@@ -65,6 +70,7 @@ export const PETS: Item[] = [
   { id: 'robot', name: 'Robot', lvl: 19 },
   { id: 'dragon', name: 'Dragonnet', lvl: 27 },
   { id: 'comet', name: 'Comète', lvl: 36 },
+  { id: 'cloud', name: 'Nuage-chat', lvl: 999, shop: 250 },
 ];
 export const MOODS: Mood[] = ['happy', 'wink', 'wow', 'think', 'sad'];
 
@@ -74,7 +80,8 @@ export const SLOTS: { key: keyof Look; label: string; list: Item[] }[] = [];
 const LOOK = 'holocote.look.v1';
 const MOOD = 'holocote.avatar.v1';
 
-const unlocked = (list: Item[], id: string, level: number) => list.some((x) => x.id === id && x.lvl <= level);
+const unlocked = (list: Item[], id: string, level: number) => list.some((x) => x.id === id && (x.lvl <= level || (x.shop !== undefined && owns(`av:${x.id}`))));
+export const isUnlocked = (it: Item, level: number) => it.lvl <= level || (it.shop !== undefined && owns(`av:${it.id}`));
 
 const LISTS: Record<keyof Look, Item[]> = { palette: PALETTES, acc: ACCESSORIES, aura: AURAS, pose: POSES, bg: BACKGROUNDS, pet: PETS };
 SLOTS.push(
@@ -106,7 +113,9 @@ export function getMood(): Mood {
 }
 
 const KIND: Record<keyof Look, [string, string]> = { palette: ['couleur', 'la couleur'], acc: ['accessoire', "l'accessoire"], aura: ['aura', "l'aura"], pose: ['pose', 'la pose'], bg: ['fond', 'le fond'], pet: ['compagnon', 'le compagnon'] };
-const allItems = () => (Object.keys(LISTS) as (keyof Look)[]).flatMap((k) => LISTS[k].filter((x) => x.lvl > 1).map((x) => ({ ...x, k })));
+const allItems = () => (Object.keys(LISTS) as (keyof Look)[]).flatMap((k) => LISTS[k].filter((x) => x.lvl > 1 && !x.shop).map((x) => ({ ...x, k })));
+/** Objets exclusifs de la boutique. */
+export const shopItems = () => (Object.keys(LISTS) as (keyof Look)[]).flatMap((k) => LISTS[k].filter((x) => x.shop).map((x) => ({ ...x, k, kind: KIND[k][0] })));
 /** Objets débloqués exactement à ce niveau (pour l'annonce de passage de niveau). */
 export function unlocksAt(level: number): string[] {
   return allItems().filter((x) => x.lvl === level).map((x) => `${KIND[x.k][0]} ${x.name}`);
@@ -154,6 +163,10 @@ function auraSvg(aura: string, id: string, p: Palette): string {
     case 'rainbow': {
       const cols = ['#ff4f6d', '#ff8a3d', '#ffd25a', '#3dffa8', '#3ef0ff', '#8a7bff'];
       return `<g fill="none" stroke-width="5" opacity=".75">${cols.map((c, i) => `<path d="M${-8 + i * 6} 120 A${70 - i * 6} ${70 - i * 6} 0 0 1 ${132 - i * 6} 120" stroke="${c}"/>`).join('')}</g>`;
+    }
+    case 'hearts': {
+      const heart = (x: number, y: number, sc: number, d: number) => `<path transform="translate(${x} ${y}) scale(${sc})" d="M0 4 C-6 -4 -14 2 0 12 C14 2 6 -4 0 4Z" fill="#ff4f8b"><animateTransform attributeName="transform" type="translate" values="${x} ${y};${x} ${y - 10};${x} ${y}" dur="${2.4 + d}s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;.4;1" dur="${2.4 + d}s" repeatCount="indefinite"/></path>`;
+      return heart(4, 30, 1, 0) + heart(120, 44, 0.8, 0.4) + heart(-4, 100, 0.7, 0.8) + heart(126, 110, 1, 0.2) + heart(60, -10, 0.7, 0.6);
     }
     case 'petals': {
       const petal = (x: number, y: number, r: number, d: number) => `<ellipse cx="${x}" cy="${y}" rx="5" ry="3" fill="#ff9cc8" transform="rotate(${r} ${x} ${y})"><animateTransform attributeName="transform" type="translate" values="0 -6;6 10;0 -6" dur="${3 + d}s" additive="sum" repeatCount="indefinite"/></ellipse>`;
@@ -204,6 +217,9 @@ function accSvg(acc: string, id: string): string {
         <path d="M94 62 l14 -6 -4 8 6 4 -16 2z" fill="#ff3d6e" stroke="#0b0918" stroke-width="2" stroke-linejoin="round"/>
         <ellipse cx="50" cy="64" rx="8" ry="5.5" fill="#f8f6ff"/><ellipse cx="74" cy="64" rx="8" ry="5.5" fill="#f8f6ff"/>
         <circle cx="50" cy="64" r="3.4" fill="#0b0918"/><circle cx="74" cy="64" r="3.4" fill="#0b0918"/>`;
+    case 'shades':
+      return `<path d="M34 56 h56 v4 q-2 12 -14 12 h-4 q-10 0 -12 -10 h-4 q-2 10 -12 10 h-4 q-12 0 -14 -12z" fill="#0b0918" stroke="#ffd25a" stroke-width="2"/>
+        <path d="M40 60 l8 -2 M70 60 l8 -2" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".8"/><path d="M34 58 l-6 -4 M90 58 l6 -4" stroke="#0b0918" stroke-width="3"/>`;
     case 'tophat':
       return `<rect x="40" y="-10" width="44" height="34" rx="4" fill="#1b1730" stroke="#f1effa" stroke-width="2.5"/>
         <rect x="40" y="12" width="44" height="7" fill="#ff4fd8"/>
@@ -226,6 +242,7 @@ function bgSvg(bg: string, id: string): string {
     case 'forest': return grad('#1d5a42', '#0b1f18') + frame(`url(#${id}bg)`, `<path d="M-14 160 L4 70 L22 160Z M100 160 L120 60 L140 160Z M-6 160 L14 100 L34 160Z" fill="#0f3a2a"/><path d="M84 160 L104 96 L124 160Z" fill="#134832"/>${[[10, 40], [100, 30], [30, 120], [110, 110], [60, -4]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="2.2" fill="#e6ff9c"><animate attributeName="opacity" values="1;.2;1" dur="${2 + i * 0.4}s" repeatCount="indefinite"/></circle>`).join('')}`);
     case 'arena': return grad('#3a1a66', '#120b26') + frame(`url(#${id}bg)`, `<path d="M10 -16 L-14 150 L40 150Z M114 -16 L84 150 L138 150Z" fill="#fff" opacity=".07"/><ellipse cx="62" cy="150" rx="80" ry="20" fill="#2a1446" stroke="#ff4fd8" stroke-opacity=".6" stroke-width="2"/><ellipse cx="62" cy="150" rx="40" ry="9" fill="none" stroke="#3ef0ff" stroke-opacity=".5" stroke-width="2"/>`);
     case 'space': return grad('#120a2e', '#000') + frame(`url(#${id}bg)`, `${stars(30, 3)}<circle cx="112" cy="14" r="14" fill="#ff8a3d"/><ellipse cx="112" cy="14" rx="24" ry="6" fill="none" stroke="#ffd25a" stroke-width="2.5" transform="rotate(-20 112 14)"/><circle cx="4" cy="128" r="6" fill="#3ef0ff" opacity=".7"/>`);
+    case 'castle': return grad('#3a2d7a', '#120b26') + frame(`url(#${id}bg)`, `${stars(14, 7)}<circle cx="112" cy="6" r="10" fill="#fff3b0"/><g fill="#1b1446"><rect x="-14" y="96" width="40" height="70"/><rect x="98" y="88" width="40" height="80"/><path d="M-14 96 l10 -18 10 18 z M8 96 l9 -16 9 16z M98 88 l10 -20 10 20z M118 88 l10 -18 10 18z"/></g><g fill="#ffd25a" opacity=".8"><rect x="0" y="110" width="6" height="9"/><rect x="112" y="104" width="6" height="9"/></g>`);
     case 'aurora': return grad('#071a2a', '#030a12') + frame(`url(#${id}bg)`, `${stars(16, 5)}<g fill="none" stroke-width="14" opacity=".45" stroke-linecap="round"><path d="M-20 30 q40 -30 80 0 t80 -6" stroke="#3dffa8"><animate attributeName="d" values="M-20 30 q40 -30 80 0 t80 -6;M-20 24 q40 -20 80 6 t80 -12;M-20 30 q40 -30 80 0 t80 -6" dur="6s" repeatCount="indefinite"/></path><path d="M-20 50 q40 -26 80 0 t80 -4" stroke="#3ef0ff"/><path d="M-20 68 q40 -22 80 0 t80 -2" stroke="#ff4fd8" opacity=".6"/></g>`);
     default: return '';
   }
@@ -243,6 +260,7 @@ function petSvg(pet: string, id: string): string {
       <rect x="113" y="118" width="16" height="16" rx="4" fill="#8f99b8" stroke="#f1effa" stroke-width="2"/><rect x="113" y="136" width="6" height="8" rx="2" fill="#8f99b8"/><rect x="123" y="136" width="6" height="8" rx="2" fill="#8f99b8"/>`;
     case 'dragon': return bob(`<path d="M112 122 q-12 -14 -2 -24 q2 10 10 12z" fill="#14a37f" stroke="#f1effa" stroke-width="1.6"/><ellipse cx="122" cy="128" rx="12" ry="10" fill="#3dffa8" stroke="#f1effa" stroke-width="2"/><ellipse cx="124" cy="131" rx="6" ry="5" fill="#e6ff9c"/>
       <circle cx="130" cy="114" r="8" fill="#3dffa8" stroke="#f1effa" stroke-width="2"/><path d="M126 107 l-2 -6 4 3z M133 107 l2 -6 -4 3z" fill="#ffd25a"/><circle cx="132" cy="113" r="1.8" fill="#0b0918"/><path d="M110 132 q-8 4 -10 -2" stroke="#3dffa8" stroke-width="4" fill="none" stroke-linecap="round"/>`, 2.8);
+    case 'cloud': return bob(`<path d="M106 128 q-8 0 -8 -8 q0 -8 9 -8 q2 -9 12 -9 q10 0 12 9 q8 0 8 8 q0 8 -8 8z" fill="#f8f6ff" stroke="#bfe9ff" stroke-width="2"/><path d="M108 104 l3 -7 4 6z M126 104 l3 -7 2 7z" fill="#f8f6ff" stroke="#bfe9ff" stroke-width="1.5"/><circle cx="114" cy="117" r="1.8" fill="#0b0918"/><circle cx="124" cy="117" r="1.8" fill="#0b0918"/><path d="M117 121 q2 2 4 0" stroke="#0b0918" stroke-width="1.3" fill="none"/><ellipse cx="111" cy="121" rx="2.5" ry="1.5" fill="#ff9cc8"/><ellipse cx="127" cy="121" rx="2.5" ry="1.5" fill="#ff9cc8"/>`, 3.2);
     case 'comet': return `<defs><linearGradient id="${id}t" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd25a"/><stop offset="1" stop-color="#ff4fd8" stop-opacity="0"/></linearGradient></defs>` + bob(`<path d="M120 112 L96 92 L104 90 L92 80 L124 106z" fill="url(#${id}t)" opacity=".85"/><path d="M122 100 l3.5 7.5 8 1.2 -6 5.5 1.6 8 -7.1 -4 -7.1 4 1.6 -8 -6 -5.5 8 -1.2z" fill="#ffd25a" stroke="#fff3b0" stroke-width="1.5"/><circle cx="120" cy="110" r="1.2" fill="#0b0918"/><circle cx="124.5" cy="110" r="1.2" fill="#0b0918"/>`, 2);
     default: return '';
   }

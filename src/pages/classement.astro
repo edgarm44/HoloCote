@@ -69,6 +69,7 @@ import Base from '../layouts/Base.astro';
     import { formatPrice } from '../lib/tcgdex';
     import { holoCard, el, url, toast } from '../lib/ui';
     import { myAvatarSvg } from '../lib/avatar';
+    import { skins } from '../lib/wallet';
     import { levelInfo } from '../lib/level';
     const myLevel = levelInfo();
 
@@ -115,6 +116,7 @@ import Base from '../layouts/Base.astro';
       const lb = $('me-league'); lb.textContent = `Ligue ${me.league.name}`; lb.className = `league-badge l-${me.league.key}`;
       $('me-lvl').textContent = `Niveau ${myLevel.level} · ${myLevel.title}`;
       $('me-av').innerHTML = myAvatarSvg(92, myLevel.level, 'Ton personnage');
+      $('me-card').dataset.banner = skins().banner;
       $('me-value').textContent = eur(me.value);
       const d = rankDelta(i + 1);
       $('me-delta').textContent = d === undefined ? '' : d > 0 ? `▲ ${d} place${d > 1 ? 's' : ''} depuis ta dernière visite` : d < 0 ? `▼ ${-d} place${d < -1 ? 's' : ''} depuis ta dernière visite` : 'Même place qu\'à ta dernière visite';

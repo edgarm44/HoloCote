@@ -1,0 +1,217 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Boutique" active="shop" description="Dépense tes Éclats, gagnés avec les quêtes du jour : relances de booster, seconde chance, boosters d'événement, skins de compte et objets exclusifs. Aucun achat réel.">
+  <section class="sh-hero">
+    <div>
+      <p class="eyebrow">Boutique HoloCote</p>
+      <h1>Dépense tes <span class="holo-text">Éclats.</span></h1>
+      <p class="muted sh-lead">Les Éclats se gagnent en jouant : quêtes du jour, coffre quotidien et passage de niveau. Ici, rien ne s'achète avec de l'argent réel.</p>
+    </div>
+    <div class="wallet" aria-live="polite">
+      <span class="w-gem" aria-hidden="true"></span>
+      <div><span class="w-l">Ton solde</span><strong class="w-v" id="w-v">0</strong><span class="w-u">Éclats</span></div>
+    </div>
+  </section>
+
+  <section class="earn" aria-label="Gagner des Éclats">
+    <a href="../compte/#quetes"><strong>15 à 25</strong><span>par quête du jour</span></a>
+    <a href="../compte/#quetes"><strong>40</strong><span>coffre du jour</span></a>
+    <a href="../compte/"><strong>30</strong><span>par niveau gagné</span></a>
+  </section>
+
+  <div id="shop"></div>
+
+  <section class="hist" aria-labelledby="hist-h">
+    <h2 id="hist-h">Derniers mouvements</h2>
+    <ul id="hist-list" class="hist-list"></ul>
+  </section>
+
+  <p class="notice">Monnaie de jeu uniquement : les Éclats n'ont aucune valeur réelle, ne s'achètent pas et ne s'échangent pas. Tout est gardé dans ton navigateur.</p>
+
+  <script>
+    import { coins, fmtCoins, spendCoins, coinLog, skins, owns, grantSkin, equip, potionActive, drinkPotion, bumpDuelSalt, duelSalt, mysteryExtra, grantMysteryExtra } from '../lib/wallet';
+    import { rerolls, addReroll, MAX_REROLLS } from '../lib/xp';
+    import { addBonusTicket, bonusTickets, activeEvent, nextEvent } from '../lib/events';
+    import { avatarSvg, getLook, getMood, shopItems } from '../lib/avatar';
+    import { todayNumber, getDay, saveDay } from '../lib/mystery';
+    import { el, toast } from '../lib/ui';
+
+    const $ = (id: string) => document.getElementById(id)!;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    interface Offer {
+      id: string; name: string; desc: string; price: number; icon: string;
+      state: () => { ok: boolean; why?: string; owned?: boolean; equipped?: boolean };
+      buy: () => void; equip?: () => void; preview?: () => string;
+    }
+
+    const duelDone = () => { try { const d = JSON.parse(localStorage.getItem('holocote.duel.day.v1') || 'null'); return !!(d && d.day === todayNumber() && d.answered); } catch { return false; } };
+    const theme = (activeEvent()?.theme ?? nextEvent()?.theme)!;
+
+    const BANNERS = [
+      { id: 'neon', name: 'Néon', price: 120 }, { id: 'sunset', name: 'Coucher de soleil', price: 120 }, { id: 'vintage', name: 'Papier 1999', price: 150 },
+      { id: 'galaxy', name: 'Galaxie', price: 180 }, { id: 'holo', name: 'Holo animé', price: 220 },
+    ];
+    const PACKS = [
+      { id: 'pk-noir', name: 'Noir et or', price: 100 }, { id: 'pk-glace', name: 'Glacé', price: 100 }, { id: 'pk-retro', name: 'Rétro', price: 120 }, { id: 'pk-arc', name: 'Arc-en-ciel', price: 150 },
+    ];
+
+    const sections: { title: string; text: string; offers: Offer[] }[] = [
+      { title: 'Bonus de jeu', text: 'Rejoue, retente ta chance, monte plus vite.', offers: [
+        { id: 'reroll', name: 'Relance du booster du jour', icon: 'R', price: 40, desc: `Ouvre un nouveau booster du jour (réserve : ${MAX_REROLLS} au maximum).`,
+          state: () => (rerolls() >= MAX_REROLLS ? { ok: false, why: `Réserve pleine (${MAX_REROLLS}/${MAX_REROLLS})` } : { ok: true, why: `En réserve : ${rerolls()}` }),
+          buy: () => addReroll() },
+        { id: 'myst', name: 'Seconde chance', icon: '?', price: 45, desc: 'Trois essais de plus à la carte mystère du jour, si tu l’as ratée.',
+          state: () => { const d = getDay(todayNumber()); if (mysteryExtra()) return { ok: false, why: 'Déjà utilisée aujourd’hui' }; if (!d.done) return { ok: false, why: 'Disponible si tu rates la carte du jour' }; if (d.won) return { ok: false, why: 'Carte du jour déjà trouvée' }; return { ok: true }; },
+          buy: () => { grantMysteryExtra(); const n = todayNumber(); const d = getDay(n); saveDay(n, { ...d, done: false, won: false }); } },
+        { id: 'duel', name: 'Nouveau duel du jour', icon: 'VS', price: 35, desc: 'Une nouvelle paire de cartes pour le duel du jour, avec sa récompense.',
+          state: () => (duelDone() ? { ok: true, why: duelSalt() ? `Duels supplémentaires aujourd’hui : ${duelSalt()}` : undefined } : { ok: false, why: 'Joue d’abord le duel du jour' }),
+          buy: () => bumpDuelSalt() },
+        { id: 'potion', name: 'Potion d’XP', icon: 'XP', price: 80, desc: 'L’XP des quêtes et du coffre est doublée jusqu’à minuit.',
+          state: () => (potionActive() ? { ok: false, why: 'Active aujourd’hui' } : { ok: true }),
+          buy: () => drinkPotion() },
+      ] },
+      { title: 'Mini-événements', text: `Des boosters bonus à ouvrir quand tu veux sur la page Événement (thème : ${theme.name}, ${theme.setName}).`, offers: [
+        { id: 'ticket1', name: 'Booster bonus', icon: 'B', price: 60, desc: 'Un booster de l’événement, à ouvrir tout de suite. Sa dernière carte peut rejoindre ton classeur.',
+          state: () => ({ ok: true, why: bonusTickets() ? `En attente : ${bonusTickets()}` : undefined }), buy: () => addBonusTicket(1) },
+        { id: 'ticket3', name: 'Pack de 3 boosters bonus', icon: 'B×3', price: 150, desc: 'Trois boosters de l’événement pour le prix de deux et demi.',
+          state: () => ({ ok: true }), buy: () => addBonusTicket(3) },
+      ] },
+      { title: 'Skins de compte', text: 'Une bannière pour ton profil, visible dans l’onglet Compte et au Classement.', offers: BANNERS.map((b) => ({
+        id: `bn:${b.id}`, name: `Bannière ${b.name}`, icon: '', price: b.price, desc: 'Fond de ton profil.',
+        preview: () => `<span class="bn-pv" data-banner="${b.id}"></span>`,
+        state: () => ({ ok: true, owned: owns(`bn:${b.id}`), equipped: skins().banner === b.id }),
+        buy: () => { grantSkin(`bn:${b.id}`); equip('banner', b.id); },
+        equip: () => equip('banner', skins().banner === b.id ? '' : b.id),
+      })) },
+      { title: 'Skins de booster', text: 'Change l’allure de ton booster du jour dans le Défi.', offers: PACKS.map((p) => ({
+        id: p.id, name: `Booster ${p.name}`, icon: '', price: p.price, desc: 'Apparence du paquet.',
+        preview: () => `<span class="pk-pv" data-skin="${p.id}"><b>HoloCote</b></span>`,
+        state: () => ({ ok: true, owned: owns(p.id), equipped: skins().pack === p.id }),
+        buy: () => { grantSkin(p.id); equip('pack', p.id); },
+        equip: () => equip('pack', skins().pack === p.id ? '' : p.id),
+      })) },
+      { title: 'Objets exclusifs du personnage', text: 'Introuvables en montant de niveau : uniquement ici.', offers: shopItems().map((it) => ({
+        id: `av:${it.id}`, name: it.name, icon: '', price: it.shop!, desc: `Exclusif · ${it.kind}`,
+        preview: () => avatarSvg({ ...getLook(), [it.k]: it.id }, getMood(), 76, ''),
+        state: () => ({ ok: true, owned: owns(`av:${it.id}`) }),
+        buy: () => grantSkin(`av:${it.id}`),
+      })) },
+    ];
+
+    let pending = '';
+    function offerEl(o: Offer): HTMLElement {
+      const st = o.state();
+      const bal = coins();
+      const btn = el('button', { type: 'button', class: 'btn' }) as HTMLButtonElement;
+      if (st.owned) {
+        if (o.equip) { btn.textContent = st.equipped ? 'Équipé · retirer' : 'Équiper'; btn.classList.toggle('btn-primary', !st.equipped); btn.addEventListener('click', () => { o.equip!(); toast(st.equipped ? 'Retiré.' : 'Équipé !'); render(); }); }
+        else { btn.textContent = 'Dans ta garde-robe'; btn.disabled = true; }
+      } else if (!st.ok) { btn.textContent = st.why ?? 'Indisponible'; btn.disabled = true; }
+      else if (bal < o.price) { btn.textContent = `Il manque ${o.price - bal} ◆`; btn.disabled = true; }
+      else {
+        const confirm = pending === o.id;
+        btn.textContent = confirm ? `Confirmer : ${o.price} ◆` : `Acheter · ${o.price} ◆`;
+        btn.classList.add('btn-primary');
+        if (confirm) btn.classList.add('confirm');
+        btn.addEventListener('click', () => {
+          if (pending !== o.id) { pending = o.id; render(); return; }
+          pending = '';
+          if (!spendCoins(o.price, o.name)) { toast('Solde insuffisant.'); render(); return; }
+          o.buy();
+          celebrate(o.name);
+          render();
+        });
+      }
+      const card = el('article', { class: `offer ${st.owned ? 'owned' : ''} ${pending === o.id ? 'pending' : ''}` }, [
+        el('div', { class: 'of-pv' }, []),
+        el('div', { class: 'of-tx' }, [
+          el('h3', {}, [o.name]),
+          el('p', { class: 'muted small' }, [o.desc]),
+          !st.owned && st.ok && st.why ? el('p', { class: 'of-info' }, [st.why]) : null,
+        ]),
+        el('div', { class: 'of-buy' }, [el('span', { class: 'of-price' }, [st.owned ? 'Possédé' : `${o.price} ◆`]), btn]),
+      ]);
+      const pv = card.querySelector('.of-pv') as HTMLElement;
+      if (o.preview) pv.innerHTML = o.preview(); else pv.append(el('span', { class: 'of-ic' }, [o.icon]));
+      return card;
+    }
+
+    function render() {
+      $('w-v').textContent = coins().toLocaleString('fr-FR');
+      $('shop').replaceChildren(...sections.map((s) => el('section', { class: 'sh-sec' }, [
+        el('div', { class: 'sec-h' }, [el('h2', {}, [s.title]), el('p', { class: 'muted' }, [s.text])]),
+        el('div', { class: 'offers' }, s.offers.map(offerEl)),
+      ])));
+      const log = coinLog().slice(0, 10);
+      $('hist-list').replaceChildren(...(log.length ? log.map((l) => el('li', {}, [
+        el('span', {}, [l.why]),
+        el('strong', { class: l.n > 0 ? 'up' : 'down' }, [`${l.n > 0 ? '+' : '−'}${Math.abs(l.n)} ◆`]),
+      ])) : [el('li', { class: 'muted' }, ['Aucun mouvement pour l’instant. Termine tes quêtes du jour pour gagner tes premiers Éclats.'])]));
+    }
+
+    function celebrate(name: string) {
+      toast(`${name} : c’est à toi !`);
+      if (reduced) return;
+      const box = el('div', { class: 'coin-burst', 'aria-hidden': 'true' });
+      for (let i = 0; i < 18; i++) { const c = el('i'); c.style.setProperty('--a', `${i * 20}deg`); c.style.setProperty('--d', `${70 + Math.random() * 60}px`); box.append(c); }
+      document.querySelector('.wallet')!.append(box);
+      setTimeout(() => box.remove(), 1000);
+    }
+
+    document.addEventListener('click', (e) => { if (pending && !(e.target as HTMLElement).closest('.offer.pending')) { pending = ''; render(); } }, true);
+    window.addEventListener('holocote:coins', render);
+    render();
+    void fmtCoins;
+  </script>
+
+  <style>
+    .sh-hero { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; padding: clamp(24px, 5vw, 48px) 0 20px; }
+    .eyebrow { margin: 0 0 6px; color: var(--cyan); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.8rem; }
+    .sh-hero h1 { margin: 0 0 10px; font-size: clamp(2.2rem, 6vw, 3.6rem); }
+    .sh-lead { max-width: 36em; margin: 0; }
+    .wallet { position: relative; display: flex; align-items: center; gap: 16px; padding: 18px 26px; border-radius: 24px; background: linear-gradient(135deg, rgba(62, 240, 255, 0.14), rgba(138, 123, 255, 0.14)); border: 1px solid rgba(62, 240, 255, 0.45); }
+    .w-gem { width: 52px; height: 52px; transform: rotate(45deg); border-radius: 10px; background: linear-gradient(135deg, #3ef0ff, #8a7bff 60%, #ff4fd8); box-shadow: 0 0 26px rgba(62, 240, 255, 0.55); animation: gem 3s ease-in-out infinite; }
+    @keyframes gem { 50% { transform: rotate(45deg) scale(1.08); box-shadow: 0 0 40px rgba(255, 79, 216, 0.6); } }
+    .wallet div { display: flex; flex-direction: column; }
+    .w-l, .w-u { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+    .w-v { font-family: var(--font-display); font-size: 2.4rem; line-height: 1; }
+    .wallet :global(.coin-burst) { position: absolute; left: 40px; top: 50%; pointer-events: none; }
+    .wallet :global(.coin-burst i) { position: absolute; width: 10px; height: 10px; transform: rotate(45deg); background: #3ef0ff; animation: cb 0.9s ease-out forwards; }
+    @keyframes cb { to { transform: rotate(var(--a)) translateX(var(--d)) rotate(45deg); opacity: 0; } }
+    .earn { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 28px; }
+    .earn a { display: flex; flex-direction: column; padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); color: var(--text); text-decoration: none; }
+    .earn a:hover { border-color: rgba(62, 240, 255, 0.5); }
+    .earn strong { font-family: var(--font-display); font-size: 1.4rem; color: #3ef0ff; }
+    .earn span { color: var(--muted); font-size: 0.85rem; }
+    #shop :global(.sh-sec) { margin-bottom: 30px; }
+    #shop :global(.sec-h h2) { margin: 0 0 2px; }
+    #shop :global(.sec-h p) { margin: 0 0 14px; }
+    #shop :global(.offers) { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    #shop :global(.offer) { display: grid; grid-template-columns: 76px 1fr; grid-template-rows: 1fr auto; gap: 10px 14px; padding: 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); transition: border-color 0.2s, transform 0.2s; }
+    #shop :global(.offer:hover) { border-color: rgba(255, 255, 255, 0.28); transform: translateY(-2px); }
+    #shop :global(.offer.pending) { border-color: var(--gold); box-shadow: 0 0 22px rgba(255, 210, 90, 0.25); }
+    #shop :global(.offer.owned) { border-color: rgba(61, 255, 168, 0.4); }
+    #shop :global(.of-pv) { grid-row: span 2; width: 76px; height: 86px; display: grid; place-items: center; border-radius: 14px; background: rgba(255, 255, 255, 0.04); overflow: hidden; }
+    #shop :global(.of-pv svg) { overflow: visible; }
+    #shop :global(.of-ic) { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 16px; background: var(--holo); color: #0a0812; font-family: var(--font-display); font-weight: 800; }
+    #shop :global(.of-tx h3) { margin: 0 0 4px; font-size: 1rem; }
+    #shop :global(.of-tx p) { margin: 0; }
+    #shop :global(.of-info) { margin-top: 4px !important; font-size: 0.78rem; font-weight: 700; color: var(--gold); }
+    #shop :global(.of-buy) { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    #shop :global(.of-price) { font-family: var(--font-display); font-weight: 800; color: #3ef0ff; }
+    #shop :global(.of-buy .btn) { min-height: 38px; padding: 0 14px; font-size: 0.85rem; }
+    #shop :global(.of-buy .btn.confirm) { background: var(--gold); color: #0a0812; animation: confirm 0.9s ease-in-out infinite; }
+    @keyframes confirm { 50% { box-shadow: 0 0 18px rgba(255, 210, 90, 0.7); } }
+    #shop :global(.bn-pv) { display: block; width: 100%; height: 100%; }
+    #shop :global(.pk-pv) { display: grid; place-items: center; width: 52px; height: 76px; border-radius: 8px; font-size: 0.6rem; color: #fff; }
+    .hist { margin-bottom: 24px; }
+    .hist-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-width: 640px; }
+    .hist-list :global(li) { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: 0.9rem; }
+    .hist-list :global(.up) { color: var(--up); }
+    .hist-list :global(.down) { color: var(--down); }
+    @media (max-width: 720px) { .earn { grid-template-columns: 1fr; } .wallet { width: 100%; } }
+    @media (prefers-reduced-motion: reduce) { .w-gem, #shop :global(.confirm) { animation: none !important; } }
+  </style>
+</Base>

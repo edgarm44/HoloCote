@@ -22,6 +22,16 @@ import Base from '../layouts/Base.astro';
           <p class="notice" data-slot="price-note"></p>
         </div>
 
+        <div class="panel srcs" data-slot="srcs" hidden>
+          <h2>Sources de la cote</h2>
+          <p class="muted small" data-slot="srcs-lead"></p>
+          <table class="src-t">
+            <thead><tr><th scope="col">Source</th><th scope="col">Via</th><th scope="col" class="num">Cote</th><th scope="col" class="num">En euros</th></tr></thead>
+            <tbody data-slot="srcs-body"></tbody>
+          </table>
+          <p class="src-links" data-slot="srcs-links"></p>
+        </div>
+
         <div class="panel hist" data-slot="hist" hidden>
           <div class="hist-head">
             <h2>Historique de la cote</h2>
@@ -55,6 +65,7 @@ import Base from '../layouts/Base.astro';
     import { holoCard, el, status, url, favInfo } from '../lib/ui';
     import { favButton } from '../lib/favorites';
     import { seriesFor, recordPrice, timeChart, dayOf, dateOf, type Point } from '../lib/history';
+    import { multiPrice, marketLinks } from '../lib/sources';
 
     const view = document.getElementById('view')!;
     const params = new URLSearchParams(location.search);
@@ -139,6 +150,39 @@ import Base from '../layouts/Base.astro';
 
       view.replaceChildren(node);
       if (price && price.unit === 'EUR') renderHistory(card, price.value);
+      renderSources(card);
+    }
+
+    async function renderSources(card: Card) {
+      const box = view.querySelector('[data-slot="srcs"]') as HTMLElement;
+      const slot = (n: string) => box.querySelector(`[data-slot="${n}"]`) as HTMLElement;
+      const mp = await multiPrice(card);
+      const links = marketLinks(card.name);
+      slot('srcs-links').replaceChildren('Vérifier soi-même : ', ...links.flatMap((l, i) => [i ? ' · ' : '', el('a', { href: l.href, target: '_blank', rel: 'noopener' }, [l.label])]));
+      if (!mp.sources.length) {
+        slot('srcs-lead').textContent = 'Aucune des sources consultées ne publie de prix pour cette carte.';
+        slot('srcs-body').replaceChildren();
+        box.hidden = false;
+        return;
+      }
+      slot('srcs-body').replaceChildren(...mp.sources.map((sp) => el('tr', {}, [
+        el('td', {}, [sp.url ? el('a', { href: sp.url, target: '_blank', rel: 'noopener' }, [sp.name]) : sp.name]),
+        el('td', { class: 'muted' }, [sp.via]),
+        el('td', { class: 'num' }, [formatPrice(sp.value, sp.unit)]),
+        el('td', { class: 'num' }, [formatPrice(sp.eur, 'EUR')]),
+      ])));
+      const n = mp.sources.length;
+      if (mp.consensus && n >= 2) {
+        // La cote affichée devient la médiane des sources.
+        const main = view.querySelector('[data-slot="price"]') as HTMLElement;
+        main.textContent = formatPrice(mp.consensus, 'EUR');
+        main.classList.remove('none');
+        main.after(el('p', { class: 'multi-tag' }, [`Cote multi-sources : médiane de ${n} sources`]));
+        slot('srcs-lead').textContent = `HoloCote recoupe ${n} sources indépendantes et retient la médiane, convertie en euros (1 $ = ${mp.fx.toFixed(2).replace('.', ',')} €). Cardmarket reflète le marché européen, TCGplayer le marché américain.${mp.spread && mp.spread > 1.6 ? ' Attention : les sources sont très éloignées les unes des autres, la cote est incertaine.' : ''}`;
+      } else {
+        slot('srcs-lead').textContent = 'Une seule source publie un prix pour cette carte : la cote est à prendre avec prudence.';
+      }
+      box.hidden = false;
     }
 
     async function renderHistory(card: Card, now: number) {
@@ -195,6 +239,14 @@ import Base from '../layouts/Base.astro';
     .price-value:global(.none) { font-size: 1.5rem; color: var(--muted); }
     .price-age { font-size: 0.85rem; font-weight: 700; color: var(--up); }
     .price-age:global(.stale) { color: var(--gold); }
+    .srcs h2 { margin: 0 0 4px; font-size: 1.15rem; }
+    .srcs p { margin: 0 0 10px; }
+    .src-t { width: 100%; border-collapse: collapse; font-size: 0.92rem; margin-bottom: 10px; }
+    .src-t th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 6px 4px; border-bottom: 1px solid var(--line); }
+    .src-t td { padding: 8px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    .src-t .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .src-links { font-size: 0.85rem; }
+    .info :global(.multi-tag) { margin: 2px 0 0; font-size: 0.8rem; font-weight: 800; color: #3ef0ff; }
     .hist-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
     .hist-head h2 { margin: 0; font-size: 1.15rem; }
     .hist-range { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-2); }
