@@ -9,9 +9,9 @@ import { todayNumber } from './mystery';
 export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me02', 'swsh12.5', 'sv06', '30th', 'me02.5', 'sv02', 'swsh11', 'sv01', 'me03', 'swsh9', 'me04', 'sv09', 'me05', 'swsh12', 'sv10'];
 
 /** Chances pour la dixième carte (affichées sur la page). */
-export const RATES = { top: 0.03, chase: 0.12, upper: 0.3 };
+export const RATES = { top: 0.1, chase: 0.25, upper: 0.35 };
 /** Bonus (7ᵉ jour d'affilée ou quêtes de la veille terminées) : chances augmentées pour la dixième carte. */
-export const BOOST_RATES = { top: 0.08, chase: 0.22, upper: 0.35 };
+export const BOOST_RATES = { top: 0.18, chase: 0.32, upper: 0.32 };
 
 const regularSet = (n: number) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
 
@@ -23,8 +23,8 @@ export const VINTAGE: Record<string, { name: string; holo: [number, number]; rar
   base3: { name: 'Fossile', holo: [1, 15], rare: [16, 31] },
 };
 /** Chances pour la dixième carte d'un booster d'époque (simulation). */
-export const VINTAGE_RATES = { holo: 0.2, rare: 0.35 };
-export const VINTAGE_BOOST = { holo: 0.33, rare: 0.4 };
+export const VINTAGE_RATES = { holo: 0.35, rare: 0.35 };
+export const VINTAGE_BOOST = { holo: 0.5, rare: 0.3 };
 
 export const setOfDay = (n = todayNumber()) => regularSet(n);
 
@@ -82,6 +82,9 @@ export async function drawBooster(opts: { save?: boolean; setId?: string; boost?
   const chase = d.cards.filter((c) => num(c) > official);
   if (main.length < 10) return null;
   const chosen = new Set<string>();
+  // Une carte du haut de la série parmi les 9 premières (comme la carte « reverse » d'un vrai booster).
+  const upperPool = main.slice(Math.floor(main.length * 0.6));
+  if (upperPool.length) chosen.add(pick(upperPool).id);
   while (chosen.size < 9) chosen.add(pick(main).id);
   // Dernière carte, chances proches d'un vrai booster (voir RATES) : les plus belles restent rares.
   const R = opts.boost ? BOOST_RATES : RATES;

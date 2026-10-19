@@ -48,7 +48,7 @@ import Base from '../layouts/Base.astro';
 
   <section class="ev-cal" aria-labelledby="cal-h">
     <h2 id="cal-h">Calendrier des événements</h2>
-    <p class="muted">Un nouveau thème chaque week-end. 5 boosters à ouvrir entre samedi 0 h et dimanche minuit : passé ce délai, les boosters non ouverts sont perdus.</p>
+    <p class="muted">Un nouveau thème chaque week-end. 5 boosters à ouvrir du samedi 1 h au dimanche 23 h (heure de Paris) : passé ce délai, les boosters non ouverts sont perdus.</p>
     <ol class="cal" id="cal"></ol>
   </section>
 
@@ -108,7 +108,7 @@ import Base from '../layouts/Base.astro';
         el('span', { class: 'ep-n' }, [label ?? (state === 'bonus' ? 'Bonus' : `${i + 1} / ${EVENT_BOOSTERS}`)]),
       );
       if (state === 'done' && p?.hitImage) b.append(el('img', { class: 'ep-hit', src: `${p.hitImage}/low.webp`, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }));
-      const cta = { open: 'Ouvrir', done: p?.claimed ? 'Carte rangée' : 'Ouvert', pending: 'À retourner', locked: 'Samedi', bonus: 'Ouvrir' }[state];
+      const cta = { open: 'Ouvrir', done: p?.claimed ? 'Carte rangée' : 'Ouvert', pending: 'À retourner', locked: 'Samedi 1 h', bonus: 'Ouvrir' }[state];
       b.append(el('span', { class: 'ep-cta' }, [cta]));
       b.setAttribute('aria-label', state === 'locked' ? `Booster ${i + 1}, disponible à l'événement` : `Booster ${i + 1} : ${cta}`);
       return b;
@@ -164,8 +164,8 @@ import Base from '../layouts/Base.astro';
       }
       $('shelf').replaceChildren(...items);
       $('shelf-help').textContent = ev
-        ? (packsLeft(ev) ? 'Touche un booster pour l’ouvrir. Tu as jusqu’à dimanche minuit pour ouvrir les 5.' : 'Bravo, tu as ouvert les 5 boosters de l’événement. Rendez-vous le week-end prochain !')
-        : `Les 5 boosters ${theme.setName} s’ouvriront samedi.${tickets ? ' Tes boosters bonus de la boutique, eux, s’ouvrent dès maintenant.' : ' Tu peux acheter des boosters bonus dans la boutique.'}`;
+        ? (packsLeft(ev) ? 'Touche un booster pour l’ouvrir. Tu as jusqu’à dimanche 23 h pour ouvrir les 5.' : 'Bravo, tu as ouvert les 5 boosters de l’événement. Rendez-vous le week-end prochain !')
+        : `Les 5 boosters ${theme.setName} s’ouvriront samedi à 1 h.${tickets ? ' Tes boosters bonus de la boutique, eux, s’ouvrent dès maintenant.' : ' Tu peux acheter des boosters bonus dans la boutique.'}`;
     }
 
     /* ---------- Ouverture ---------- */

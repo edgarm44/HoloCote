@@ -89,7 +89,9 @@ const day = Math.floor((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), to
 let hist = { v: 1, epoch: '2026-01-01', updated: '', cards: {} };
 try { const h = JSON.parse(fs.readFileSync(out, 'utf8')); if (h && h.cards) hist = h; } catch { /* premier relevé */ }
 
-const ids = [...new Set([...watch, ...rivals, ...(await newestChase())])];
+const chaseIds = await newestChase();
+const ids = [...new Set([...watch, ...rivals, ...chaseIds])];
+const CHASE_RARITY = /illustration sp|special illustration|hyper|secr|gold|dor|ultra rare|double rare/i;
 let fx = 0.92;
 try { const f = await fetch(FX_API).then((r) => r.json()); if (f?.rates?.EUR > 0.5 && f.rates.EUR < 1.5) fx = f.rates.EUR; } catch { /* taux par défaut */ }
 const ptcg = await ptcgPrices(ids).catch(() => new Map());
@@ -102,7 +104,8 @@ await Promise.all(Array.from({ length: 8 }, async () => {
     let card = await get(`/fr/cards/${encodeURIComponent(id)}`);
     let cmv = price(card);
     let tpCard = card;
-    if (cmv === undefined) { const en = await get(`/en/cards/${encodeURIComponent(id)}`); const pe = price(en); if (pe !== undefined) { card = card ?? en; cmv = pe; tpCard = en; } }
+    let lang = card ? 'fr' : 'en';
+    if (cmv === undefined) { const en = await get(`/en/cards/${encodeURIComponent(id)}`); const pe = price(en); if (pe !== undefined) { if (!card) { card = en; lang = 'en'; } cmv = pe; tpCard = en; } }
     const tpv = tpVal(tpCard?.pricing?.tcgplayer, TCGDEX_TP);
     const pc = ptcg.get(id);
     const pcm = median([num(pc?.cardmarket?.prices?.trendPrice), num(pc?.cardmarket?.prices?.averageSellPrice), num(pc?.cardmarket?.prices?.avg7), num(pc?.cardmarket?.prices?.avg30)]);
@@ -118,6 +121,17 @@ await Promise.all(Array.from({ length: 8 }, async () => {
     entry.p = entry.p.slice(-MAX_POINTS);
     entry.c = [day, Math.round(p * 100) / 100, eur.length];
     entry.s = Object.fromEntries(Object.entries(src).filter(([, v]) => v !== undefined).map(([k, v]) => [k, Math.round(v * 100) / 100]));
+    // Fiche pour le Marché et la Recherche (évite des centaines de requêtes côté visiteur).
+    const cm = (lang === 'fr' ? card : tpCard)?.pricing?.cardmarket ?? card?.pricing?.cardmarket;
+    const holoOnly = card?.variants?.normal === false && card?.variants?.holo === true && !num(cm?.avg30) && !num(cm?.avg7);
+    const k = (f) => num(cm?.[holoOnly ? `${f}-holo` : f]);
+    const refs = [k('trend'), k('avg'), k('avg7'), k('avg30')].filter((x) => x !== undefined);
+    const group = watch.includes(id) ? 'legend' : chaseIds.includes(id) && /pok[eé]mon/i.test(card?.category ?? 'Pokemon') && CHASE_RARITY.test(card?.rarity ?? '') ? 'new' : 'other';
+    entry.m = {
+      l: lang, i: card?.image, s: card?.set?.name, r: card?.rarity, g: group,
+      a7: k('avg7'), a30: k('avg30'), lo: k('low'), up: cm?.updated,
+      u: refs.length < 2 || Math.max(...refs) / Math.min(...refs) > 3 || undefined,
+    };
     hist.cards[id] = entry;
     if (watch.includes(id)) { index += p; indexN++; }
     if (eur.length >= 2) multi++;

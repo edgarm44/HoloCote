@@ -1,5 +1,4 @@
-// Événements du week-end : chaque samedi et dimanche, 5 boosters d'une extension à thème à ouvrir
-// (à récupérer avant dimanche minuit). La dernière carte de chaque booster peut rejoindre le classeur.
+// Événements du week-end : du samedi 1 h au dimanche 23 h (heure de Paris), 5 boosters d'une extension à thème à ouvrir. La dernière carte de chaque booster peut rejoindre le classeur.
 // Jeu gratuit, sans achat ni gain réel. Tout est gardé dans le navigateur.
 
 import { todayNumber, msToMidnight } from './mystery';
@@ -42,15 +41,28 @@ export const themeOf = (n: number) => THEMES[((weekendOf(n) % THEMES.length) + T
 
 export interface ActiveEvent { key: number; theme: EventTheme; endsIn: number; lastDay: boolean }
 
+/** Horaires (heure de Paris) : du samedi 1 h au dimanche 23 h. */
+export const START_HOUR = 1;
+export const END_HOUR = 23;
+const H = 3.6e6;
+const sinceMidnight = () => 864e5 - msToMidnight();
+
 export function activeEvent(n = todayNumber()): ActiveEvent | null {
-  if (!isEventDay(n)) return null;
-  const sunday = weekday(n) === 0;
-  return { key: weekendOf(n), theme: themeOf(n), endsIn: msToMidnight() + (sunday ? 0 : 864e5), lastDay: sunday };
+  const w = weekday(n);
+  const t = sinceMidnight();
+  if (w === 6 && t >= START_HOUR * H) return { key: weekendOf(n), theme: themeOf(n), endsIn: msToMidnight() + END_HOUR * H, lastDay: false };
+  if (w === 0 && t < END_HOUR * H) return { key: weekendOf(n), theme: themeOf(n), endsIn: END_HOUR * H - t, lastDay: true };
+  return null;
 }
 
+/** Prochain début d'événement (samedi 1 h). */
 export function nextEvent(n = todayNumber()): { inDays: number; theme: EventTheme; startsIn: number } | null {
-  for (let k = 1; k < 8; k++) {
-    if (isEventDay(n + k)) return { inDays: k, theme: themeOf(n + k), startsIn: msToMidnight() + (k - 1) * 864e5 };
+  if (activeEvent(n)) return null;
+  for (let k = 0; k < 8; k++) {
+    if (weekday(n + k) !== 6) continue;
+    const startsIn = k === 0 ? START_HOUR * H - sinceMidnight() : msToMidnight() + (k - 1) * 864e5 + START_HOUR * H;
+    if (startsIn <= 0) continue;
+    return { inDays: k, theme: themeOf(n + k), startsIn };
   }
   return null;
 }

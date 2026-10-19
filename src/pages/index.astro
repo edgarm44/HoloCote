@@ -1,18 +1,21 @@
 ---
 import Base from '../layouts/Base.astro';
 import { mascotSvg } from '../lib/mascot';
+import SearchPanel from '../components/SearchPanel.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // Index des onglets : chaque ligne dit ce qu'on y fait, en une phrase.
 const TOOLS = [
   { href: '/scanner/', name: 'Scanner', text: 'Photographie ta carte, elle est reconnue et rangée dans ton classeur.', icon: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16" />' },
-  { href: '/recherche/', name: 'Recherche', text: 'Trouve n\'importe quelle carte, même avec une faute d\'orthographe.', icon: '<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />' },
+  { href: '/#recherche', name: 'Recherche', text: 'Trouve n\'importe quelle carte, même avec une faute d\'orthographe.', icon: '<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />' },
   { href: '/marche/', name: 'Marché', text: 'Les cours du jour, les plus fortes hausses et les plus fortes baisses.', icon: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />' },
   { href: '/opportunites/', name: 'Opportunités', text: 'Les cartes qui se vendent sous leur prix habituel en ce moment.', icon: '<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" />' },
   { href: '/favoris/', name: 'Favoris', text: 'Suis les cartes qui te manquent et reçois une alerte au bon prix.', icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />' },
   { href: '/collection/', name: 'Collection', text: 'Ton classeur : chaque carte, son état et la valeur de l\'ensemble.', icon: '<rect x="4" y="3" width="12" height="17" rx="2" /><path d="M8 7h4M19 6v13a2 2 0 0 1-2 2H9" />' },
   { href: '/classement/', name: 'Classement', text: 'Ton classeur face à quatorze rivaux, de la ligue Bronze à Légende.', icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />' },
   { href: '/compte/', name: 'Compte', text: 'Ton pseudo, tes quêtes du jour et tes succès, sans e-mail ni mot de passe.', icon: '<circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />' },
+  { href: '/evenement/', name: 'Événement', text: 'Chaque week-end, du samedi 1 h au dimanche 23 h : 5 boosters d\'une extension à thème.', icon: '<path d="M12 2l2.4 5.6L20 8.3l-4.3 3.9 1.2 5.8L12 15l-4.9 3 1.2-5.8L4 8.3l5.6-.7z" />' },
+  { href: '/boutique/', name: 'Boutique', text: 'Dépense tes Éclats : relances, boosters bonus, skins et objets exclusifs.', icon: '<path d="M5 8h14l-1.2 12H6.2z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" />' },
   { href: '/defi/', name: 'Défi du jour', text: 'Carte mystère, booster et duel : chaque jour, des cartes à gagner pour ton classeur.', icon: '<rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.6v.4M12 16.8v.01" />' },
 ];
 ---
@@ -70,6 +73,14 @@ const TOOLS = [
   </section>
 
   <div class="ticker-slot" id="ticker-slot"></div>
+
+  <section class="home-search" id="recherche" aria-labelledby="hs-h" data-reveal>
+    <div class="sec-head">
+      <h2 id="hs-h" class="sec-title">Rechercher une carte</h2>
+      <p class="muted hs-sub">Même avec une faute : « Dracofeu », « Pikatchu » ou « Raykaza », HoloCote comprend.</p>
+    </div>
+    <SearchPanel compact />
+  </section>
 
   <section class="today" data-reveal aria-labelledby="today-h">
     <h2 id="today-h" class="sec-title">Aujourd'hui</h2>
@@ -172,6 +183,15 @@ const TOOLS = [
     import { holoCard, attachTilt, el, url } from '../lib/ui';
 
     const $ = (id: string) => document.getElementById(id)!;
+    /* La barre de recherche du haut lance la recherche dans la section Recherche de l'accueil. */
+    document.querySelector<HTMLFormElement>('.hero-search')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = (document.getElementById('hq') as HTMLInputElement).value.trim();
+      if (q.length < 2) return;
+      window.dispatchEvent(new CustomEvent('holocote:search', { detail: q }));
+      document.getElementById('recherche')?.classList.add('in');
+      document.getElementById('recherche')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     const href = (q: Quote) => url(`/carte/?id=${encodeURIComponent(q.id)}&lang=${q.lang}`);
     const eur = (v: number) => formatPrice(v, 'EUR');
     document.querySelectorAll<HTMLElement>('.fan-card').forEach(attachTilt);
@@ -200,7 +220,7 @@ const TOOLS = [
         } else if (ne) {
           $('evb-tag').textContent = 'Bientôt';
           $('evb-title').textContent = `${t.name} ${ne.inDays === 1 ? 'demain' : `dans ${ne.inDays} jours`}`;
-          $('evb-sub').textContent = `5 boosters ${t.setName} (${t.year}) à ouvrir samedi et dimanche. Début dans ${fmtDuration(ne.startsIn)}.`;
+          $('evb-sub').textContent = `5 boosters ${t.setName} (${t.year}) à ouvrir du samedi 1 h au dimanche 23 h. Début dans ${fmtDuration(ne.startsIn)}.`;
           $('evb-cta').textContent = 'Voir l’événement';
         }
         const fx = band.querySelector('.evb-fx')!;
@@ -466,7 +486,9 @@ const TOOLS = [
     .sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
     .text-link { font-weight: 700; text-decoration: none; }
     .text-link:hover { text-decoration: underline; }
-    section.today, section.risers, section.tools, section.how { margin-bottom: clamp(56px, 9vw, 96px); }
+    section.today, section.risers, section.tools, section.how, section.home-search { margin-bottom: clamp(56px, 9vw, 96px); }
+    .home-search { scroll-margin-top: 80px; }
+    .hs-sub { margin: -10px 0 18px; width: 100%; }
 
     /* ---------- Aujourd'hui ---------- */
     .today-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }

@@ -319,6 +319,110 @@ export const WATCHLIST: string[] = [
   'swsh12-199',     // Zarbi VSTAR (Secret Rare)
   'swsh12.5-160',   // Pikachu (Secret Rare)
   'swsh12.5-102',   // Rayquaza VMAX (Ultra Rare)
+  // Ajouts du 19 octobre 2026 : identifiants, noms et raretés vérifiés dans la base ouverte TCGdex (GitHub tcgdex/cards-database).
+  'me02.5-276',               // Pikachu-ex (Special illustration rare) — Héros Transcendants
+  'sv10-229',                 // Sulfura-ex de la Team Rocket (Special illustration rare) — Rivalités Destinées
+  'sv10-230',                 // Ho-Oh-ex de Luth (Special illustration rare) — Rivalités Destinées
+  'sv08.5-148',               // Ogerpon Masque du Fourneau-ex (Special illustration rare) — Évolutions Prismatiques
+  'sv08.5-152',               // Ogerpon Masque du Puits-ex (Special illustration rare) — Évolutions Prismatiques
+  'sv08.5-163',               // Pêchaminus-ex (Special illustration rare) — Évolutions Prismatiques
+  'sv08.5-145',               // Ogerpon Masque Turquoise-ex (Special illustration rare) — Évolutions Prismatiques
+  'sv08.5-160',               // Ogerpon Masque de la Pierre-ex (Special illustration rare) — Évolutions Prismatiques
+  'sv08-239',                 // Latias-ex (Special illustration rare) — Étincelles Déferlantes
+  'sv02-271',                 // Miascarade-ex (Hyper rare) — Évolutions à Paldea
+  'me05-118',                 // Combat Final de Gladio (Special illustration rare) — Nuit Noire
+  'me05-119',                 // Albia (Special illustration rare) — Nuit Noire
+  'me04-121',                 // Performance de Strykna (Special illustration rare) — Chaos Ascendant
+  'me04-120',                 // Tranquillité d'A.Z. (Special illustration rare) — Chaos Ascendant
+  'me03-123',                 // Encouragement d'Écho (Special illustration rare) — Équilibre Parfait
+  'me03-122',                 // Violine (Special illustration rare) — Équilibre Parfait
+  'me02.5-273',               // Méga-Roitiflam-ex (Special illustration rare) — Héros Transcendants
+  'me02.5-291',               // Narica (Special illustration rare) — Héros Transcendants
+  'me02.5-278',               // Méga-Ohmassacre-ex (Special illustration rare) — Héros Transcendants
+  'me02.5-272',               // Méga-Méganium-ex (Special illustration rare) — Héros Transcendants
+  'me02.5-282',               // Méga-Diancie-ex (Special illustration rare) — Héros Transcendants
+  'me02.5-292',               // Esprit Combatif d'Iris (Special illustration rare) — Héros Transcendants
+  'me02.5-275',               // Méga-Momartik-ex (Special illustration rare) — Héros Transcendants
+  'me02.5-279',               // Ampibidou-ex de Mashynn (Special illustration rare) — Héros Transcendants
+  'me02.5-293',               // Surfeur (Special illustration rare) — Héros Transcendants
+  'me02.5-280',               // Mélofée-ex de Lilie (Special illustration rare) — Héros Transcendants
+  'me02.5-283',               // Méga-Brutalibré-ex (Special illustration rare) — Héros Transcendants
+  'me02.5-274',               // Méga-Aligatueur-ex (Special illustration rare) — Héros Transcendants
+  'me02-129',                 // Aurore (Special illustration rare) — Flammes Fantasmagoriques
+  'me01-185',                 // Négociation de Major Bob (Special illustration rare) — Méga-Évolution
+  'ecard1-4',                 // Tortank (Holo Rare) — Expedition
+  'ecard1-6',                 // Dracaufeu (Holo Rare) — Expedition
+  'ecard1-13',                // Ectoplasma (Holo Rare) — Expedition
+  'ecard1-19',                // Mew (Holo Rare) — Expedition
+  'ecard1-20',                // Mewtwo (Holo Rare) — Expedition
+  'ecard1-30',                // Florizarre (Holo Rare) — Expedition
+  'ecard1-29',                // Tyranocif (Holo Rare) — Expedition
+  'ecard1-9',                 // Dracolosse (Holo Rare) — Expedition
+  '30th-130',                 // Sulfura (Illustration rare) — 30th Celebration
+  '30th-132',                 // Artikodin (Illustration rare) — 30th Celebration
+  '30th-141',                 // Miaouss de Galar (Illustration rare) — 30th Celebration
+  '30th-133',                 // Électhor (Illustration rare) — 30th Celebration
+  '30th-131',                 // Lokhlass (Illustration rare) — 30th Celebration
+  '30th-139',                 // Miaouss d'Alola (Illustration rare) — 30th Celebration
+  'me02.5-235',               // Togekiss (Illustration rare) — Héros Transcendants
+  'me02.5-238',               // Mimiqui de la Team Rocket (Illustration rare) — Héros Transcendants
+  'me01-133',                 // Bulbizarre (Illustration rare) — Méga-Évolution
+  'sv10.5w-143',              // Zoroark (Illustration rare) — Flamme Blanche
+  'sv10-194',                 // Lokhlass d'Ondine (Illustration rare) — Rivalités Destinées
+  'sv10-203',                 // Miaouss de la Team Rocket (Illustration rare) — Rivalités Destinées
+  'sv09-161',                 // Artikodin (Illustration rare) — Aventures Ensemble
+  'sv09-167',                 // Reshiram de N (Illustration rare) — Aventures Ensemble
+  'sv08-203',                 // Latios (Illustration rare) — Étincelles Déferlantes
+  'sv07-148',                 // Carapuce (Illustration rare) — Couronne Stellaire
+  'sv07-143',                 // Bulbizarre (Illustration rare) — Couronne Stellaire
+  'sv06-188',                 // Évoli (Illustration rare) — Mascarade Crépusculaire
+  'sv04-199',                 // Groudon (Illustration rare) — Faille Paradoxe
+  'sv03.5-170',               // Carapuce (Illustration rare) — 151
+  'sv03.5-166',               // Bulbizarre (Illustration rare) — 151
+  'sv03.5-168',               // Salamèche (Illustration rare) — 151
+  'sv03.5-173',               // Pikachu (Illustration rare) — 151
+  'sv02-203',                 // Magicarpe (Illustration rare) — Évolutions à Paldea
+  'sv02-222',                 // Tyranocif (Illustration rare) — Évolutions à Paldea
+  'swsh12.5gg-GG67',          // Palkia Originel VSTAR (Secret Rare) — Zénith Suprême Galerie Galaroise
+  'swsh12.5gg-GG69',          // Giratina VSTAR (Secret Rare) — Zénith Suprême Galerie Galaroise
+  'swsh12.5gg-GG70',          // Arceus VSTAR (Secret Rare) — Zénith Suprême Galerie Galaroise
+  'swsh12.5gg-GG68',          // Dialga Originel VSTAR (Secret Rare) — Zénith Suprême Galerie Galaroise
+  'swsh12tg-TG29',            // Rayquaza VMAX (Secret Rare) — Tempête Argentée Galerie de Dresseurs
+  'swsh11-203',               // Zoroark de Hisui VSTAR (Secret Rare) — Origine Perdue
+  'swsh11tg-TG30',            // Mew VMAX (Secret Rare) — Origine Perdue Galerie de Dresseurs
+  'swsh11tg-TG29',            // Pikachu VMAX (Secret Rare) — Origine Perdue Galerie de Dresseurs
+  'swsh10.5-079',             // Mewtwo VSTAR (Secret Rare) — Pokémon GO
+  'swsh10.5-086',             // Mewtwo VSTAR (Secret Rare) — Pokémon GO
+  'swsh10.5-081',             // Dracolosse VSTAR (Secret Rare) — Pokémon GO
+  'swsh10-198',               // Dialga Originel VSTAR (Secret Rare) — Astres Radieux
+  'swsh10-192',               // Palkia Originel VSTAR (Secret Rare) — Astres Radieux
+  'cel25-25',                 // Mew (Secret Rare) — Célébrations
+  'swsh7-207',                // Léviator VMAX (Secret Rare) — Évolution Céleste
+  'swsh7-208',                // Givrali VMAX (Secret Rare) — Évolution Céleste
+  'swsh7-205',                // Phyllali VMAX (Secret Rare) — Évolution Céleste
+  'swsh7-204',                // Phyllali VMAX (Secret Rare) — Évolution Céleste
+  'swsh6-199',                // Celebi VMAX (Secret Rare) — Règne de Glace
+  'swsh3.5-74',               // Dracaufeu VMAX (Secret Rare) — Champion's Path
+  'swsh3.5-76',               // Gardevoir VMAX (Secret Rare) — Champion's Path
+  'swsh3.5-79',               // Dracaufeu V (Secret Rare) — Champion's Path
+  'swsh1-203',                // Lokhlass VMAX (Secret Rare) — Épée et Bouclier
+  'sm12-259',                 // Reshiram et Zekrom GX (Secret Rare) — Éclipse Cosmique
+  'sm12-261',                 // Méga-Lockpin et Rondoudou GX (Secret Rare) — Éclipse Cosmique
+  'sm12-241',                 // Pikachu (Secret Rare) — Éclipse Cosmique
+  'sm12-249',                 // Florizarre et Vipélierre GX (Secret Rare) — Éclipse Cosmique
+  'sm12-258',                 // Arceus, Dialga et Palkia GX (Secret Rare) — Éclipse Cosmique
+  'sm12-251',                 // Dracaufeu et Roussil GX (Secret Rare) — Éclipse Cosmique
+  'sm12-253',                 // Tortank et Tiplouf GX (Secret Rare) — Éclipse Cosmique
+  'me05-101',                 // Méga-Darkrai-ex (Ultra Rare) — Nuit Noire
+  'me04-100',                 // Méga-Amphinobi-ex (Ultra Rare) — Chaos Ascendant
+  'me03-107',                 // Miaouss-ex (Ultra Rare) — Équilibre Parfait
+  'me02-109',                 // Méga-Dracaufeu X-ex (Ultra Rare) — Flammes Fantasmagoriques
+  'me01-155',                 // Méga-Florizarre-ex (Ultra Rare) — Méga-Évolution
+  'me01-163',                 // Méga-Latias-ex (Ultra Rare) — Méga-Évolution
+  'me01-160',                 // Méga-Lucario-ex (Ultra Rare) — Méga-Évolution
+  'me01-159',                 // Méga-Gardevoir-ex (Ultra Rare) — Méga-Évolution
+  'sv10.5b-158',              // Zekrom-ex (Ultra Rare) — Foudre Noire
+  'sv10.5w-158',              // Reshiram-ex (Ultra Rare) — Flamme Blanche
 ];
 
 /** Époque d'une carte, d'après le préfixe de son identifiant (filtres du Marché). */
@@ -416,6 +520,7 @@ export interface Market {
   quotes: Quote[];
   index?: { value: number; change7?: number };
   loadedAt: number;
+  daily?: boolean; // cotes issues du relevé quotidien multi-sources
 }
 
 const CACHE_KEY = 'holocote.market.v6';
@@ -446,6 +551,34 @@ function computeIndex(quotes: Quote[]): Market['index'] {
 
 let inflight: Promise<Market> | null = null;
 
+interface DailyEntry { n: string; p: [number, number][]; c?: [number, number, number]; m?: { l: Lang; i?: string; s?: string; r?: string; g: string; a7?: number; a30?: number; lo?: number; up?: string; u?: boolean } }
+
+/** Cotes du Marché à partir du relevé quotidien (null s'il est absent ou trop ancien). */
+async function quotesFromDaily(): Promise<Quote[] | null> {
+  const h = await loadHistory();
+  if (!h?.updated) return null;
+  const today = dayOf();
+  if (today - dayOf(new Date(`${h.updated}T12:00:00Z`)) > 2) return null;
+  const out: Quote[] = [];
+  let fresh = 0;
+  for (const [id, raw] of Object.entries(h.cards)) {
+    const e = raw as unknown as DailyEntry;
+    if (id.startsWith('_') || !e.m || !e.c || today - e.c[0] > 2) continue;
+    const group = e.m.g === 'legend' ? 'legend' : e.m.g === 'new' ? 'new' : null;
+    if (!group || (group === 'new' && ++fresh > 16)) continue;
+    const price = e.c[1];
+    const recent = e.p.filter(([d]) => d >= today - 30).map(([, v]) => v);
+    const points = recent.length >= 3 ? recent : [e.m.a30, e.m.a7, price].filter((x): x is number => x !== undefined);
+    out.push({
+      id, lang: e.m.l === 'en' ? 'en' : 'fr', name: e.n, image: e.m.i, setName: e.m.s, rarity: e.m.r,
+      price, avg30: e.m.a30, avg7: e.m.a7, low: e.m.lo, unsure: !!e.m.u,
+      change7: pct(e.m.a7, e.m.a30), points: points.length >= 2 ? points : [price, price],
+      updated: e.m.up, group, sources: e.c[2],
+    });
+  }
+  return out;
+}
+
 export function loadMarket(force = false): Promise<Market> {
   if (force) {
     try { sessionStorage.removeItem(CACHE_KEY); } catch { /* rien */ }
@@ -455,6 +588,14 @@ export function loadMarket(force = false): Promise<Market> {
   if (cached) return Promise.resolve(cached);
   if (inflight) return inflight;
   inflight = (async () => {
+    // 1) Relevé quotidien multi-sources (un seul fichier, mis à jour chaque matin) s'il est récent.
+    const fromDaily = await quotesFromDaily().catch(() => null);
+    if (fromDaily && fromDaily.length >= Math.min(40, WATCHLIST.length / 2)) {
+      const market: Market = { quotes: fromDaily, index: computeIndex(fromDaily), loadedAt: Date.now(), daily: true };
+      try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(market)); } catch { /* rien */ }
+      return market;
+    }
+    // 2) Sinon, cotes en direct carte par carte (TCGdex).
     const legends = await pool(WATCHLIST, 10, async (id) => {
       const r = await cardAnyLang(id);
       return r ? toQuote(r.card, r.lang, 'legend') : null;
