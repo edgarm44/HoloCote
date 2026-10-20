@@ -562,6 +562,7 @@ import { mascotSvg } from '../lib/mascot';
 
   <script>
     import { playHitReveal } from '../lib/hitfx';
+    import { playPackOpen, dealCards } from '../lib/packfx';
     import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, VINTAGE, VINTAGE_RATES, VINTAGE_BOOST, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
     import { activeEvent, nextEvent, packsLeft, fmtDuration } from '../lib/events';
     import { syncToday, streak as getStreak, week, played } from '../lib/progress';
@@ -777,8 +778,9 @@ import { mascotSvg } from '../lib/mascot';
       revealing = true;
       document.querySelector('#bx-cards .bx-c.last')?.classList.add('up');
       const lastC = pulled[pulled.length - 1]?.card ?? null;
-      await playHitReveal(hitLevel(lastC), lastC?.image, lastC?.name);
+      // Enregistré tout de suite : recharger la page pendant l'animation ne fait pas perdre le retournement.
       if (bState && !bState.opened && !bxTrain) { bState.opened = true; saveBooster(bState); }
+      await playHitReveal(hitLevel(lastC), lastC?.image, lastC?.name);
       renderHit(true);
       if (hitLevel(pulled[pulled.length - 1]?.card ?? null) >= 2) navigator.vibrate?.([30, 40, 60]);
       refreshStatus();
@@ -791,26 +793,38 @@ import { mascotSvg } from '../lib/mascot';
       if (pack.disabled) return;
       pack.disabled = true;
       pack.classList.add('tearing');
-      try {
-        if (bxTrain) { const pool = [...BOOSTER_SETS, ...Object.keys(VINTAGE)]; bState = await drawBooster({ save: false, setId: pool[Math.floor(Math.random() * pool.length)] }); }
-        else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday });
-        if (!bState) throw new Error('booster');
-        pulled = await loadPulled(bState.cards);
-      } catch {
+      let failed = false;
+      const load = (async () => {
+        try {
+          if (bxTrain) { const pool = [...BOOSTER_SETS, ...Object.keys(VINTAGE)]; bState = await drawBooster({ save: false, setId: pool[Math.floor(Math.random() * pool.length)] }); }
+          else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday });
+          if (!bState) throw new Error('booster');
+          pulled = await loadPulled(bState.cards);
+        } catch { failed = true; }
+      })();
+      // Le sachet s'ouvre en plein écran pendant que les cartes se préparent.
+      await Promise.all([load, playPackOpen({ label: $('bx-pack-set').textContent || 'Booster', sub: '10 cartes' })]);
+      if (failed) {
         pack.disabled = false;
         pack.classList.remove('tearing');
         $('bx-state').replaceChildren(el('p', { class: 'muted' }, ["Le booster n'a pas pu être préparé : vérifie ta connexion et réessaie."]));
         return;
       }
-      if (!reduced) await sleep(500);
       pack.hidden = true;
       const grid = $('bx-cards');
       grid.hidden = false;
       const nine = pulled.slice(0, 9);
       grid.replaceChildren(...nine.map((p, i) => mini(p, i, false)), mini(pulled[9], 9, false, true));
+      if (!reduced) {
+        dealCards([...grid.children] as HTMLElement[], { step: 70 });
+        await sleep(10 * 70 + 600);
+      }
       for (let i = 0; i < nine.length; i++) {
-        await sleep(reduced ? 0 : 170);
-        grid.children[i]?.classList.add('up');
+        await sleep(reduced ? 0 : 150);
+        const c = grid.children[i] as HTMLElement | undefined;
+        c?.classList.add('up');
+        const lvl = hitLevel(pulled[i]?.card ?? null);
+        if (lvl >= 1 && !reduced) setTimeout(() => c?.classList.add(`glint-${lvl}`), 350);
       }
       renderSummary();
       renderHit(false);

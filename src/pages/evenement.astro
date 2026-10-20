@@ -58,6 +58,7 @@ import Base from '../layouts/Base.astro';
     import { activeEvent, nextEvent, EVENT_BOOSTERS, eventPacks, packsLeft, bonusTickets, bonusPacks, openEventPack, updatePack, fmtDuration, themeOf, isEventDay, type EventPack, type EventTheme } from '../lib/events';
     import { loadPulled, hitLevel, type Pulled } from '../lib/booster';
     import { playHitReveal } from '../lib/hitfx';
+    import { playPackOpen, dealCards } from '../lib/packfx';
     import { addItem, hasCard } from '../lib/collection';
     import { formatPrice } from '../lib/tcgdex';
     import { todayNumber } from '../lib/mystery';
@@ -202,12 +203,19 @@ import Base from '../layouts/Base.astro';
       $('op-cards').replaceChildren(status('On ouvre le booster…'));
       $('hit-wrap').replaceChildren();
       $('opening').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
-      const pulled = await loadPulled(pack.cards);
+      const loading = loadPulled(pack.cards);
+      // Ouverture du sachet en plein écran, aux couleurs de l'événement, pendant que les cartes se préparent.
+      if (fresh) await Promise.all([loading, playPackOpen({ label: theme.setName, sub: `${theme.name} · ${theme.year}`, colors: theme.colors })]);
+      const pulled = await loading;
       current = { pack, index, bonus, pulled, key };
-      $('op-cards').replaceChildren();
-      for (let i = 0; i < 9; i++) {
-        $('op-cards').append(mini(pulled[i], i));
-        if (fresh) await sleep(110);
+      const box = $('op-cards');
+      const cards: HTMLElement[] = Array.from({ length: 9 }, (_, i) => mini(pulled[i], i));
+      box.replaceChildren(...cards);
+      if (fresh && !reduced) {
+        dealCards(cards, { step: 80 });
+        await sleep(9 * 80 + 650);
+        cards.forEach((c, i) => { const lvl = hitLevel(pulled[i]?.card ?? null); if (lvl >= 1) setTimeout(() => c.classList.add(`glint-${lvl}`), i * 90); });
+        await sleep(600);
       }
       if (pack.revealed) renderHit(true); else renderHit(false);
     }
@@ -263,16 +271,19 @@ import Base from '../layouts/Base.astro';
 
     let revealing = false;
     async function reveal() {
-      if (!current || revealing) return;
+      const cur = current;
+      if (!cur || revealing) return;
       revealing = true;
-      const c = current.pulled.at(-1)?.card;
+      const c = cur.pulled.at(-1)?.card;
+      // Le retournement est enregistré tout de suite : fermer la page ou revenir aux boosters pendant l'animation ne le perd pas.
+      cur.pack.revealed = true;
+      cur.pack.hitName = c?.name; cur.pack.hitImage = c?.image;
+      updatePack(cur.index, cur.bonus, { revealed: true, hitName: c?.name, hitImage: c?.image }, cur.key);
       await playHitReveal(hitLevel(c ?? null), c?.image, c?.name);
-      if (!current) { revealing = false; return; }
-      current.pack.revealed = true;
-      updatePack(current.index, current.bonus, { revealed: true, hitName: c?.name, hitImage: c?.image }, current.key);
-      current.pack.hitName = c?.name; current.pack.hitImage = c?.image;
-      renderHit(true);
-      if (hitLevel(c ?? null) >= 2) navigator.vibrate?.([30, 40, 60]);
+      if (current === cur) {
+        renderHit(true);
+        if (hitLevel(c ?? null) >= 2) navigator.vibrate?.([30, 40, 60]);
+      }
       renderShelf();
       revealing = false;
     }
@@ -420,7 +431,8 @@ import Base from '../layouts/Base.astro';
     .op-head h2 { margin: 0; }
     .op-cards { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; margin-bottom: 22px; }
     @media (max-width: 900px) { .op-cards { grid-template-columns: repeat(5, 1fr); } }
-    .op-cards :global(.oc) { position: relative; aspect-ratio: 245 / 342; border-radius: 6px; overflow: hidden; background: var(--surface-2); animation: card-in 0.45s cubic-bezier(.2,.9,.3,1.3) both; }
+    .op-cards :global(.oc) { position: relative; aspect-ratio: 245 / 342; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+    .op-cards :global(.oc:not(.dealin)) { animation: card-in 0.45s cubic-bezier(.2,.9,.3,1.3) both; }
     .op-cards :global(.oc img) { width: 100%; height: 100%; object-fit: cover; display: block; }
     .op-cards :global(.oc-ph) { display: grid; place-items: center; height: 100%; padding: 4px; font-size: 0.7rem; text-align: center; }
     .op-cards :global(.oc-v) { position: absolute; left: 3px; right: 3px; bottom: 3px; padding: 1px 0; border-radius: 4px; background: rgba(0, 0, 0, 0.7); font-size: 0.66rem; font-weight: 700; text-align: center; color: var(--gold); }

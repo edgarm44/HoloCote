@@ -24,7 +24,7 @@ function preload(url: string): Promise<void> {
 export async function playHitReveal(level: 0 | 1 | 2 | 3, image?: string, name = ''): Promise<void> {
   try { if (matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch { /* rien */ }
   const url = image ? `${image}/high.webp` : '';
-  if (url) await preload(url);
+  if (url) void preload(url); // l'image se charge pendant la charge d'énergie
   const total = TOTAL[level];
   const color = COLORS[level];
   const root = document.createElement('div');
