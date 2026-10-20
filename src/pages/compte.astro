@@ -36,7 +36,7 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
         <input id="ac-pseudo" type="text" maxlength="20" placeholder="Ex. : Dresseur du Bourg" />
         <p class="muted small">20 caractères maximum. Choisis un surnom, pas ton vrai nom. Il s'affiche sur le site (classement compris) et n'est jamais envoyé.</p>
       </div>
-      <fieldset class="wr"><legend>Expression</legend><div class="wr-row" id="wr-mood"></div></fieldset>
+      <div class="wr-tabs" id="wr-tabs" role="tablist" aria-label="Catégories du personnage"></div>
       <div id="wr-slots" class="wr-slots"></div>
       <div class="ed-actions">
         <button class="btn btn-primary" type="submit">Enregistrer</button>
@@ -208,17 +208,42 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
       });
       return card;
     }
+    let wrTab = 'mood';
+    function showTab(key: string) {
+      wrTab = key;
+      document.querySelectorAll<HTMLElement>('#wr-tabs [role=tab]').forEach((b) => { const on = b.dataset.tab === key; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
+      document.querySelectorAll<HTMLElement>('#wr-slots > fieldset').forEach((f) => { f.hidden = f.dataset.tab !== key; });
+    }
     function renderWardrobe() {
       const base: Look = { palette: draft.palette, acc: draft.acc, aura: draft.aura, pose: draft.pose, bg: draft.bg, pet: draft.pet };
-      $('wr-mood').replaceChildren(...MOODS.map((m) => option('mood', m, MOOD_NAMES[m], 1, avatarSvg(base, m, 54, ''), draft.mood === m)));
-      $('wr-slots').replaceChildren(...SLOTS.map((sl) => {
-        const free = sl.list.filter((x) => isUnlocked(x, lv.level)).length;
-        const fs = el('fieldset', { class: 'wr' }, [
-          el('legend', {}, [sl.label, el('span', { class: 'wr-count' }, [`${free}/${sl.list.length}`])]),
-          el('div', { class: 'wr-row' }, sl.list.map((it) => option(sl.key, it.id, it.name, it.lvl, avatarSvg({ ...base, [sl.key]: it.id }, draft.mood, 54, ''), draft[sl.key] === it.id, it.shop, isUnlocked(it, lv.level)))),
-        ]);
-        return fs;
+      const groups: { key: string; label: string; count: string; row: HTMLElement[] }[] = [
+        { key: 'mood', label: 'Expression', count: '', row: MOODS.map((m) => option('mood', m, MOOD_NAMES[m], 1, avatarSvg(base, m, 48, ''), draft.mood === m)) },
+        ...SLOTS.map((sl) => ({
+          key: sl.key, label: sl.label,
+          count: `${sl.list.filter((x) => isUnlocked(x, lv.level)).length}/${sl.list.length}`,
+          row: sl.list.map((it) => option(sl.key, it.id, it.name, it.lvl, avatarSvg({ ...base, [sl.key]: it.id }, draft.mood, 48, ''), draft[sl.key] === it.id, it.shop, isUnlocked(it, lv.level))),
+        })),
+      ];
+      if (!groups.some((g) => g.key === wrTab)) wrTab = 'mood';
+      $('wr-tabs').replaceChildren(...groups.map((g) => {
+        const b = el('button', { type: 'button', role: 'tab', class: 'wr-tab', 'data-tab': g.key, id: `wr-tab-${g.key}` }, [g.label, g.count ? el('span', { class: 'wr-count' }, [g.count]) : null]);
+        b.addEventListener('click', () => showTab(g.key));
+        b.addEventListener('keydown', (e) => {
+          const i = groups.findIndex((x) => x.key === g.key);
+          const n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : -1;
+          if (n < 0) return;
+          e.preventDefault();
+          const t = groups[(n + groups.length) % groups.length].key;
+          showTab(t);
+          document.getElementById(`wr-tab-${t}`)?.focus();
+        });
+        return b;
       }));
+      $('wr-slots').replaceChildren(...groups.map((g) => el('fieldset', { class: 'wr', 'data-tab': g.key, role: 'tabpanel', 'aria-labelledby': `wr-tab-${g.key}` }, [
+        el('legend', { class: 'sr-only' }, [g.label]),
+        el('div', { class: 'wr-row' }, g.row),
+      ])));
+      showTab(wrTab);
     }
 
     $('ac-form').addEventListener('submit', (e) => {
@@ -463,14 +488,21 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
     .wr-slots :global(.wr) { border: 0; padding: 0; margin: 0; min-width: 0; }
     .wr-slots :global(.wr legend) { font-weight: 700; margin-bottom: 8px; padding: 0; display: flex; align-items: center; gap: 8px; }
     .wr-slots :global(.wr-count), .wr :global(.wr-count) { font-size: 0.72rem; font-weight: 700; color: var(--muted); padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); }
-    .wr-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .wr-row :global(.wr-opt) { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 92px; padding: 8px 4px 8px; border-radius: 16px;
+    .wr-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+    .wr-tabs :global(.wr-tab) { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+    .wr-tabs :global(.wr-tab:hover) { color: var(--text); }
+    .wr-tabs :global(.wr-tab[aria-selected='true']) { color: var(--text); border-color: var(--magenta); background: rgba(255, 79, 216, 0.14); }
+    .wr-tabs :global(.wr-tab:focus-visible) { outline: 3px solid var(--cyan); outline-offset: 2px; }
+    .wr-tabs :global(.wr-count) { font-size: 0.7rem; font-weight: 700; color: var(--muted); padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); }
+    .wr-slots :global(.wr[hidden]) { display: none; }
+    .wr-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .wr-row :global(.wr-opt) { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 82px; padding: 6px 4px 6px; border-radius: 16px;
       border: 2px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color 0.2s, transform 0.2s; }
     .wr-row :global(.wr-opt:hover) { border-color: rgba(255, 255, 255, 0.3); }
     .wr-row :global(.wr-opt input) { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
     .wr-row :global(.wr-opt:has(input:checked)) { border-color: var(--magenta); box-shadow: 0 0 20px rgba(255, 79, 216, 0.3); transform: translateY(-2px); }
     .wr-row :global(.wr-opt:has(input:focus-visible)) { outline: 3px solid var(--cyan); outline-offset: 3px; }
-    .wr-row :global(.wr-pv) { display: grid; place-items: center; height: 66px; pointer-events: none; }
+    .wr-row :global(.wr-pv) { display: grid; place-items: center; height: 56px; pointer-events: none; }
     .wr-row :global(.wr-pv svg) { overflow: visible; }
     .wr-row :global(.wr-name) { font-size: 0.78rem; font-weight: 700; text-align: center; line-height: 1.15; }
     .wr-row :global(.wr-opt.locked) { cursor: not-allowed; }

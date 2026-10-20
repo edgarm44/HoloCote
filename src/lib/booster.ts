@@ -9,7 +9,7 @@ import { todayNumber } from './mystery';
 export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me02', 'swsh12.5', 'sv06', '30th', 'me02.5', 'sv02', 'swsh11', 'sv01', 'me03', 'swsh9', 'me04', 'sv09', 'me05', 'swsh12', 'sv10'];
 
 /** Chances pour la dixième carte (affichées sur la page). */
-export const RATES = { top: 0.1, chase: 0.25, upper: 0.35 };
+export const RATES = { top: 0.13, chase: 0.28, upper: 0.34 };
 /** Bonus (7ᵉ jour d'affilée ou quêtes de la veille terminées) : chances augmentées pour la dixième carte. */
 export const BOOST_RATES = { top: 0.18, chase: 0.32, upper: 0.32 };
 /** Boosters d'événement : 5 boosters d'un coup, donc des chances plus faibles par booster. */
@@ -25,7 +25,7 @@ export const VINTAGE: Record<string, { name: string; holo: [number, number]; rar
   base3: { name: 'Fossile', holo: [1, 15], rare: [16, 31] },
 };
 /** Chances pour la dixième carte d'un booster d'époque (simulation). */
-export const VINTAGE_RATES = { holo: 0.35, rare: 0.35 };
+export const VINTAGE_RATES = { holo: 0.4, rare: 0.35 };
 export const VINTAGE_BOOST = { holo: 0.5, rare: 0.3 };
 export const VINTAGE_EVENT = { holo: 0.12, rare: 0.25 };
 

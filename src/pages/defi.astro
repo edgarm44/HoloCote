@@ -172,7 +172,7 @@ import { mascotSvg } from '../lib/mascot';
             </div>
           </div>
         </div>
-        <p class="bx-rates muted small" id="bx-rates">Chances pour la dixième carte : 10 % carte exceptionnelle (hyper rare, dorée…), 25 % carte « chasse » (numéro au-delà de la série), 35 % rare de la série, 30 % carte ordinaire. Simulation : ce ne sont pas les taux officiels.</p>
+        <p class="bx-rates muted small" id="bx-rates">Chances pour la dixième carte : 13 % carte exceptionnelle (hyper rare, dorée…), 28 % carte « chasse » (numéro au-delà de la série), 34 % rare de la série, 25 % carte ordinaire. Simulation : ce ne sont pas les taux officiels.</p>
         <button type="button" class="btn btn-primary bx-again" id="bx-again" hidden>Ouvrir un autre booster</button>
         <div class="bx-sum" id="bx-sum" hidden>
           <div><span class="muted small">Valeur du booster</span><strong id="bx-total">—</strong></div>
@@ -561,6 +561,7 @@ import { mascotSvg } from '../lib/mascot';
   </script>
 
   <script>
+    import { playHitReveal } from '../lib/hitfx';
     import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, VINTAGE, VINTAGE_RATES, VINTAGE_BOOST, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
     import { activeEvent, nextEvent, packsLeft, fmtDuration } from '../lib/events';
     import { syncToday, streak as getStreak, week, played } from '../lib/progress';
@@ -774,15 +775,14 @@ import { mascotSvg } from '../lib/mascot';
     async function revealHit() {
       if (revealing || !$('hit-card').classList.contains('hidden-card')) return;
       revealing = true;
-      setTimeout(() => { revealing = false; }, 600);
       document.querySelector('#bx-cards .bx-c.last')?.classList.add('up');
-      const box = $('hit-card');
-      box.classList.add('flipping');
-      if (!reduced) await sleep(450);
+      const lastC = pulled[pulled.length - 1]?.card ?? null;
+      await playHitReveal(hitLevel(lastC), lastC?.image, lastC?.name);
       if (bState && !bState.opened && !bxTrain) { bState.opened = true; saveBooster(bState); }
       renderHit(true);
       if (hitLevel(pulled[pulled.length - 1]?.card ?? null) >= 2) navigator.vibrate?.([30, 40, 60]);
       refreshStatus();
+      revealing = false;
     }
 
     let bxTrain = false;

@@ -50,6 +50,8 @@ const sinceMidnight = () => 864e5 - msToMidnight();
 /** Événements ponctuels en plus des week-ends (dates et heures de Paris). */
 const SPECIALS: { key: number; from: string; to: string; theme: string; name: string }[] = [
   // Événement de test du lundi 19 octobre 2026, jusqu'à 22 h.
+  // Événement de test du mardi 20 octobre 2026, jusqu'à 15 h : thème Jungle.
+  { key: 9002, from: '2026-10-20T00:00:00+02:00', to: '2026-10-20T15:00:00+02:00', theme: 'jungle', name: 'Événement des effets' },
   { key: 9001, from: '2026-10-19T00:00:00+02:00', to: '2026-10-19T22:00:00+02:00', theme: 'base', name: 'Événement de lancement' },
 ];
 

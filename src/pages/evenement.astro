@@ -57,6 +57,7 @@ import Base from '../layouts/Base.astro';
   <script>
     import { activeEvent, nextEvent, EVENT_BOOSTERS, eventPacks, packsLeft, bonusTickets, bonusPacks, openEventPack, updatePack, fmtDuration, themeOf, isEventDay, type EventPack, type EventTheme } from '../lib/events';
     import { loadPulled, hitLevel, type Pulled } from '../lib/booster';
+    import { playHitReveal } from '../lib/hitfx';
     import { addItem, hasCard } from '../lib/collection';
     import { formatPrice } from '../lib/tcgdex';
     import { todayNumber } from '../lib/mystery';
@@ -264,10 +265,10 @@ import Base from '../layouts/Base.astro';
     async function reveal() {
       if (!current || revealing) return;
       revealing = true;
-      $('hit-wrap').classList.add('flipping');
-      await sleep(420);
-      current.pack.revealed = true;
       const c = current.pulled.at(-1)?.card;
+      await playHitReveal(hitLevel(c ?? null), c?.image, c?.name);
+      if (!current) { revealing = false; return; }
+      current.pack.revealed = true;
       updatePack(current.index, current.bonus, { revealed: true, hitName: c?.name, hitImage: c?.image }, current.key);
       current.pack.hitName = c?.name; current.pack.hitImage = c?.image;
       renderHit(true);
