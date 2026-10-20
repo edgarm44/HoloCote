@@ -52,13 +52,14 @@ import Base from '../layouts/Base.astro';
     <ol class="cal" id="cal"></ol>
   </section>
 
-  <p class="notice">Chances pour la dernière carte d'un booster événement : 2 % carte exceptionnelle, 8 % carte « chasse », 25 % rare (boosters d'époque : 12 % holo, 25 % rare). Simulation de jeu : les boosters sont virtuels, gratuits, sans achat ni gain réel, et ces taux ne sont pas les taux officiels.</p>
+  <p class="notice">Chances pour la dernière carte d'un booster événement : 3 % carte exceptionnelle, 11 % carte « chasse », 30 % rare (boosters d'époque : 15 % holo, 30 % rare). Simulation de jeu : les boosters sont virtuels, gratuits, sans achat ni gain réel, et ces taux ne sont pas les taux officiels.</p>
 
   <script>
     import { activeEvent, nextEvent, EVENT_BOOSTERS, eventPacks, packsLeft, bonusTickets, bonusPacks, openEventPack, updatePack, fmtDuration, themeOf, isEventDay, type EventPack, type EventTheme } from '../lib/events';
     import { loadPulled, hitLevel, type Pulled } from '../lib/booster';
     import { playHitReveal } from '../lib/hitfx';
-    import { playPackOpen, dealCards } from '../lib/packfx';
+    import { playPackOpen } from '../lib/packfx';
+    import { playDeck } from '../lib/deckfx';
     import { addItem, hasCard } from '../lib/collection';
     import { formatPrice } from '../lib/tcgdex';
     import { todayNumber } from '../lib/mystery';
@@ -212,10 +213,17 @@ import Base from '../layouts/Base.astro';
       const cards: HTMLElement[] = Array.from({ length: 9 }, (_, i) => mini(pulled[i], i));
       box.replaceChildren(...cards);
       if (fresh && !reduced) {
-        dealCards(cards, { step: 80 });
-        await sleep(9 * 80 + 650);
-        cards.forEach((c, i) => { const lvl = hitLevel(pulled[i]?.card ?? null); if (lvl >= 1) setTimeout(() => c.classList.add(`glint-${lvl}`), i * 90); });
-        await sleep(600);
+        // Les neuf premières cartes sont dévoilées une à une, puis rangées dans la grille.
+        cards.forEach((c) => c.classList.add('wait'));
+        await playDeck(cards.map((c, i) => {
+          const lvl = hitLevel(pulled[i]?.card ?? null);
+          return {
+            image: pulled[i]?.card?.image, name: pulled[i]?.card?.name ?? 'Carte', price: pulled[i]?.value !== undefined ? fmt(pulled[i].value, pulled[i].unit) : undefined,
+            lvl, target: c,
+            land: () => { c.classList.remove('wait'); if (lvl >= 1) c.classList.add(`glint-${lvl}`); },
+          };
+        }), { colors: theme.colors, title: theme.setName, decor: theme.decor });
+        await sleep(250);
       }
       if (pack.revealed) renderHit(true); else renderHit(false);
     }
@@ -432,6 +440,7 @@ import Base from '../layouts/Base.astro';
     .op-cards { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; margin-bottom: 22px; }
     @media (max-width: 900px) { .op-cards { grid-template-columns: repeat(5, 1fr); } }
     .op-cards :global(.oc) { position: relative; aspect-ratio: 245 / 342; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+    .op-cards :global(.oc.wait) { visibility: hidden; }
     .op-cards :global(.oc:not(.dealin)) { animation: card-in 0.45s cubic-bezier(.2,.9,.3,1.3) both; }
     .op-cards :global(.oc img) { width: 100%; height: 100%; object-fit: cover; display: block; }
     .op-cards :global(.oc-ph) { display: grid; place-items: center; height: 100%; padding: 4px; font-size: 0.7rem; text-align: center; }

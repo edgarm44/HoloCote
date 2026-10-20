@@ -562,7 +562,8 @@ import { mascotSvg } from '../lib/mascot';
 
   <script>
     import { playHitReveal } from '../lib/hitfx';
-    import { playPackOpen, dealCards } from '../lib/packfx';
+    import { playPackOpen } from '../lib/packfx';
+    import { playDeck } from '../lib/deckfx';
     import { getBooster, saveBooster, drawBooster, loadPulled, hitLevel, setOfDay, BOOSTER_SETS, VINTAGE, VINTAGE_RATES, VINTAGE_BOOST, RATES, BOOST_RATES, type BoosterState, type Pulled } from '../lib/booster';
     import { activeEvent, nextEvent, packsLeft, fmtDuration } from '../lib/events';
     import { syncToday, streak as getStreak, week, played } from '../lib/progress';
@@ -796,7 +797,7 @@ import { mascotSvg } from '../lib/mascot';
       let failed = false;
       const load = (async () => {
         try {
-          if (bxTrain) { const pool = [...BOOSTER_SETS, ...Object.keys(VINTAGE)]; bState = await drawBooster({ save: false, setId: pool[Math.floor(Math.random() * pool.length)] }); }
+          if (bxTrain) { const pool = [...BOOSTER_SETS, ...Object.keys(VINTAGE)]; bState = null; for (let t = 0; t < 4 && !bState; t++) bState = await drawBooster({ save: false, setId: pool[Math.floor(Math.random() * pool.length)] }); }
           else if (!bState) bState = await drawBooster({ boost: getStreak().boostToday });
           if (!bState) throw new Error('booster');
           pulled = await loadPulled(bState.cards);
@@ -815,17 +816,16 @@ import { mascotSvg } from '../lib/mascot';
       grid.hidden = false;
       const nine = pulled.slice(0, 9);
       grid.replaceChildren(...nine.map((p, i) => mini(p, i, false)), mini(pulled[9], 9, false, true));
-      if (!reduced) {
-        dealCards([...grid.children] as HTMLElement[], { step: 70 });
-        await sleep(10 * 70 + 600);
-      }
-      for (let i = 0; i < nine.length; i++) {
-        await sleep(reduced ? 0 : 150);
+      // Les neuf premières cartes sont dévoilées une à une, puis se retournent dans la grille.
+      await playDeck(nine.map((p, i) => {
+        const lvl = hitLevel(p?.card ?? null);
         const c = grid.children[i] as HTMLElement | undefined;
-        c?.classList.add('up');
-        const lvl = hitLevel(pulled[i]?.card ?? null);
-        if (lvl >= 1 && !reduced) setTimeout(() => c?.classList.add(`glint-${lvl}`), 350);
-      }
+        return {
+          image: p?.card?.image, name: p?.card?.name ?? 'Carte', price: p?.value !== undefined ? fmt(p.value, p.unit) : undefined,
+          lvl, target: c,
+          land: () => { c?.classList.add('up'); if (lvl >= 1 && !reduced) setTimeout(() => c?.classList.add(`glint-${lvl}`), 350); },
+        };
+      }), { colors: bxTrain ? undefined : undefined, title: $('bx-pack-set').textContent || 'Ton booster' });
       renderSummary();
       renderHit(false);
       refreshStatus();

@@ -6,14 +6,16 @@ import { getCard, getSet, priceFor, type Card, type CardBrief } from './tcgdex';
 import { todayNumber } from './mystery';
 
 /** Extensions proposées, une par jour à tour de rôle. */
-export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me02', 'swsh12.5', 'sv06', '30th', 'me02.5', 'sv02', 'swsh11', 'sv01', 'me03', 'swsh9', 'me04', 'sv09', 'me05', 'swsh12', 'sv10'];
+export const BOOSTER_SETS = ['sv03.5', 'sv08.5', 'me01', 'swsh7', 'sv04.5', 'me02', 'swsh12.5', 'sv06', '30th', 'me02.5', 'sv02', 'swsh11', 'sv01', 'me03', 'swsh9', 'me04', 'sv09', 'me05', 'swsh12', 'sv10',
+  // Extensions ajoutées le 20 octobre 2026
+  'sv03', 'sv05', 'sv07', 'sv10.5b', 'sv10.5w', 'swsh8', 'swsh10', 'swsh6', 'swsh1', 'swsh4', 'sm12', 'sm11'];
 
 /** Chances pour la dixième carte (affichées sur la page). */
 export const RATES = { top: 0.13, chase: 0.28, upper: 0.34 };
 /** Bonus (7ᵉ jour d'affilée ou quêtes de la veille terminées) : chances augmentées pour la dixième carte. */
 export const BOOST_RATES = { top: 0.18, chase: 0.32, upper: 0.32 };
 /** Boosters d'événement : 5 boosters d'un coup, donc des chances plus faibles par booster. */
-export const EVENT_RATES = { top: 0.02, chase: 0.08, upper: 0.25 };
+export const EVENT_RATES = { top: 0.03, chase: 0.11, upper: 0.3 };
 
 const regularSet = (n: number) => BOOSTER_SETS[((n - 1) % BOOSTER_SETS.length + BOOSTER_SETS.length) % BOOSTER_SETS.length];
 
@@ -27,7 +29,7 @@ export const VINTAGE: Record<string, { name: string; holo: [number, number]; rar
 /** Chances pour la dixième carte d'un booster d'époque (simulation). */
 export const VINTAGE_RATES = { holo: 0.4, rare: 0.35 };
 export const VINTAGE_BOOST = { holo: 0.5, rare: 0.3 };
-export const VINTAGE_EVENT = { holo: 0.12, rare: 0.25 };
+export const VINTAGE_EVENT = { holo: 0.15, rare: 0.3 };
 
 export const setOfDay = (n = todayNumber()) => regularSet(n);
 

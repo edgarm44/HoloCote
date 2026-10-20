@@ -7,3 +7,4 @@ dist/
 *.log
 public/ocr/
 public/data/history.json
+*.tgz
