@@ -205,6 +205,50 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
             root.classList.toggle('ev-still', !on);
             if (on) spawn(); else fxBox.replaceChildren();
           };
+          // Gerbes d'étincelles au clic, traînée au passage de la souris, éclairs et étoiles filantes selon le thème.
+          const burst = document.createElement('div');
+          burst.className = 'ev-burst';
+          burst.setAttribute('aria-hidden', 'true');
+          document.body.append(burst);
+          const puff = (x: number, y: number, n: number, dist: number, cls = '') => {
+            for (let i = 0; i < n; i++) {
+              const b = document.createElement('i');
+              b.className = `evb evb-${theme.decor} ${cls}`;
+              b.style.left = `${x}px`; b.style.top = `${y}px`;
+              b.style.setProperty('--a', `${Math.round((i / n) * 360 + Math.random() * 30)}deg`);
+              b.style.setProperty('--d', `${Math.round(dist * (0.6 + Math.random() * 0.8))}px`);
+              b.style.setProperty('--r', `${Math.round(Math.random() * 360)}deg`);
+              burst.append(b);
+              setTimeout(() => b.remove(), 900);
+            }
+          };
+          document.addEventListener('pointerdown', (e) => { if (on && burst.childElementCount < 80) puff(e.clientX, e.clientY, 12, 90); });
+          let lastMove = 0;
+          if (matchMedia('(pointer: fine)').matches) document.addEventListener('pointermove', (e) => {
+            const t = performance.now();
+            if (!on || t - lastMove < 55 || burst.childElementCount > 40) return;
+            lastMove = t;
+            puff(e.clientX, e.clientY, 1, 26, 'trail');
+          }, { passive: true });
+          const sky = () => {
+            if (!on || document.hidden) return;
+            if (theme.decor === 'mega') {
+              const f = document.createElement('div');
+              f.className = 'ev-bolt';
+              f.style.left = `${8 + Math.random() * 80}%`;
+              f.style.setProperty('--tilt', `${Math.round(-12 + Math.random() * 24)}deg`);
+              burst.append(f);
+              setTimeout(() => f.remove(), 700);
+            } else if (theme.decor === 'prism' || theme.decor === 'kanto' || theme.decor === 'vintage') {
+              const f = document.createElement('div');
+              f.className = `ev-shoot ev-shoot-${theme.decor}`;
+              f.style.top = `${10 + Math.random() * 40}%`;
+              burst.append(f);
+              setTimeout(() => f.remove(), 1400);
+            }
+          };
+          setInterval(sky, 7000);
+          setTimeout(sky, 2500);
           fxBtn.addEventListener('click', () => { on = !on; try { localStorage.setItem('holocote.evfx.v1', on ? 'on' : 'off'); } catch { /* rien */ } apply(); });
           apply();
         }

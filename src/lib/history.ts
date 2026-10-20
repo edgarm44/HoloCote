@@ -2,6 +2,7 @@
 // par GitHub Actions) + relevés faits par ton navigateur quand tu consultes une carte.
 
 import { BASE } from './ui';
+import { consensusOf, type Srcs } from './consensus';
 
 export interface Point { day: number; price: number; ref?: string } // day = jours depuis le 1er janvier 2026 (UTC)
 const EPOCH = Date.UTC(2026, 0, 1);
@@ -11,12 +12,39 @@ export const dateOf = (day: number) => new Date(EPOCH + day * 864e5);
 interface History { v: number; updated: string; cards: Record<string, { n: string; p: [number, number][] }> }
 let pub: Promise<History | null> | null = null;
 
+/**
+ * Recalcule la cote retenue de chaque carte à partir des sources enregistrées (règle de consensus.ts) :
+ * corrige tout de suite les anciens relevés, sans attendre le prochain passage du relevé quotidien.
+ */
+function normalize(h: History): History {
+  const fx = typeof (h as unknown as { fx?: number }).fx === 'number' ? (h as unknown as { fx: number }).fx : 0.9;
+  let day = 0, sum = 0, n = 0;
+  for (const [id, raw] of Object.entries(h.cards)) {
+    if (id.startsWith('_')) continue;
+    const e = raw as unknown as { p: [number, number][]; c?: [number, number, number]; s?: Srcs; m?: { g?: string; u?: boolean } };
+    if (!e.s || !e.c) continue;
+    const r = consensusOf(e.s, fx);
+    if (!r) continue;
+    const v = Math.round(r.value * 100) / 100;
+    const [d] = e.c;
+    e.c = [d, v, r.n];
+    const last = e.p[e.p.length - 1];
+    if (last && last[0] === d) last[1] = v;
+    if (r.uncertain && e.m) e.m.u = true;
+    if (e.m?.g === 'legend') { sum += v; n++; day = Math.max(day, d); }
+  }
+  const idx = h.cards._index as unknown as { p: [number, number][] } | undefined;
+  if (idx && n && idx.p.length && idx.p[idx.p.length - 1][0] === day) idx.p[idx.p.length - 1][1] = Math.round(sum);
+  return h;
+}
+
+
 /** Historique publié (null s'il n'existe pas encore). */
 export function loadHistory(): Promise<History | null> {
   if (!pub) {
     pub = fetch(`${BASE}/data/history.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((h) => (h && h.cards ? (h as History) : null))
+      .then((h) => (h && h.cards ? normalize(h as History) : null))
       .catch(() => null);
   }
   return pub;

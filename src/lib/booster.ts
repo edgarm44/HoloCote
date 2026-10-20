@@ -55,6 +55,22 @@ async function setDetail(id: string): Promise<SetDetail | null> {
 }
 
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+/** Cartes « fortes » (ex, V, VMAX, VSTAR, GX, Méga, Téra…) : réservées à la dernière carte du booster. */
+export const STRONG = /(\bex\b|\bv\b|vmax|vstar|\bgx\b|-gx\b|\bmega\b|méga|\btera\b|téra|radieux|\bprime\b|\blv\.?x\b|\bbreak\b|\bstellar\b)/i;
+/** Tire n cartes différentes (et de noms différents tant que possible) dans la liste. */
+function drawDistinct(pool: CardBrief[], n: number, taken: Set<string> = new Set()): string[] {
+  const out: string[] = [];
+  const names = new Set<string>();
+  const left = [...pool];
+  while (out.length < n && left.length) {
+    const i = Math.floor(Math.random() * left.length);
+    const c = left.splice(i, 1)[0];
+    if (taken.has(c.id)) continue;
+    if (names.has(c.name) && left.some((x) => !names.has(x.name) && !taken.has(x.id))) continue;
+    names.add(c.name); out.push(c.id);
+  }
+  return out;
+}
 
 /** Tire un nouveau booster : 9 cartes de l'extension, puis une 10ᵉ « carte à gagner » plus souvent rare. */
 export async function drawBooster(opts: { save?: boolean; setId?: string; boost?: boolean; event?: boolean } = {}): Promise<BoosterState | null> {
@@ -71,7 +87,7 @@ export async function drawBooster(opts: { save?: boolean; setId?: string; boost?
     const rare = d.cards.filter((c) => inR(c, vintage.rare));
     const rest = d.cards.filter((c) => num(c) > vintage.rare[1] && num(c) <= (vintage.last ?? 999));
     if (rest.length < 10 || !holo.length) return null;
-    const nine = new Set<string>();
+    const nine = new Set<string>(drawDistinct(rest, 9));
     while (nine.size < 9) nine.add(pick(rest).id);
     const R = opts.event ? VINTAGE_EVENT : opts.boost ? VINTAGE_BOOST : VINTAGE_RATES;
     const r = Math.random();
@@ -84,10 +100,11 @@ export async function drawBooster(opts: { save?: boolean; setId?: string; boost?
   const main = d.cards.filter((c) => num(c) > 0 && num(c) <= official);
   const chase = d.cards.filter((c) => num(c) > official);
   if (main.length < 10) return null;
-  const chosen = new Set<string>();
-  // Une carte du haut de la série parmi les 9 premières (comme la carte « reverse » d'un vrai booster).
-  const upperPool = main.slice(Math.floor(main.length * 0.6));
-  if (upperPool.length && !opts.event) chosen.add(pick(upperPool).id);
+  // Les neuf premières cartes sont communes ou peu communes : pas de ex, V, VMAX… au début. La meilleure carte est la dernière.
+  const low = main.slice(0, Math.max(10, Math.ceil(main.length * 0.7)));
+  const mild = low.filter((c) => !STRONG.test(c.name));
+  const first = drawDistinct(mild.length >= 14 ? mild : low, 9);
+  const chosen = new Set<string>(first);
   while (chosen.size < 9) chosen.add(pick(main).id);
   // Dernière carte, chances proches d'un vrai booster (voir RATES) : les plus belles restent rares.
   const R = opts.event ? EVENT_RATES : opts.boost ? BOOST_RATES : RATES;

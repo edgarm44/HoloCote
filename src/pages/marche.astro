@@ -376,7 +376,7 @@ import Base from '../layouts/Base.astro';
       const multi = quotes.filter((q) => q.sources).length;
       const age = updated ? priceAgeText(updated) : null;
       if (updated) $('live-text').textContent = `Cotes du ${formatDate(updated)}`;
-      if (multi) $('cb-date').textContent = `Cotes multi-sources (Cardmarket et TCGplayer) pour ${multi} cartes${market.daily ? ' · relevé du jour' : ''}${age ? ` · ${age.text}` : ''}`;
+      if (multi) $('cb-date').textContent = `Cotes Cardmarket (recoupées avec pokemontcg.io, TCGplayer en secours) pour ${multi} cartes${market.daily ? ' · relevé du jour' : ''}${age ? ` · ${age.text}` : ''}`;
       else if (updated && age) $('cb-date').textContent = `Cotes Cardmarket du ${formatDate(updated)} · ${age.text}`;
       loadedAt = market.loadedAt;
       $('cb-ago').textContent = agoText();

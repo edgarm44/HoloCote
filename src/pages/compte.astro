@@ -67,7 +67,7 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
         <g class="ch-glow"><path d="M60 46 L30 0 L50 0 Z M60 46 L70 0 L90 0 Z M60 46 L104 10 L112 22 Z M60 46 L8 22 L16 10 Z" fill="#fff3b0" opacity=".55"/></g>
         <g class="ch-lid"><path d="M12 48 q0 -36 48 -36 q48 0 48 36 z" fill="url(#chW)" stroke="#ffd25a" stroke-width="3"/><path d="M14 40 h92" stroke="url(#chG)" stroke-width="5"/><rect x="52" y="34" width="16" height="12" rx="3" fill="url(#chG)"/></g></svg></button>
       <div class="chest-tx">
-        <strong>Coffre du jour : +50 XP et +40 Éclats</strong>
+        <strong id="chest-title">Coffre du jour</strong>
         <span class="muted small" id="chest-t">Récupère les récompenses des 3 quêtes pour l'ouvrir.</span>
         <span class="chest-steps" id="chest-steps" aria-hidden="true"><i></i><i></i><i></i></span>
       </div>
@@ -141,13 +141,13 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
 
   <script>
     import { computeBadges } from '../lib/badges';
-    import { todayQuests, questDays, claimQuest, chestState, openChest, rewardText, pendingRewards, rerolls, MAX_REROLLS } from '../lib/quests';
+    import { CHEST_XP, CHEST_COINS, todayQuests, questDays, claimQuest, chestState, openChest, rewardText, pendingRewards, rerolls, MAX_REROLLS } from '../lib/quests';
     import { streak } from '../lib/progress';
     import { countCards } from '../lib/collection';
     import { getPseudo, setPseudo } from '../lib/leaderboard';
     import { avatarSvg, getLook, setLook, getMood, SLOTS, MOODS, nextUnlock, isUnlocked, type Look } from '../lib/avatar';
     import { levelInfo } from '../lib/level';
-    import { coins, fmtCoins, skins } from '../lib/wallet';
+    import { coins, fmtCoins, skins, potionActive } from '../lib/wallet';
     import type { Mood } from '../lib/mascot';
     import { msToMidnight } from '../lib/mystery';
     import { el, url, toast } from '../lib/ui';
@@ -189,17 +189,20 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
     /* ---------- Garde-robe ---------- */
     function option(group: string, value: string, label: string, lvl: number, preview: string, checked: boolean, shop?: number, free = true): HTMLElement {
       const locked = !free;
-      const lockTxt = shop ? `Boutique · ${shop} ◆` : `Niv. ${lvl}`;
+      const lockTxt = shop ? `${shop} ◆` : `Niv. ${lvl}`;
       const input = el('input', { type: 'radio', name: group, value, 'aria-label': locked ? (shop ? `${label}, à acheter dans la boutique` : `${label}, débloqué au niveau ${lvl}`) : label }) as HTMLInputElement;
       input.checked = checked;
       input.disabled = locked;
       const card = el('label', { class: `wr-opt ${locked ? 'locked' : ''}`, title: locked ? `Niveau ${lvl}` : label }, [
         input,
         el('span', { class: 'wr-pv' }, []),
+        locked ? el('span', { class: 'wr-padlock', 'aria-hidden': 'true' }, []) : null,
         el('span', { class: 'wr-name' }, [label]),
         locked ? el('span', { class: `wr-lock ${shop ? 'shop' : ''}` }, [lockTxt]) : shop ? el('span', { class: 'wr-lock shop own' }, ['Exclusif']) : null,
       ]);
       (card.querySelector('.wr-pv') as HTMLElement).innerHTML = preview;
+      const pad = card.querySelector('.wr-padlock') as HTMLElement | null;
+      if (pad) pad.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5" fill="currentColor" fill-opacity=".18"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="16" r="1.3" fill="currentColor"/></svg>';
       input.addEventListener('change', () => {
         (draft as unknown as Record<string, string>)[group] = value;
         renderHero();
@@ -274,6 +277,26 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
       }
     }
 
+    const QTYPE: Record<string, string> = { myst: 'game', myst3: 'game', box: 'game', duel: 'game', play2: 'game', add: 'coll', fav: 'coll', cards3: 'look', market: 'look', deals: 'look', rank: 'look', scan: 'coll' };
+    const svg = (d: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+    const QICON: Record<string, string> = {
+      myst: svg('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5M12 17v.01"/>'),
+      myst3: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'),
+      box: svg('<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M6 7h12M9 3v4M15 3v4"/>'),
+      duel: svg('<path d="M5 19l6-14M19 19l-6-14M4 11h16"/>'),
+      play2: svg('<rect x="3" y="7" width="18" height="11" rx="3"/><path d="M8 12v3M6.5 13.5h3M16 12.5v.01M18 14.5v.01"/>'),
+      add: svg('<rect x="5" y="3" width="12" height="17" rx="2"/><path d="M19 8v13H9M11 8v6M8 11h6"/>'),
+      fav: svg('<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>'),
+      cards3: svg('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5"/>'),
+      market: svg('<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>'),
+      deals: svg('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>'),
+      rank: svg('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/>'),
+      scan: svg('<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"/>'),
+      star: svg('<path d="M12 3l2.5 6 6.5.5-5 4.3 1.6 6.4L12 16.8 6.4 20.2 8 13.8 3 9.5 9.5 9z"/>'),
+      done: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+      ok: svg('<path d="M4 12l5 5L20 6"/><path d="M12 3l1 2M19 6l-1.5 1.5" opacity=".6"/>'),
+    };
+
     function renderQuests() {
       const q = todayQuests();
       $('q-done').textContent = String(q.filter((x) => x.done).length);
@@ -287,19 +310,28 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
             if (!r) { renderAll(); return; }
             celebrate(`${r.reroll ? 'Relance du booster, ' : r.full ? `Réserve de relances pleine (${MAX_REROLLS}) : ` : ''}+${r.xp} XP et +${r.coins} Éclats !`);
           });
-        } else action = el('a', { class: 'btn q-go', href: url(x.href) }, [x.goal > 1 ? `${x.value}/${x.goal} · Y aller` : 'Y aller']);
-        return el('li', { class: `q ${x.done ? 'done' : ''} ${x.claimed ? 'claimed' : ''}` }, [
-          el('span', { class: 'q-n', 'aria-hidden': 'true' }, [x.done ? '✓' : String(i + 1)]),
+        } else action = el('a', { class: 'btn q-go', href: url(x.href) }, ['Y aller']);
+        const pct = Math.round((x.value / x.goal) * 100);
+        const ico = el('span', { class: `q-ico t-${QTYPE[x.id] ?? 'game'}`, 'aria-hidden': 'true' }, []);
+        ico.innerHTML = x.claimed ? QICON.ok : x.done ? QICON.done : (QICON[x.id] ?? QICON.star);
+        const chips = [
+          el('span', { class: 'q-chip xp' }, [`+${potionActive() ? x.reward.xp * 2 : x.reward.xp} XP`]),
+          el('span', { class: 'q-chip coin' }, [`+${x.reward.coins} ◆`]),
+          x.reward.reroll ? el('span', { class: 'q-chip rr' }, ['Relance du booster']) : null,
+        ];
+        return el('li', { class: `q ${x.done ? 'done' : ''} ${x.claimed ? 'claimed' : ''}`, style: `--p:${pct}%;--i:${i}` }, [
+          ico,
           el('div', { class: 'q-tx' }, [
             el('strong', {}, [x.title]),
             el('span', { class: 'muted small' }, [x.hint]),
-            el('span', { class: `q-rw ${x.reward.reroll ? 'reroll' : ''}` }, [`Récompense : ${rewardText(x.reward)}`]),
-            x.goal > 1 ? el('span', { class: 'q-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(x.goal), 'aria-valuenow': String(x.value), 'aria-label': `${x.title} : ${x.value} sur ${x.goal}` }, [el('i', { style: `width:${(x.value / x.goal) * 100}%` })]) : null,
+            el('span', { class: 'q-chips' }, chips),
+            el('span', { class: 'q-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(x.goal), 'aria-valuenow': String(x.value), 'aria-label': `${x.title} : ${x.value} sur ${x.goal}` }, [el('i', {}, []), el('b', {}, [`${x.value}/${x.goal}`])]),
           ]),
           action,
         ]);
       }));
       const st = chestState();
+      $('chest-title').textContent = `Coffre du jour : +${CHEST_XP} XP et +${CHEST_COINS} Éclats`;
       const got = q.filter((x) => x.claimed).length;
       $('chest').className = `chest ${st}`;
       const btn = $('chest-btn') as HTMLButtonElement;
@@ -495,23 +527,27 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
     .wr-tabs :global(.wr-tab:focus-visible) { outline: 3px solid var(--cyan); outline-offset: 2px; }
     .wr-tabs :global(.wr-count) { font-size: 0.7rem; font-weight: 700; color: var(--muted); padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); }
     .wr-slots :global(.wr[hidden]) { display: none; }
-    .wr-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .wr-row :global(.wr-opt) { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 82px; padding: 6px 4px 6px; border-radius: 16px;
+    :global(.wr-row) { display: flex; gap: 8px; flex-wrap: wrap; }
+    :global(.wr-row) :global(.wr-opt) { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 82px; padding: 6px 4px 6px; border-radius: 16px;
       border: 2px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color 0.2s, transform 0.2s; }
-    .wr-row :global(.wr-opt:hover) { border-color: rgba(255, 255, 255, 0.3); }
-    .wr-row :global(.wr-opt input) { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
-    .wr-row :global(.wr-opt:has(input:checked)) { border-color: var(--magenta); box-shadow: 0 0 20px rgba(255, 79, 216, 0.3); transform: translateY(-2px); }
-    .wr-row :global(.wr-opt:has(input:focus-visible)) { outline: 3px solid var(--cyan); outline-offset: 3px; }
-    .wr-row :global(.wr-pv) { display: grid; place-items: center; height: 56px; pointer-events: none; }
-    .wr-row :global(.wr-pv svg) { overflow: visible; }
-    .wr-row :global(.wr-name) { font-size: 0.78rem; font-weight: 700; text-align: center; line-height: 1.15; }
-    .wr-row :global(.wr-opt.locked) { cursor: not-allowed; }
-    .wr-row :global(.wr-opt.locked input) { cursor: not-allowed; }
-    .wr-row :global(.wr-opt.locked .wr-pv) { filter: grayscale(1) brightness(0.45); }
-    .wr-row :global(.wr-opt.locked .wr-name) { color: var(--muted); }
-    .wr-row :global(.wr-lock.shop) { color: #3ef0ff; }
-    .wr-row :global(.wr-lock.own) { color: var(--up); }
-    .wr-row :global(.wr-lock) { position: absolute; top: 6px; right: 6px; padding: 1px 6px; border-radius: 8px; font-size: 0.66rem; font-weight: 800; background: var(--bg); border: 1px solid var(--line); color: var(--gold); }
+    :global(.wr-row) :global(.wr-opt:hover) { border-color: rgba(255, 255, 255, 0.3); }
+    :global(.wr-row) :global(.wr-opt input) { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
+    :global(.wr-row) :global(.wr-opt:has(input:checked)) { border-color: var(--magenta); box-shadow: 0 0 20px rgba(255, 79, 216, 0.3); transform: translateY(-2px); }
+    :global(.wr-row) :global(.wr-opt:has(input:focus-visible)) { outline: 3px solid var(--cyan); outline-offset: 3px; }
+    :global(.wr-row) :global(.wr-pv) { display: grid; place-items: center; height: 56px; pointer-events: none; }
+    :global(.wr-row) :global(.wr-pv svg) { overflow: visible; }
+    :global(.wr-row) :global(.wr-name) { font-size: 0.78rem; font-weight: 700; text-align: center; line-height: 1.15; }
+    :global(.wr-row) :global(.wr-opt.locked) { cursor: not-allowed; }
+    :global(.wr-row) :global(.wr-opt.locked input) { cursor: not-allowed; }
+    :global(.wr-row) :global(.wr-opt.locked .wr-pv) { filter: grayscale(1) brightness(0.45); }
+    :global(.wr-row) :global(.wr-opt.locked .wr-name) { color: var(--muted); }
+    :global(.wr-row) :global(.wr-padlock) { position: absolute; left: 50%; top: 14px; transform: translate(-50%, 0); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--gold); background: rgba(8, 6, 20, 0.82); border: 1.5px solid rgba(255, 210, 90, 0.65); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 2; }
+    :global(.wr-row) :global(.wr-padlock svg) { width: 16px; height: 16px; }
+    :global(.wr-row) :global(.wr-opt.locked:hover .wr-padlock) { animation: pad-wiggle 0.5s; }
+    @keyframes pad-wiggle { 25% { transform: translate(-50%, 0) rotate(-14deg); } 50% { transform: translate(-50%, 0) rotate(12deg); } 75% { transform: translate(-50%, 0) rotate(-6deg); } }
+    :global(.wr-row) :global(.wr-lock.shop) { color: #3ef0ff; }
+    :global(.wr-row) :global(.wr-lock.own) { color: var(--up); }
+    :global(.wr-row) :global(.wr-lock) { position: static; margin-top: 3px; padding: 1px 6px; border-radius: 8px; font-size: 0.66rem; font-weight: 800; background: var(--bg); border: 1px solid var(--line); color: var(--gold); }
     .ed-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
     .ed-actions [hidden] { display: none; }
     #ed-dirty { color: var(--gold); }
@@ -531,21 +567,38 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
     .q-score { font-family: var(--font-display); font-size: 1.2rem; color: var(--muted); white-space: nowrap; }
     .q-score strong { font-size: 2.2rem; color: var(--text); }
     .q-list { list-style: none; margin: 18px 0 12px; padding: 0; display: grid; gap: 10px; }
-    .q-list :global(.q) { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); }
-    .q-list :global(.q.done) { border-color: rgba(61, 255, 168, 0.45); background: rgba(61, 255, 168, 0.05); }
-    .q-list :global(.q-n) { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--surface-2); }
-    .q-list :global(.q.done .q-n) { background: rgba(61, 255, 168, 0.22); color: var(--up); }
-    .q-list :global(.q-tx) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .q-list :global(.q.done strong) { text-decoration: line-through; text-decoration-color: rgba(61, 255, 168, 0.6); }
-    .q-list :global(.q-bar) { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); position: relative; max-width: 260px; }
-    .q-list :global(.q-bar i) { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--holo); }
+    .q-list :global(.q) { position: relative; display: flex; align-items: center; gap: 14px; padding: 14px 16px 14px 14px; border-radius: 18px; border: 1px solid var(--line); overflow: hidden;
+      background: linear-gradient(110deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)); animation: q-in 0.5s cubic-bezier(.2,.9,.3,1.1) both; animation-delay: calc(var(--i, 0) * 90ms); transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
+    .q-list :global(.q::before) { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--holo); opacity: 0.55; }
+    .q-list :global(.q:hover) { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.22); }
+    @keyframes q-in { from { opacity: 0; transform: translateX(-24px); } }
+    .q-list :global(.q.done) { border-color: rgba(61, 255, 168, 0.55); background: linear-gradient(110deg, rgba(61, 255, 168, 0.12), rgba(61, 255, 168, 0.03)); box-shadow: 0 0 24px rgba(61, 255, 168, 0.12); }
+    .q-list :global(.q.done::before) { background: var(--up); opacity: 1; }
+    .q-list :global(.q.done:not(.claimed)::after) { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.14) 50%, transparent 65%); background-size: 250% 100%; animation: q-shine 2.6s ease-in-out infinite; pointer-events: none; }
+    @keyframes q-shine { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+    .q-list :global(.q-ico) { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: #0a0812; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35); }
+    .q-list :global(.q-ico svg) { width: 24px; height: 24px; }
+    .q-list :global(.q-ico.t-game) { background: linear-gradient(135deg, #ffd25a, #ff8a3d); }
+    .q-list :global(.q-ico.t-coll) { background: linear-gradient(135deg, #ff7ae0, #8a7bff); }
+    .q-list :global(.q-ico.t-look) { background: linear-gradient(135deg, #3ef0ff, #3dffa8); }
+    .q-list :global(.q.done .q-ico) { background: linear-gradient(135deg, #3dffa8, #14a37f); }
+    .q-list :global(.q-tx) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .q-list :global(.q.claimed strong) { text-decoration: line-through; text-decoration-color: rgba(61, 255, 168, 0.6); }
+    .q-list :global(.q-chips) { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .q-list :global(.q-chip) { padding: 2px 9px; border-radius: 999px; font-size: 0.74rem; font-weight: 800; border: 1px solid transparent; }
+    .q-list :global(.q-chip.xp) { background: rgba(138, 123, 255, 0.18); color: #cfc8ff; border-color: rgba(138, 123, 255, 0.35); }
+    .q-list :global(.q-chip.coin) { background: rgba(255, 210, 90, 0.14); color: var(--gold); border-color: rgba(255, 210, 90, 0.35); }
+    .q-list :global(.q-chip.rr) { background: rgba(62, 240, 255, 0.12); color: var(--cyan); border-color: rgba(62, 240, 255, 0.35); }
+    .q-list :global(.q-bar) { display: flex; align-items: center; gap: 8px; margin-top: 6px; max-width: 320px; }
+    .q-list :global(.q-bar i) { position: relative; flex: 1; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+    .q-list :global(.q-bar i::after) { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--p, 0%); border-radius: 4px; background: var(--holo); transition: width 0.8s cubic-bezier(.2,.9,.3,1); animation: q-fill 0.9s cubic-bezier(.2,.9,.3,1) both; }
+    @keyframes q-fill { from { width: 0; } }
+    .q-list :global(.q-bar b) { font-size: 0.74rem; color: var(--muted); font-weight: 800; min-width: 28px; }
     .q-list :global(.q-go) { flex: 0 0 auto; white-space: nowrap; }
     .q-list :global(.q-ok) { flex: 0 0 auto; color: var(--up); font-weight: 800; }
-    .q-note { margin: 0; }
-    .q-list :global(.q-rw) { align-self: flex-start; margin-top: 4px; padding: 2px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 800; background: rgba(138, 123, 255, 0.16); color: #c9c1ff; }
-    .q-list :global(.q-rw.reroll) { background: rgba(255, 210, 90, 0.14); color: var(--gold); }
-    .q-list :global(.q.claimed) { opacity: 0.75; }
+    .q-list :global(.q.claimed) { opacity: 0.8; }
     .q-list :global(.q-claim) { flex: 0 0 auto; white-space: nowrap; animation: claim-pulse 1.6s ease-in-out infinite; }
+    .q-note { margin: 0; }
     @keyframes claim-pulse { 50% { box-shadow: 0 0 22px rgba(61, 255, 168, 0.45); } }
     .chest { display: flex; align-items: center; gap: 16px; padding: 14px 16px; margin: 0 0 12px; border-radius: 18px; border: 1px dashed rgba(255, 210, 90, 0.45); background: rgba(255, 210, 90, 0.04); }
     .chest.ready { border-style: solid; border-color: var(--gold); background: linear-gradient(120deg, rgba(255, 210, 90, 0.14), rgba(255, 138, 61, 0.06)); box-shadow: 0 0 30px rgba(255, 210, 90, 0.25); }
@@ -630,7 +683,7 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
       .ac-avatar :global(svg) { width: 150px; height: auto; }
       .xp { margin: 0 auto; }
       .chips { justify-content: center; }
-      .wr-row :global(.wr-opt) { width: calc((100% - 30px) / 4); min-width: 70px; }
+      :global(.wr-row) :global(.wr-opt) { width: calc((100% - 30px) / 4); min-width: 70px; }
       .chest { flex-wrap: wrap; }
       .chest .btn { width: 100%; }
       .q-list :global(.q-claim) { width: 100%; }

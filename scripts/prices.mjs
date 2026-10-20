@@ -3,8 +3,8 @@
 // Les cartes suivies sont celles du Marché (liste WATCHLIST), des rivaux du Classement et les cartes
 // « chasse » des deux dernières extensions.
 // Sources recoupées : Cardmarket et TCGplayer via TCGdex, Cardmarket et TCGplayer via pokemontcg.io,
-// taux de change du jour de la Banque centrale européenne (frankfurter.app). La cote retenue est la
-// médiane des sources disponibles, en euros.
+// taux de change du jour de la Banque centrale européenne (frankfurter.app). La cote retenue suit src/lib/consensus.ts
+// (Cardmarket d'abord, TCGplayer en secours), en euros.
 
 import fs from 'node:fs';
 
@@ -31,6 +31,14 @@ async function get(path, base = API) {
 }
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
+/** Même règle que src/lib/consensus.ts : Cardmarket d'abord, TCGplayer seulement en secours. */
+function consensusOf(s, fx) {
+  const cm = num(s.cm), pcm = num(s.pcm);
+  if (cm && pcm) { const r = Math.max(cm, pcm) / Math.min(cm, pcm); return r <= 1.5 ? { value: (cm + pcm) / 2, n: 2, uncertain: false } : { value: cm, n: 1, uncertain: r > 2.5 }; }
+  if (cm || pcm) return { value: cm ?? pcm, n: 1, uncertain: false };
+  const us = [num(s.tp), num(s.ptp)].filter((x) => x !== undefined).map((x) => x * fx);
+  return us.length ? { value: median(us), n: us.length, uncertain: true } : null;
+}
 const median = (a) => { const v = a.filter((x) => x !== undefined).sort((x, y) => x - y); if (!v.length) return undefined; const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
 
 /** Même calcul que la fiche carte : médiane de la tendance, du prix moyen et des moyennes 7 et 30 jours. */
@@ -111,15 +119,16 @@ await Promise.all(Array.from({ length: 8 }, async () => {
     const pcm = median([num(pc?.cardmarket?.prices?.trendPrice), num(pc?.cardmarket?.prices?.averageSellPrice), num(pc?.cardmarket?.prices?.avg7), num(pc?.cardmarket?.prices?.avg30)]);
     const ptp = tpVal(pc?.tcgplayer?.prices, PTCG_TP);
     const src = { cm: cmv, tp: tpv, pcm, ptp };
-    const eur = [cmv, tpv && tpv * fx, pcm, ptp && ptp * fx].filter((x) => x !== undefined && x > 0);
-    const p = median(eur);
-    if (p === undefined) continue;
+    const cons = consensusOf(src, fx);
+    if (!cons) continue;
+    const p = cons.value;
+    const eur = [cmv, tpv && tpv * fx, pcm, ptp && ptp * fx].filter((x) => x !== undefined && x > 0); // toutes les sources, pour l'écart affiché
     const entry = hist.cards[id] ?? { n: card?.name ?? id, p: [] };
     entry.n = card?.name ?? entry.n;
     entry.p = entry.p.filter(([d]) => d !== day);
     entry.p.push([day, Math.round(p * 100) / 100]);
     entry.p = entry.p.slice(-MAX_POINTS);
-    entry.c = [day, Math.round(p * 100) / 100, eur.length];
+    entry.c = [day, Math.round(p * 100) / 100, cons.n];
     entry.s = Object.fromEntries(Object.entries(src).filter(([, v]) => v !== undefined).map(([k, v]) => [k, Math.round(v * 100) / 100]));
     // Fiche pour le Marché et la Recherche (évite des centaines de requêtes côté visiteur).
     const cm = (lang === 'fr' ? card : tpCard)?.pricing?.cardmarket ?? card?.pricing?.cardmarket;
@@ -130,15 +139,25 @@ await Promise.all(Array.from({ length: 8 }, async () => {
     entry.m = {
       l: lang, i: card?.image, s: card?.set?.name, r: card?.rarity, g: group,
       a7: k('avg7'), a30: k('avg30'), lo: k('low'), up: cm?.updated,
-      u: refs.length < 2 || Math.max(...refs) / Math.min(...refs) > 3 || undefined,
+      u: refs.length < 2 || Math.max(...refs) / Math.min(...refs) > 3 || cons.uncertain || undefined,
     };
     hist.cards[id] = entry;
     if (watch.includes(id)) { index += p; indexN++; }
-    if (eur.length >= 2) multi++;
+    if (cons.n >= 2) multi++;
     ok++;
   }
 }));
 hist.fx = fx;
+// Anciens relevés : on recalcule la cote du dernier jour avec la règle actuelle (idempotent).
+for (const [id, e] of Object.entries(hist.cards)) {
+  if (id.startsWith('_') || !e.s || !e.c || e.c[0] === day) continue;
+  const r = consensusOf(e.s, hist.fx);
+  if (!r) continue;
+  const v = Math.round(r.value * 100) / 100;
+  e.c = [e.c[0], v, r.n];
+  const last = e.p[e.p.length - 1];
+  if (last && last[0] === e.c[0]) last[1] = v;
+}
 if (indexN) {
   const e = hist.cards._index ?? { n: 'Indice HoloCote (somme des cotes du Marché)', p: [] };
   e.p = [...e.p.filter(([d]) => d !== day), [day, Math.round(index)]].slice(-MAX_POINTS);

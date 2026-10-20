@@ -404,12 +404,39 @@ html[data-event] .btn-primary { box-shadow: 0 0 22px color-mix(in srgb, var(--ev
   100% { transform: translate(calc(var(--sway) * -0.3), 106vh) rotate(calc(var(--r0, 0deg) + 300deg)) scale(var(--s)); opacity: 0; }
 }
 @keyframes ev-flip { from { transform: perspective(200px) rotateX(-70deg) rotateY(15deg); } to { transform: perspective(200px) rotateX(70deg) rotateY(-15deg); } }
-.evp-fossil { width: 14px; height: 14px; border-radius: 50% 50% 50% 0; background: radial-gradient(circle at 35% 35%, #ffe2a8, #ff9a2e 55%, #8a4f16); }
-.evp-mega { width: 4px; height: 26px; border-radius: 2px; background: linear-gradient(transparent, #ff4fd8, #fff); box-shadow: 0 0 10px #ff4fd8; }
-.evp-mega:nth-child(2n) { background: linear-gradient(transparent, #8a7bff, #fff); box-shadow: 0 0 10px #8a7bff; }
-.evp-kanto { width: 12px; height: 12px; background: #ffd25a; clip-path: polygon(50% 0, 61% 35%, 100% 35%, 68% 57%, 79% 100%, 50% 72%, 21% 100%, 32% 57%, 0 35%, 39% 35%); }
-.evp-kanto:nth-child(3n) { background: #ff4f6d; }
-.evp-prism { width: 10px; height: 10px; transform: rotate(45deg); background: linear-gradient(135deg, #3ef0ff, #ff4fd8, #ffd25a); box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); }
+.evp-fossil { width: 30px; height: 30px; animation-name: ev-drift; background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M20 4a16 16 0 1 1-14 24 12 12 0 0 1 22-10 8 8 0 0 1-12 8 5 5 0 0 1 6-6' fill='none' stroke='%23ffb36b' stroke-width='3.2' stroke-linecap='round'/%3E%3Cpath d='M20 4a16 16 0 0 1 16 16M9 10l3 3M4 22h4M30 6l-2 3M36 22l-4 1M33 32l-3-2' stroke='%23c97b2a' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4)); }
+.evp-fossil:nth-child(3n) { width: 14px; height: 14px; background: radial-gradient(circle at 35% 35%, #ffe2a8, #ff9a2e 55%, #8a4f16); border-radius: 50% 50% 50% 0; filter: none; }
+.evp-fossil:nth-child(4n) { width: 20px; height: 20px; }
+.evp-mega { width: 16px; height: 34px; animation-name: ev-drift; clip-path: polygon(50% 0, 100% 32%, 72% 100%, 28% 100%, 0 32%); background: linear-gradient(160deg, #fff, #ff4fd8 45%, #5a2bd6); filter: drop-shadow(0 0 8px #ff4fd8); }
+.evp-mega:nth-child(2n) { background: linear-gradient(160deg, #fff, #8a7bff 45%, #2b1a7a); filter: drop-shadow(0 0 8px #8a7bff); }
+.evp-mega:nth-child(5n) { width: 10px; height: 22px; }
+.evp-kanto { width: 18px; height: 12px; animation-name: ev-drift; border-radius: 100% 0 100% 0; background: linear-gradient(135deg, #ffd2dc, #ff4f6d 60%, #b3203f); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.evp-kanto:nth-child(4n) { width: 14px; height: 14px; border-radius: 0; background: #ffd25a; clip-path: polygon(50% 0, 61% 35%, 100% 35%, 68% 57%, 79% 100%, 50% 72%, 21% 100%, 32% 57%, 0 35%, 39% 35%); filter: drop-shadow(0 0 6px #ffb347); }
+.evp-prism { width: 22px; height: 22px; animation: ev-drift var(--d) linear infinite var(--delay), ev-tw 1.3s ease-in-out infinite alternate; clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); background: linear-gradient(135deg, #3ef0ff, #fff 45%, #ff4fd8); }
+.evp-prism:nth-child(3n) { background: linear-gradient(135deg, #ffd25a, #fff 45%, #8a7bff); width: 14px; height: 14px; }
+@keyframes ev-tw { from { filter: brightness(0.8); } to { filter: brightness(1.8) drop-shadow(0 0 6px #fff); } }
+
+/* Gerbes au clic, traînée de la souris, éclairs et étoiles filantes */
+.ev-burst { position: fixed; inset: 0; z-index: 91; pointer-events: none; overflow: hidden; }
+.evb { position: absolute; width: 9px; height: 9px; margin: -4px; background: var(--ev1, #fff); box-shadow: 0 0 10px var(--ev2, #fff); border-radius: 50%; animation: ev-burst 0.85s cubic-bezier(0.1, 0.7, 0.3, 1) forwards; }
+.evb.trail { width: 6px; height: 6px; margin: -3px; animation-name: ev-trail; animation-duration: 0.7s; }
+.evb-jungle { width: 14px; height: 9px; border-radius: 0 100% 0 100%; background: linear-gradient(135deg, #b8ffd9, #12a06f); }
+.evb-vintage { width: 14px; height: 6px; border-radius: 1px; background: linear-gradient(115deg, #b8860b, #fff6c8 40%, #ffd25a); }
+.evb-fossil { background: radial-gradient(circle at 35% 35%, #ffe2a8, #ff9a2e 60%, #8a4f16); }
+.evb-mega { width: 5px; height: 16px; border-radius: 2px; background: linear-gradient(#fff, #ff4fd8); }
+.evb-kanto { width: 12px; height: 12px; border-radius: 0; background: #ffd25a; clip-path: polygon(50% 0, 61% 35%, 100% 35%, 68% 57%, 79% 100%, 50% 72%, 21% 100%, 32% 57%, 0 35%, 39% 35%); }
+.evb-prism { width: 12px; height: 12px; border-radius: 0; background: linear-gradient(135deg, #3ef0ff, #fff, #ff4fd8); clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); }
+@keyframes ev-burst { 0% { transform: rotate(var(--a)) translateX(6px) rotate(var(--r)) scale(1); opacity: 1; } 100% { transform: rotate(var(--a)) translateX(var(--d)) rotate(calc(var(--r) + 260deg)) scale(0.2); opacity: 0; } }
+@keyframes ev-trail { 0% { transform: translate(0, 0) scale(1); opacity: 0.9; } 100% { transform: translate(calc(cos(var(--a)) * var(--d)), calc(sin(var(--a)) * var(--d) + 18px)) scale(0); opacity: 0; } }
+.ev-bolt { position: absolute; top: 0; width: 120px; height: 70vh; margin-left: -60px; transform: rotate(var(--tilt, 0deg)); transform-origin: 50% 0; opacity: 0; mix-blend-mode: screen;
+  background: no-repeat center top / 100% 100% url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 200' preserveAspectRatio='none'%3E%3Cpath d='M34 0L18 62l14 4-20 70 12 3-14 61 42-82-14-3 22-64-16-3z' fill='%23fff' stroke='%23ff4fd8' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E"); filter: drop-shadow(0 0 18px #ff4fd8) drop-shadow(0 0 40px #8a7bff); animation: ev-bolt 0.65s steps(1) forwards; }
+@keyframes ev-bolt { 0% { opacity: 0; } 8% { opacity: 1; } 18% { opacity: 0.15; } 28% { opacity: 1; } 55% { opacity: 0.5; } 100% { opacity: 0; } }
+.ev-shoot { position: absolute; left: -10%; width: 160px; height: 3px; border-radius: 3px; transform: rotate(18deg); background: linear-gradient(90deg, transparent, #fff); box-shadow: 0 0 12px #fff; animation: ev-shoot 1.2s ease-in forwards; }
+.ev-shoot-kanto { background: linear-gradient(90deg, transparent, #ffd25a); box-shadow: 0 0 12px #ff8a3d; }
+.ev-shoot-prism { background: linear-gradient(90deg, transparent, #3ef0ff 40%, #ff4fd8); box-shadow: 0 0 14px #8a7bff; }
+.ev-shoot-vintage { background: linear-gradient(90deg, transparent, #ffd25a); box-shadow: 0 0 12px #ffb347; }
+@keyframes ev-shoot { from { transform: translate(0, 0) rotate(18deg); opacity: 1; } to { transform: translate(120vw, 40vh) rotate(18deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ev-burst { display: none; } }
 html.ev-still .evr-main, html.ev-still .holo-text { animation: none; }
 @media (prefers-reduced-motion: reduce) { .ev-fx { display: none; } .evr-main, html[data-event] .holo-text { animation: none; } }
 
@@ -482,8 +509,8 @@ html.ev-still .evr-main, html.ev-still .holo-text { animation: none; }
 /* Méga : éclairs, impulsions d'énergie, balayage lumineux */
 .ev-amb-mega b:nth-child(1) { inset: 0; background: radial-gradient(circle at 50% 40%, rgba(255, 79, 216, 0.25), transparent 55%); mix-blend-mode: screen; opacity: 0; animation: ev-flicker 6.5s steps(1) infinite; }
 @keyframes ev-flicker { 0%, 6%, 9%, 100% { opacity: 0; } 7% { opacity: 1; } 8% { opacity: 0.2; } 52% { opacity: 0; } 53% { opacity: 0.8; } 55% { opacity: 0; } }
-.ev-amb-mega b:nth-child(2) { left: 50%; top: 40%; width: 20px; height: 20px; margin: -10px; border-radius: 50%; border: 2px solid rgba(255, 79, 216, 0.6); animation: ev-pulse 4s ease-out infinite; }
-.ev-amb-mega b:nth-child(3) { left: 50%; top: 40%; width: 20px; height: 20px; margin: -10px; border-radius: 50%; border: 2px solid rgba(138, 123, 255, 0.6); animation: ev-pulse 4s ease-out 2s infinite; }
+.ev-amb-mega b:nth-child(2) { left: 50%; top: 40%; width: 20px; height: 20px; margin: -10px; border-radius: 50%; border: 2px solid rgba(255, 79, 216, 0.3); animation: ev-pulse 4s ease-out infinite; }
+.ev-amb-mega b:nth-child(3) { left: 50%; top: 40%; width: 20px; height: 20px; margin: -10px; border-radius: 50%; border: 2px solid rgba(138, 123, 255, 0.3); animation: ev-pulse 4s ease-out 2s infinite; }
 @keyframes ev-pulse { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(90); opacity: 0; } }
 /* Kanto : lanternes qui montent, lueur rouge et or */
 .ev-amb-kanto b:nth-child(1) { inset: 0; background: radial-gradient(ellipse at 50% 120%, rgba(255, 79, 109, 0.28), transparent 60%); animation: ev-breathe 5s ease-in-out infinite alternate; }
@@ -552,3 +579,4 @@ html.ev-still .ev-amb { display: none; }
 .glint-2 { box-shadow: 0 0 18px rgba(255, 79, 216, 0.85); }
 .glint-3 { box-shadow: 0 0 24px 4px rgba(255, 210, 90, 0.95); animation: glint-pop 0.6s ease-out; }
 @keyframes glint-pop { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+html.ev-still .ev-burst { display: none; }

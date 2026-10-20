@@ -608,13 +608,13 @@ export function loadMarket(force = false): Promise<Market> {
       return toQuote(card, 'fr', 'new');
     })).filter(Boolean).slice(0, 16);
     const quotes = [...legends, ...fresh].filter((q): q is Quote => !!q);
-    // Cote multi-sources du relevé quotidien (Cardmarket + TCGplayer via deux API), si elle date de moins de 3 jours.
+    // Cote du relevé quotidien (Cardmarket recoupé, TCGplayer en secours, règle de consensus.ts), si elle date de moins de 3 jours.
     try {
       const h = await loadHistory();
       const today = dayOf();
       for (const q of quotes) {
         const c = (h?.cards[q.id] as unknown as { c?: [number, number, number] } | undefined)?.c;
-        if (c && c[2] >= 2 && today - c[0] <= 3 && c[1] > 0) {
+        if (c && c[2] >= 1 && today - c[0] <= 3 && c[1] > 0) {
           q.price = c[1];
           q.sources = c[2];
           if (q.points.length) q.points[q.points.length - 1] = c[1];

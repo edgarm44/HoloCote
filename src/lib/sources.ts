@@ -2,14 +2,15 @@
 //  - Cardmarket (marché européen, en euros) et TCGplayer (marché américain, en dollars) via TCGdex ;
 //  - les mêmes places de marché via l'API pokemontcg.io (copie indépendante, mise à jour chaque jour) ;
 //  - le relevé quotidien HoloCote (data/history.json), qui fait ce recoupement chaque matin.
-// La cote HoloCote multi-sources est la médiane des valeurs disponibles, converties en euros.
+// La cote HoloCote suit la règle de consensus.ts : Cardmarket d'abord (euros), TCGplayer converti seulement en secours.
 
 import type { Card } from './tcgdex';
 import { USD_TO_EUR } from './rarity';
 import { loadHistory } from './history';
+import { consensusOf } from './consensus';
 
 export interface SourcePrice { id: 'cm' | 'tp' | 'pcm' | 'ptp'; name: string; via: string; value: number; unit: 'EUR' | 'USD'; eur: number; updated?: string; url?: string }
-export interface MultiPrice { sources: SourcePrice[]; consensus?: number; spread?: number; fx: number }
+export interface MultiPrice { sources: SourcePrice[]; consensus?: number; n?: number; uncertain?: boolean; spread?: number; fx: number }
 
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
 const median = (a: (number | undefined)[]) => { const v = a.filter((x): x is number => x !== undefined).sort((x, y) => x - y); if (!v.length) return undefined; const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
@@ -88,9 +89,11 @@ export async function multiPrice(card: Card): Promise<MultiPrice> {
   const pt = tpValue(p?.tcgplayer?.prices);
   if (pt) out.push({ id: 'ptp', name: 'TCGplayer', via: 'pokemontcg.io', value: pt, unit: 'USD', eur: pt * fx, updated: p?.tcgplayer?.updatedAt?.replace(/\//g, '-'), url: p?.tcgplayer?.url });
   const vals = out.map((s) => s.eur);
-  const consensus = median(vals);
+  const by = (id: SourcePrice['id']) => out.find((x) => x.id === id)?.value;
+  const c = consensusOf({ cm: by('cm'), pcm: by('pcm'), tp: by('tp'), ptp: by('ptp') }, fx);
+  const consensus = c?.value;
   const spread = vals.length >= 2 ? Math.max(...vals) / Math.min(...vals) : undefined;
-  return { sources: out, consensus, spread, fx };
+  return { sources: out, consensus, n: c?.n, uncertain: c?.uncertain, spread, fx };
 }
 
 /** Liens de vérification directe sur les places de marché. */

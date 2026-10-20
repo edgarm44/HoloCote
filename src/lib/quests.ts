@@ -47,13 +47,13 @@ function defs(): Def[] {
   try { const h = JSON.parse(localStorage.getItem('holocote.scans.v1') || '[]'); scans = Array.isArray(h) ? h.filter((x) => x && typeof x.at === 'number' && isToday(x.at)).length : 0; } catch { /* rien */ }
   return [
     { id: 'myst', title: 'Trouve la carte mystère du jour', hint: 'Dans le Défi, devine le Pokémon caché.', href: '/defi/#mystere', goal: 1, value: () => (today.m === 'won' ? 1 : 0) },
-    { id: 'myst3', title: 'Trouve la carte mystère en 3 essais ou moins', hint: 'Prends le temps de lire les indices.', href: '/defi/#mystere', goal: 1, value: () => (today.m === 'won' && (today.mt ?? 9) <= 3 ? 1 : 0) },
+    { id: 'myst3', title: 'Trouve la carte mystère en 4 essais ou moins', hint: 'Prends le temps de lire les indices.', href: '/defi/#mystere', goal: 1, value: () => (today.m === 'won' && (today.mt ?? 9) <= 4 ? 1 : 0) },
     { id: 'box', title: 'Ouvre le booster du jour', hint: 'Dix cartes, la dernière est pour toi.', href: '/defi/#booster', goal: 1, value: () => (today.b !== undefined ? 1 : 0) },
-    { id: 'duel', title: 'Gagne le duel du jour', hint: 'Laquelle des deux cartes a la plus grosse cote ?', href: '/defi/#duel', goal: 1, value: () => (today.d === 'ok' ? 1 : 0) },
+    { id: 'duel', title: 'Joue au duel du jour', hint: 'Laquelle des deux cartes a la plus grosse cote ? Gagné ou perdu, la quête compte.', href: '/defi/#duel', goal: 1, value: () => (today.d ? 1 : 0) },
     { id: 'play2', title: 'Joue à 2 jeux du Défi', hint: 'Carte mystère, booster ou duel du jour.', href: '/defi/', goal: 2, value: () => [today.m, today.b !== undefined ? 1 : undefined, today.d].filter(Boolean).length },
     { id: 'add', title: 'Range une carte dans ton classeur', hint: 'Avec le scanner, ou en gagnant une carte au Défi.', href: '/scanner/', goal: 1, value: () => getItems().filter((i) => isToday(i.addedAt)).length },
     { id: 'fav', title: 'Ajoute une carte à tes favoris', hint: 'L’étoile sur la fiche d’une carte.', href: '/#recherche', goal: 1, value: () => getFavorites().filter((f) => isToday(f.addedAt)).length },
-    { id: 'cards3', title: 'Consulte 3 fiches de cartes', hint: 'Cherche tes Pokémon préférés.', href: '/#recherche', goal: 3, value: () => v.cards.length },
+    { id: 'cards3', title: 'Consulte 2 fiches de cartes', hint: 'Cherche tes Pokémon préférés.', href: '/#recherche', goal: 2, value: () => v.cards.length },
     { id: 'market', title: 'Jette un œil au Marché', hint: 'Les cartes qui montent et qui baissent.', href: '/marche/', goal: 1, value: () => (v.pages.includes('marche') ? 1 : 0) },
     { id: 'deals', title: 'Regarde les Opportunités', hint: 'Les cartes peut-être bonnes à guetter.', href: '/opportunites/', goal: 1, value: () => (v.pages.includes('opportunites') ? 1 : 0) },
     { id: 'rank', title: 'Vérifie ta place au Classement', hint: 'Où en est ton classeur face aux rivaux ?', href: '/classement/', goal: 1, value: () => (v.pages.includes('classement') ? 1 : 0) },
@@ -66,11 +66,11 @@ const GAME = ['myst', 'box', 'duel', 'play2', 'myst3'];
 
 /** Récompense de chaque quête : la quête de jeu offre une relance du booster du jour, les autres de l'XP. */
 const REWARDS: Record<string, Reward> = {
-  myst: { xp: 20, coins: 15, reroll: true }, myst3: { xp: 40, coins: 25, reroll: true }, box: { xp: 20, coins: 15, reroll: true }, duel: { xp: 30, coins: 15, reroll: true }, play2: { xp: 30, coins: 20, reroll: true },
-  add: { xp: 60, coins: 25 }, fav: { xp: 40, coins: 20 }, cards3: { xp: 40, coins: 20 }, market: { xp: 30, coins: 15 }, deals: { xp: 30, coins: 15 }, rank: { xp: 30, coins: 15 }, scan: { xp: 60, coins: 25 },
+  myst: { xp: 30, coins: 25, reroll: true }, myst3: { xp: 60, coins: 40, reroll: true }, box: { xp: 30, coins: 25, reroll: true }, duel: { xp: 45, coins: 25, reroll: true }, play2: { xp: 45, coins: 30, reroll: true },
+  add: { xp: 80, coins: 40 }, fav: { xp: 60, coins: 30 }, cards3: { xp: 55, coins: 30 }, market: { xp: 45, coins: 25 }, deals: { xp: 45, coins: 25 }, rank: { xp: 45, coins: 25 }, scan: { xp: 80, coins: 40 },
 };
-export const CHEST_XP = 50;
-export const CHEST_COINS = 40;
+export const CHEST_XP = 80;
+export const CHEST_COINS = 60;
 
 function pickIds(n: number): string[] {
   const all = defs().map((d) => d.id);
