@@ -77,8 +77,16 @@ function drawDistinct(pool: CardBrief[], n: number, taken: Set<string> = new Set
 /** Tire un nouveau booster : 9 cartes de l'extension, puis une 10ᵉ « carte à gagner » plus souvent rare. */
 export async function drawBooster(opts: { save?: boolean; setId?: string; boost?: boolean; event?: boolean } = {}): Promise<BoosterState | null> {
   const day = todayNumber();
-  const setId = opts.setId ?? setOfDay(day);
-  const d = await setDetail(setId);
+  let setId = opts.setId ?? setOfDay(day);
+  let d = await setDetail(setId);
+  // Booster du jour : si l'extension du jour ne répond pas, on prend la suivante de la rotation plutôt que d'échouer.
+  if (!d?.cards?.length && !opts.setId) {
+    const i = BOOSTER_SETS.indexOf(setId);
+    for (let k = 1; k <= 3 && !d?.cards?.length; k++) {
+      setId = BOOSTER_SETS[(i + k) % BOOSTER_SETS.length];
+      d = await setDetail(setId);
+    }
+  }
   if (!d?.cards?.length) return null;
   const official = d.cardCount?.official ?? d.cards.length;
   const num = (c: CardBrief) => (/^\d+$/.test(c.localId) ? Number(c.localId) : 0);

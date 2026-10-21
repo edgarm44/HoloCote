@@ -134,3 +134,12 @@ export async function playDeck(items: DeckItem[], o: { colors?: [string, string,
   await wait(skipAll ? 80 : 420);
   root.remove();
 }
+
+// Retour arrière du navigateur (page restaurée telle quelle) : on retire tout écran de dévoilement resté ouvert.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pageshow', (e) => {
+    if (!(e as PageTransitionEvent).persisted) return;
+    document.querySelectorAll('.dfx, .pfx, .hfx').forEach((n) => n.remove());
+    document.body.classList.remove('dfx-lock');
+  });
+}
