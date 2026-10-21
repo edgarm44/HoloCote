@@ -421,6 +421,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
       }
       nav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 18px; }
       @media (min-width: 1241px) { nav a { padding: 8px 6px; gap: 5px; font-size: 0.85rem; } nav svg { width: 15px; height: 15px; flex-basis: 15px; } }
+      @media (min-width: 1241px) and (max-width: 1440px) { nav svg { display: none; } nav a { padding: 8px 7px; } }
       @media (min-width: 721px) and (max-width: 1240px) {
         nav svg { display: none; }
         nav a { padding: 8px 6px; font-size: 0.86rem; }

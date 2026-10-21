@@ -36,6 +36,7 @@ import Base from '../layouts/Base.astro';
           <button type="button" class="btn btn-primary" id="hit-claim" hidden>Ranger dans mon classeur</button>
           <button type="button" class="btn" id="hit-next" hidden>Booster suivant</button>
         </div>
+        <p class="op-sum" id="op-sum" hidden></p>
         <p class="muted small" id="hit-note"></p>
       </div>
     </div>
@@ -244,7 +245,7 @@ import Base from '../layouts/Base.astro';
         $('hit-name').textContent = 'Encore face cachée';
         $('hit-meta').textContent = 'Retourne-la : c’est cette carte que tu peux ranger dans ton classeur.';
         $('hit-price').textContent = '';
-        claim.hidden = true; next.hidden = true; $('hit-note').textContent = '';
+        claim.hidden = true; next.hidden = true; $('hit-note').textContent = ''; $('op-sum').hidden = true;
         return;
       }
       const lvl = hitLevel(c ?? null);
@@ -260,6 +261,13 @@ import Base from '../layouts/Base.astro';
       claim.disabled = current.pack.claimed || owned || !c;
       claim.textContent = current.pack.claimed ? 'Dans ton classeur' : owned ? 'Déjà dans ton classeur' : 'Ranger dans mon classeur';
       $('hit-note').textContent = owned ? 'Tu as déjà cette carte : chaque carte n’est rangée qu’une fois.' : current.pack.claimed ? 'Rangée en état Near Mint.' : 'La dernière carte de chaque booster événement peut rejoindre ton classeur (état Near Mint).';
+      const eur = current.pulled.filter((p) => p.unit === 'EUR' && p.value !== undefined);
+      const sum = $('op-sum');
+      if (eur.length) {
+        const best = [...eur].sort((x, y) => (y.value ?? 0) - (x.value ?? 0))[0];
+        sum.textContent = `Valeur du booster : ${fmt(eur.reduce((t, p) => t + (p.value ?? 0), 0))} · carte la plus chère : ${best.card?.name ?? '—'} (${fmt(best.value, best.unit)})`;
+        sum.hidden = false;
+      } else sum.hidden = true;
       const more = (ev && packsLeft(ev) > 0) || bonusTickets() > 0;
       next.hidden = !more;
     }
@@ -294,6 +302,21 @@ import Base from '../layouts/Base.astro';
       }
       renderShelf();
       revealing = false;
+      // Cinquième et dernier booster : pluie de confettis aux couleurs de l'événement.
+      if (!cur.bonus && ev && packsLeft(ev) <= 0 && !reduced) finale();
+    }
+
+    function finale() {
+      const [a, b, c] = theme.colors;
+      const box = el('div', { class: 'ev-finale', 'aria-hidden': 'true' });
+      for (let i = 0; i < 70; i++) {
+        const p = el('i');
+        p.style.cssText = `--x:${Math.random() * 100}%;--d:${(2.2 + Math.random() * 2).toFixed(2)}s;--dl:${(Math.random() * 0.9).toFixed(2)}s;--r:${Math.round(Math.random() * 720 - 360)}deg;--w:${6 + Math.round(Math.random() * 8)}px;background:${[a, b, c, '#fff', '#ffd25a'][i % 5]}`;
+        box.append(p);
+      }
+      document.body.append(box);
+      toast('Les 5 boosters sont ouverts : bravo !');
+      setTimeout(() => box.remove(), 5200);
     }
 
     $('hit-claim').addEventListener('click', () => {
@@ -440,6 +463,7 @@ import Base from '../layouts/Base.astro';
     .op-cards { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; margin-bottom: 22px; }
     @media (max-width: 900px) { .op-cards { grid-template-columns: repeat(5, 1fr); } }
     .op-cards :global(.oc) { position: relative; aspect-ratio: 245 / 342; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+    .op-sum { margin: 8px 0 0; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14); font-weight: 700; font-size: 0.9rem; }
     .op-cards :global(.oc.wait) { visibility: hidden; }
     .op-cards :global(.oc:not(.dealin)) { animation: card-in 0.45s cubic-bezier(.2,.9,.3,1.3) both; }
     .op-cards :global(.oc img) { width: 100%; height: 100%; object-fit: cover; display: block; }

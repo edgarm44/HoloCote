@@ -175,7 +175,7 @@ import { mascotSvg } from '../lib/mascot';
         <p class="bx-rates muted small" id="bx-rates">Chances pour la dixième carte : 13 % carte exceptionnelle (hyper rare, dorée…), 28 % carte « chasse » (numéro au-delà de la série), 34 % rare de la série, 25 % carte ordinaire. Simulation : ce ne sont pas les taux officiels.</p>
         <button type="button" class="btn btn-primary bx-again" id="bx-again" hidden>Ouvrir un autre booster</button>
         <div class="bx-sum" id="bx-sum" hidden>
-          <div><span class="muted small">Valeur du booster</span><strong id="bx-total">—</strong></div>
+          <div><span class="muted small" id="bx-total-l">Valeur du booster</span><strong id="bx-total">—</strong></div>
           <div><span class="muted small">Meilleure carte</span><strong id="bx-best">—</strong></div>
           <div><span class="muted small">Prochain booster dans</span><strong id="bx-next">--:--:--</strong></div>
         </div>
@@ -764,8 +764,10 @@ import { mascotSvg } from '../lib/mascot';
       $('bx-reroll-note').textContent = `Relances gagnées avec les quêtes du jour.${lost ? ' Attention : la dixième carte de ce booster, pas encore rangée, sera perdue.' : ''}`;
     }
 
-    function renderSummary() {
-      const eur = pulled.filter((p) => p.unit === 'EUR' && p.value !== undefined);
+    /** Récapitulatif : tant que la dixième carte est face cachée, elle n'est pas comptée (pas de spoiler). */
+    function renderSummary(full: boolean) {
+      $('bx-total-l').textContent = full ? 'Valeur du booster' : 'Valeur des 9 premières cartes';
+      const eur = (full ? pulled : pulled.slice(0, 9)).filter((p) => p.unit === 'EUR' && p.value !== undefined);
       const total = eur.reduce((s, p) => s + (p.value ?? 0), 0);
       const best = [...eur].sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0];
       $('bx-total').textContent = eur.length ? fmt(total) : '—';
@@ -783,6 +785,7 @@ import { mascotSvg } from '../lib/mascot';
       if (bState && !bState.opened && !bxTrain) { bState.opened = true; saveBooster(bState); }
       await playHitReveal(hitLevel(lastC), lastC?.image, lastC?.name);
       renderHit(true);
+      renderSummary(true);
       if (hitLevel(pulled[pulled.length - 1]?.card ?? null) >= 2) navigator.vibrate?.([30, 40, 60]);
       refreshStatus();
       revealing = false;
@@ -826,7 +829,7 @@ import { mascotSvg } from '../lib/mascot';
           land: () => { c?.classList.add('up'); if (lvl >= 1 && !reduced) setTimeout(() => c?.classList.add(`glint-${lvl}`), 350); },
         };
       }), { colors: bxTrain ? undefined : undefined, title: $('bx-pack-set').textContent || 'Ton booster' });
-      renderSummary();
+      renderSummary(false);
       renderHit(false);
       refreshStatus();
       if (bxTrain && bState) { $('bx-set').textContent = bState.setName; }
@@ -869,7 +872,7 @@ import { mascotSvg } from '../lib/mascot';
       $('bx-state').replaceChildren();
       $('bx-cards').hidden = false;
       $('bx-cards').replaceChildren(...pulled.slice(0, 9).map((p, i) => mini(p, i, true)), mini(pulled[9], 9, bState.opened, true));
-      renderSummary();
+      renderSummary(!!bState.opened);
       renderHit(bState.opened);
     }
 

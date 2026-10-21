@@ -634,3 +634,9 @@ body.dfx-lock { overflow: hidden; }
 
 @keyframes dfx-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } }
 .dfx .dfx-fx { position: absolute; top: 0; z-index: 1; }
+
+/* ---- Confettis de fin d'événement ---- */
+.ev-finale { position: fixed; inset: 0; z-index: 93; pointer-events: none; overflow: hidden; }
+.ev-finale i { position: absolute; top: -20px; left: var(--x); width: var(--w); height: calc(var(--w) * 1.7); border-radius: 2px; opacity: 0; animation: ev-conf var(--d) cubic-bezier(0.3, 0.1, 0.6, 1) var(--dl) forwards; }
+@keyframes ev-conf { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 1; transform: translate(calc(var(--r) * 0.3), 105vh) rotate(var(--r)); } }
+@media (prefers-reduced-motion: reduce) { .ev-finale { display: none; } }
