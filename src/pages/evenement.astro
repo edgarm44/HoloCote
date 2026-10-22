@@ -220,7 +220,7 @@ import Base from '../layouts/Base.astro';
           const lvl = hitLevel(pulled[i]?.card ?? null);
           return {
             image: pulled[i]?.card?.image, name: pulled[i]?.card?.name ?? 'Carte', price: pulled[i]?.value !== undefined ? fmt(pulled[i].value, pulled[i].unit) : undefined,
-            lvl, target: c,
+            lvl, target: c, isNew: !!pulled[i]?.card && !hasCard(pulled[i].card!.id, 'fr'),
             land: () => { c.classList.remove('wait'); if (lvl >= 1) c.classList.add(`glint-${lvl}`); },
           };
         }), { colors: theme.colors, title: theme.setName, decor: theme.decor });

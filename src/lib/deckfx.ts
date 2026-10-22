@@ -6,6 +6,8 @@ export interface DeckItem {
   image?: string;
   name: string;
   price?: string;
+  /** Carte que le joueur n'a pas encore dans son classeur. */
+  isNew?: boolean;
   /** Niveau de rareté de la carte : 0 (commune) à 3 (exceptionnelle). */
   lvl: number;
   /** Emplacement de la carte dans la grille (vers lequel elle s'envole). */
@@ -35,12 +37,12 @@ export async function playDeck(items: DeckItem[], o: { colors?: [string, string,
     <div class="dfx-dots">${items.map(() => '<i></i>').join('')}</div>
     <div class="dfx-stage">
       <div class="dfx-pile"><i></i><i></i><i></i></div>
-      <div class="dfx-card" id="dfx-card"><div class="dfx-in"><div class="dfx-back"><span>HC</span></div><div class="dfx-front"></div><div class="dfx-shine"></div></div></div>
+      <div class="dfx-card" id="dfx-card"><div class="dfx-in"><div class="dfx-back"><span>HC</span></div><div class="dfx-front"></div><span class="dfx-new" id="dfx-new" hidden>Nouvelle</span><div class="dfx-shine"></div></div></div>
       <div class="dfx-sparks" id="dfx-sparks"></div>
     </div>
     <div class="dfx-info"><p class="dfx-tag" id="dfx-tag"></p><p class="dfx-name" id="dfx-name"></p><p class="dfx-price" id="dfx-price"></p></div>
     <p class="dfx-hint">Touche pour la carte suivante</p>
-    <button type="button" class="dfx-skip" id="dfx-skip">Tout passer</button>`;
+    <div class="dfx-btns"><button type="button" class="dfx-skip" id="dfx-fast" aria-pressed="false">Rapide</button><button type="button" class="dfx-skip" id="dfx-skip">Tout passer</button></div>`;
   if (o.decor) {
     // Décor de l'événement (feuilles, papier, éclats…) qui tombe derrière la carte.
     const fx = document.createElement('div');
@@ -60,10 +62,20 @@ export async function playDeck(items: DeckItem[], o: { colors?: [string, string,
   const card = $('dfx-card'), front = root.querySelector('.dfx-front') as HTMLElement, sparks = $('dfx-sparks');
   const dots = Array.from(root.querySelectorAll('.dfx-dots i')) as HTMLElement[];
 
+  let fast = false;
+  try { fast = localStorage.getItem('holocote.deckfast.v1') === '1'; } catch { /* rien */ }
+  const fastBtn = $('dfx-fast');
+  const paintFast = () => { fastBtn.setAttribute('aria-pressed', String(fast)); fastBtn.textContent = fast ? 'Rapide : oui' : 'Rapide'; };
+  paintFast();
   let skipAll = false;
   let nudge: () => void = () => {};
   const next = () => nudge();
-  root.addEventListener('click', (e) => { if ((e.target as HTMLElement).id === 'dfx-skip') { skipAll = true; } nudge(); });
+  root.addEventListener('click', (e) => {
+    const id = (e.target as HTMLElement).id;
+    if (id === 'dfx-fast') { fast = !fast; try { localStorage.setItem('holocote.deckfast.v1', fast ? '1' : '0'); } catch { /* rien */ } paintFast(); return; }
+    if (id === 'dfx-skip') skipAll = true;
+    nudge();
+  });
   const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { skipAll = true; nudge(); } else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); next(); } };
   document.addEventListener('keydown', key);
   /** Attend `ms` millisecondes, ou jusqu'à un clic. */
@@ -95,6 +107,7 @@ export async function playDeck(items: DeckItem[], o: { colors?: [string, string,
       front.append(img);
     } else front.append(Object.assign(document.createElement('span'), { className: 'dfx-ph', textContent: it.name }));
     $('dfx-tag').textContent = ''; $('dfx-name').textContent = ''; $('dfx-price').textContent = '';
+    $('dfx-new').hidden = true;
     root.classList.remove('flip', 'fly');
     card.style.transition = 'none'; card.style.transform = ''; card.style.opacity = '';
     void card.offsetWidth;
@@ -107,12 +120,13 @@ export async function playDeck(items: DeckItem[], o: { colors?: [string, string,
     root.classList.add('flip');
     burst(lvl);
     sparks.classList.remove('go'); void sparks.offsetWidth; sparks.classList.add('go');
-    await hold(430);
-    $('dfx-tag').textContent = LABEL[lvl];
+    await hold(fast ? 250 : 430);
+    $('dfx-new').hidden = !it.isNew;
+    $('dfx-tag').textContent = it.isNew && lvl === 0 ? 'Nouvelle carte' : LABEL[lvl];
     $('dfx-name').textContent = it.name;
     $('dfx-price').textContent = it.price ?? '';
     // 3. pause, plus longue pour les belles cartes
-    await hold(skipAll ? 0 : [620, 950, 1500, 2200][lvl]);
+    await hold(skipAll ? 0 : [620, 950, 1500, 2200][lvl] * (fast ? 0.45 : 1));
     // 4. elle s'envole vers sa place dans la grille
     if (!skipAll && it.target) {
       const r = it.target.getBoundingClientRect(), s = card.getBoundingClientRect();

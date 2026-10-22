@@ -825,7 +825,7 @@ import { mascotSvg } from '../lib/mascot';
         const c = grid.children[i] as HTMLElement | undefined;
         return {
           image: p?.card?.image, name: p?.card?.name ?? 'Carte', price: p?.value !== undefined ? fmt(p.value, p.unit) : undefined,
-          lvl, target: c,
+          lvl, target: c, isNew: !!p?.card && !hasCard(p.card.id, 'fr'),
           land: () => { c?.classList.add('up'); if (lvl >= 1 && !reduced) setTimeout(() => c?.classList.add(`glint-${lvl}`), 350); },
         };
       }), { colors: bxTrain ? undefined : undefined, title: $('bx-pack-set').textContent || 'Ton booster' });
