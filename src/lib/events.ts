@@ -11,7 +11,7 @@ export interface EventTheme {
   setName: string;
   year: string;
   tagline: string;
-  decor: 'vintage' | 'jungle' | 'fossil' | 'mega' | 'kanto' | 'prism';
+  decor: 'vintage' | 'jungle' | 'fossil' | 'mega' | 'kanto' | 'prism' | 'volt' | 'shadow';
   colors: [string, string, string];
 }
 
@@ -28,6 +28,10 @@ export const THEMES: EventTheme[] = [
     tagline: 'Les 151 originaux remis à neuf, illustrations spéciales comprises.' },
   { id: 'prism', name: 'Éclat prismatique', setId: 'sv08.5', setName: 'Évolutions Prismatiques', year: '2025', decor: 'prism', colors: ['#3ef0ff', '#ff4fd8', '#120b26'],
     tagline: 'Évoli et ses évolutions sous toutes les couleurs de l’arc-en-ciel.' },
+  { id: 'volt', name: 'Orage électrique', setId: 'swsh4', setName: 'Voltage Éclatant', year: '2020', decor: 'volt', colors: ['#ffe45a', '#3ea6ff', '#0b1230'],
+    tagline: 'Éclairs, étincelles et cartes Amazing : l’extension la plus électrique d’Épée et Bouclier.' },
+  { id: 'shadow', name: 'Nuit des rivalités', setId: 'sv10', setName: 'Rivalités Destinées', year: '2025', decor: 'shadow', colors: ['#ff4f6d', '#8a3dff', '#14061f'],
+    tagline: 'Des dresseurs et des Pokémon prêts à tout dans l’ombre : des cartes venues de la nuit.' },
 ];
 
 export const EVENT_BOOSTERS = 5;

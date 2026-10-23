@@ -51,6 +51,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
     <meta name="theme-color" content="#07060d" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <script is:inline>try { var t = localStorage.getItem('holocote.theme.v1'); if (t && /^[a-z]+$/.test(t) && t !== 'neon') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
   </head>
   <body>
     <a class="sr-only skip" href="#contenu">Aller au contenu</a>
@@ -147,7 +148,7 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
         if (/assets\.tcgdex\.net\/fr\//.test(img.src)) { img.dataset.fbk = '1'; img.src = img.src.replace('/fr/', '/en/'); }
       }, true);
       // Événement du week-end : il habille tout le site (couleurs, bandeau, particules qui tombent des onglets).
-      // Aperçu possible en semaine : ?apercu=jungle (ou base, fossil, mega, kanto, prism), ?apercu=off pour arrêter.
+      // Aperçu possible en semaine : ?apercu=jungle (ou base, fossil, mega, kanto, prism, volt, shadow), ?apercu=off pour arrêter.
       {
         const qp = new URLSearchParams(location.search).get('apercu');
         try { if (qp === 'off') sessionStorage.removeItem('holocote.apercu'); else if (qp && THEMES.some((t) => t.id === qp)) sessionStorage.setItem('holocote.apercu', qp); } catch { /* rien */ }
@@ -232,14 +233,14 @@ const ogImage = new URL(`${base}/og.png`, Astro.site).href;
           }, { passive: true });
           const sky = () => {
             if (!on || document.hidden) return;
-            if (theme.decor === 'mega') {
+            if (theme.decor === 'mega' || theme.decor === 'volt') {
               const f = document.createElement('div');
               f.className = 'ev-bolt';
               f.style.left = `${8 + Math.random() * 80}%`;
               f.style.setProperty('--tilt', `${Math.round(-12 + Math.random() * 24)}deg`);
               burst.append(f);
               setTimeout(() => f.remove(), 700);
-            } else if (theme.decor === 'prism' || theme.decor === 'kanto' || theme.decor === 'vintage') {
+            } else if (theme.decor === 'prism' || theme.decor === 'kanto' || theme.decor === 'vintage' || theme.decor === 'shadow') {
               const f = document.createElement('div');
               f.className = `ev-shoot ev-shoot-${theme.decor}`;
               f.style.top = `${10 + Math.random() * 40}%`;

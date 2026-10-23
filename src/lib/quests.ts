@@ -7,6 +7,8 @@ import { getItems } from './collection';
 import { getFavorites } from './favorites';
 import { addXp, addReroll, rerolls, MAX_REROLLS } from './xp';
 import { addCoins, potionActive, COIN } from './wallet';
+import { todayPred } from './predict';
+import { daily as intrusToday } from './intrus';
 
 /* ---------- Pages visitées aujourd'hui (pour les quêtes d'exploration) ---------- */
 const VISITS = 'holocote.visits.v1';
@@ -57,16 +59,19 @@ function defs(): Def[] {
     { id: 'market', title: 'Jette un œil au Marché', hint: 'Les cartes qui montent et qui baissent.', href: '/marche/', goal: 1, value: () => (v.pages.includes('marche') ? 1 : 0) },
     { id: 'deals', title: 'Regarde les Opportunités', hint: 'Les cartes peut-être bonnes à guetter.', href: '/opportunites/', goal: 1, value: () => (v.pages.includes('opportunites') ? 1 : 0) },
     { id: 'rank', title: 'Vérifie ta place au Classement', hint: 'Où en est ton classeur face aux rivaux ?', href: '/classement/', goal: 1, value: () => (v.pages.includes('classement') ? 1 : 0) },
+    { id: 'pred', title: 'Fais ta prédiction du jour', hint: 'Dans le Défi : la cote va-t-elle monter, rester stable ou baisser ?', href: '/defi/#prediction', goal: 1, value: () => (todayPred() ? 1 : 0) },
+    { id: 'intrus', title: 'Trouve l’intrus du jour', hint: 'Dans le Défi : quatre cartes, une seule n’a rien à voir.', href: '/defi/#intrus', goal: 1, value: () => (intrusToday()?.picked ? 1 : 0) },
     { id: 'scan', title: 'Scanne une carte', hint: 'Une photo suffit, même si tu l’as déjà.', href: '/scanner/', goal: 1, value: () => scans },
   ];
 }
 
 // Toujours une quête de jeu + deux autres, tirées selon le jour.
-const GAME = ['myst', 'box', 'duel', 'play2', 'myst3'];
+const GAME = ['myst', 'box', 'duel', 'play2', 'myst3', 'pred', 'intrus'];
 
 /** Récompense de chaque quête : la quête de jeu offre une relance du booster du jour, les autres de l'XP. */
 const REWARDS: Record<string, Reward> = {
   myst: { xp: 30, coins: 25, reroll: true }, myst3: { xp: 60, coins: 40, reroll: true }, box: { xp: 30, coins: 25, reroll: true }, duel: { xp: 45, coins: 25, reroll: true }, play2: { xp: 45, coins: 30, reroll: true },
+  pred: { xp: 40, coins: 25, reroll: true }, intrus: { xp: 40, coins: 25, reroll: true },
   add: { xp: 80, coins: 40 }, fav: { xp: 60, coins: 30 }, cards3: { xp: 55, coins: 30 }, market: { xp: 45, coins: 25 }, deals: { xp: 45, coins: 25 }, rank: { xp: 45, coins: 25 }, scan: { xp: 80, coins: 40 },
 };
 export const CHEST_XP = 80;

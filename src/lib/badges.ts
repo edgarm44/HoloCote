@@ -8,9 +8,12 @@ import { rarityTier } from './rarity';
 import { questDays } from './quests';
 import { bestSetPct } from './sets';
 import { eventStats } from './events';
+import { stats as predStats, predictions } from './predict';
+import { stats as intrusStats } from './intrus';
+import { addCoins } from './wallet';
 
 export type BadgeGroup = 'Classeur' | 'Défi' | 'Événements' | 'Quêtes' | 'Fidélité' | 'Explorer';
-export interface Badge { id: string; group: BadgeGroup; name: string; hint: string; icon: string; got: boolean; progress?: [number, number] }
+export interface Badge { id: string; group: BadgeGroup; name: string; hint: string; icon: string; got: boolean; progress?: [number, number]; reward: number; claimed: boolean }
 
 const num = (k: string, f: (v: unknown) => number): number => {
   try { return f(JSON.parse(localStorage.getItem(k) || 'null')); } catch { return 0; }
@@ -39,8 +42,14 @@ export function computeBadges(): Badge[] {
   const evs = eventStats();
   const saved = num('holocote.backup.v1', (v) => (typeof v === 'number' && v > 0 ? 1 : 0));
 
+  const pr = predStats();
+  const predToday = predictions().length ? 1 : 0;
+  const it = intrusStats();
+  let theme = '';
+  try { theme = localStorage.getItem('holocote.theme.v1') || ''; } catch { /* rien */ }
+  const claimed = claimedIds();
   const B = (id: string, group: BadgeGroup, icon: string, name: string, hint: string, value: number, goal: number): Badge =>
-    ({ id, group, icon, name, hint, got: value >= goal, progress: goal > 1 ? [Math.min(value, goal), goal] : undefined });
+    ({ id, group, icon, name, hint, got: value >= goal, progress: goal > 1 ? [Math.min(value, goal), goal] : undefined, reward: rewardFor(id, goal), claimed: claimed.includes(id) });
 
   return [
     B('c1', 'Classeur', '1', 'Première carte', 'Range ta première carte', cards, 1),
@@ -76,6 +85,23 @@ export function computeBadges(): Badge[] {
     B('scan', 'Explorer', 'SC', 'Premier scan', 'Scanne une carte', scans, 1),
     B('fav', 'Explorer', '★', 'Fan', '5 cartes en favoris', favs, 5),
     B('save', 'Explorer', 'SV', 'Prévoyant', 'Sauvegarde ta progression dans Compte', saved, 1),
+    B('c25', 'Classeur', '25', 'Classeur bien rempli', '25 cartes différentes', cards, 25),
+    B('c250', 'Classeur', '250', 'Grand collectionneur', '250 cartes différentes', cards, 250),
+    B('sets10', 'Classeur', 'XX', 'Explorateur d’extensions', 'Des cartes de 10 extensions', sets, 10),
+    B('box10', 'Défi', 'B10', 'Habitué des boosters', '10 boosters du jour ouverts', boosters, 10),
+    B('box30', 'Défi', 'B30', 'Ouvreur chevronné', '30 boosters du jour ouverts', boosters, 30),
+    B('myst30', 'Défi', '30?', 'Grand détective', '30 cartes mystère trouvées', mysteryWins, 30),
+    B('pred1', 'Défi', 'P', 'Voyant', 'Fais ta première prédiction', pr.played + predToday, 1),
+    B('pred5', 'Défi', 'P5', 'Bon pronostic', '5 prédictions justes', pr.won, 5),
+    B('pred3s', 'Défi', 'P3', 'Flair', '3 prédictions justes d’affilée', pr.best, 3),
+    B('int1', 'Défi', 'IN', 'Œil d’expert', 'Trouve ton premier intrus', it.won, 1),
+    B('int10', 'Défi', 'IN+', 'Pas dupe', '10 intrus trouvés', it.won, 10),
+    B('int5s', 'Défi', 'IN5', 'Sans faute', '5 intrus trouvés d’affilée', it.best, 5),
+    B('scan10', 'Explorer', 'S10', 'Scanner confirmé', 'Scanne 10 cartes', scans, 10),
+    B('fav20', 'Explorer', '20★', 'Super fan', '20 cartes en favoris', favs, 20),
+    B('ev25', 'Événements', 'E25', 'Fêtard', '25 boosters événement ouverts', evs.opened, 25),
+    B('ev5t', 'Événements', '5T', 'Tour du monde', 'Participe à 5 événements différents', evs.themes.length, 5),
+    B('palette', 'Explorer', 'TH', 'Changement de décor', 'Choisis un thème de couleur dans Compte', theme && theme !== 'neon' ? 1 : 0, 1),
   ];
 }
 
@@ -90,3 +116,33 @@ export function newlyUnlocked(): Badge[] {
   if (!Array.isArray(seen)) return []; // première visite : on ne félicite pas pour l'existant
   return got.filter((b) => !seen!.includes(b.id));
 }
+
+
+/* ---------- Récompenses : des Éclats à récupérer pour chaque succès ---------- */
+const CLAIM = 'holocote.badgeclaim.v1';
+const BIG = new Set(['set100', 'q30', 's30', 'c250', 'myst30', 'ev25']);
+/** Éclats offerts : plus le succès est difficile, plus c'est généreux. */
+export function rewardFor(id: string, goal: number): number {
+  if (BIG.has(id)) return 150;
+  if (goal >= 100) return 100;
+  if (goal >= 30) return 80;
+  if (goal >= 10) return 50;
+  if (goal >= 3) return 30;
+  return 20;
+}
+function claimedIds(): string[] {
+  try { const v = JSON.parse(localStorage.getItem(CLAIM) || '[]'); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch { return []; }
+}
+/** Récupère les Éclats d'un succès débloqué (une seule fois). Renvoie le nombre d'Éclats gagnés. */
+export function claimBadge(id: string): number {
+  const b = computeBadges().find((x) => x.id === id);
+  if (!b || !b.got || b.claimed) return 0;
+  try { localStorage.setItem(CLAIM, JSON.stringify([...claimedIds(), id])); } catch { return 0; }
+  addCoins(b.reward, `Succès : ${b.name}`);
+  return b.reward;
+}
+export function claimAllBadges(): number {
+  const ids = computeBadges().filter((b) => b.got && !b.claimed).map((b) => b.id);
+  return ids.reduce((t, id) => t + claimBadge(id), 0);
+}
+export const unclaimedCount = () => computeBadges().filter((b) => b.got && !b.claimed).length;

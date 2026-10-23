@@ -95,7 +95,7 @@ import Base from '../layouts/Base.astro';
         if (t.decor === 'vintage' && i % 4 === 0) p.textContent = t.year;
         parts.push(p);
       }
-      if (t.decor === 'mega' || t.decor === 'prism') for (let i = 0; i < 3; i++) parts.push(el('span', { class: `ring ring-${i}` }));
+      if (t.decor === 'mega' || t.decor === 'prism' || t.decor === 'volt') for (let i = 0; i < 3; i++) parts.push(el('span', { class: `ring ring-${i}` }));
       box.replaceChildren(...parts);
     }
 
@@ -442,6 +442,8 @@ import Base from '../layouts/Base.astro';
     .ev-decor :global(.dp-mega) { width: 4px; height: 40px; border-radius: 2px; background: linear-gradient(transparent, #ff4fd8, transparent); opacity: 0.6; animation: streak var(--d) linear infinite var(--delay); }
     .ev-decor :global(.dp-kanto) { width: 10px; height: 10px; background: #ffd25a; clip-path: polygon(50% 0, 61% 35%, 100% 35%, 68% 57%, 79% 100%, 50% 72%, 21% 100%, 32% 57%, 0 35%, 39% 35%); opacity: 0.7; animation: twinkle var(--d) ease-in-out infinite var(--delay); }
     .ev-decor :global(.dp-kanto:nth-child(3n)) { background: #ff4f6d; }
+    .ev-decor :global(.dp-volt) { width: 10px; height: 26px; background: linear-gradient(#fff, #ffe45a); clip-path: polygon(55% 0, 15% 55%, 45% 55%, 30% 100%, 90% 38%, 55% 38%); opacity: 0.75; animation: twinkle var(--d) ease-in-out infinite var(--delay); }
+    .ev-decor :global(.dp-shadow) { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ff9ab0, #8a3dff); filter: blur(1px); opacity: 0.55; animation: twinkle var(--d) ease-in-out infinite var(--delay); }
     .ev-decor :global(.dp-prism) { width: 8px; height: 8px; transform: rotate(45deg) scale(var(--s)); background: linear-gradient(135deg, #3ef0ff, #ff4fd8, #ffd25a); opacity: 0.75; animation: twinkle var(--d) ease-in-out infinite var(--delay); }
     .ev-decor :global(.ring) { position: absolute; left: 70%; top: 40%; width: 220px; height: 220px; margin: -110px; border-radius: 50%; border: 3px solid var(--c1); opacity: 0; animation: ring 4.5s ease-out infinite; }
     .ev-decor :global(.ring-1) { animation-delay: 1.5s; border-color: var(--c2); }

@@ -2,12 +2,12 @@
 import Base from '../layouts/Base.astro';
 import { mascotSvg } from '../lib/mascot';
 ---
-<Base title="Défi du jour" active="mystery" description="Chaque jour : une carte mystère à deviner, un booster à ouvrir et des duels de cotes. Gagne des cartes pour ton classeur.">
+<Base title="Défi du jour" active="mystery" description="Chaque jour : une carte mystère, un booster, un duel de cotes, une prédiction et un intrus à trouver. Gagne des cartes et des Éclats.">
   <section class="mx-hero">
     <div class="hero-txt">
       <p class="mx-eyebrow"><span class="pulse" aria-hidden="true"></span><span id="mx-tag">Défi du jour</span></p>
       <h1>Défi <span class="holo-text">du jour.</span></h1>
-      <p class="mx-slogan">Une carte mystère, un booster, des duels. Chaque jour, de quoi remplir ton classeur.</p>
+      <p class="mx-slogan">Carte mystère, booster, duel, prédiction et intrus : chaque jour, de quoi remplir ton classeur.</p>
     </div>
     <div class="hero-coti" id="hero-coti" set:html={mascotSvg('wink', 150)} />
   </section>
@@ -16,6 +16,8 @@ import { mascotSvg } from '../lib/mascot';
     <a href="#mystere" class="mode" data-mode="mystery" aria-current="page"><span class="m-name">Carte mystère</span><span class="m-st" id="st-mystery">à jouer</span></a>
     <a href="#booster" class="mode" data-mode="booster"><span class="m-name">Booster du jour</span><span class="m-st" id="st-booster">à ouvrir</span></a>
     <a href="#duel" class="mode" data-mode="duel"><span class="m-name">Duel du jour</span><span class="m-st" id="st-duel">à jouer</span></a>
+    <a href="#prediction" class="mode" data-mode="predict"><span class="m-name">Prédiction</span><span class="m-st" id="st-predict">à jouer</span></a>
+    <a href="#intrus" class="mode" data-mode="intrus"><span class="m-name">Trouve l’intrus</span><span class="m-st" id="st-intrus">à jouer</span></a>
     <a href="#entrainement" class="mode mode-train" data-mode="train"><span class="m-name">Entraînement</span><span class="m-st">illimité, sans gain</span></a>
   </nav>
 
@@ -180,6 +182,26 @@ import { mascotSvg } from '../lib/mascot';
           <div><span class="muted small">Prochain booster dans</span><strong id="bx-next">--:--:--</strong></div>
         </div>
       </div>
+    </section>
+  </div>
+
+  <div class="mode-panel" id="mode-predict" hidden>
+    <section class="gx">
+      <h2>Prédiction du jour</h2>
+      <p class="muted">Une carte, trois choix : sa cote va-t-elle monter, rester stable ou baisser d’ici au prochain relevé ? Aucune mise : tu gagnes des Éclats si tu vois juste, et un petit lot de consolation sinon.</p>
+      <div id="pr-state" aria-live="polite"></div>
+      <div id="pr-body"></div>
+      <div id="pr-hist"></div>
+      <p class="muted small">Un jeu pour s’amuser : les cotes bougent pour plein de raisons, ce n’est ni un conseil d’achat ni une promesse de valeur.</p>
+    </section>
+  </div>
+
+  <div class="mode-panel" id="mode-intrus" hidden>
+    <section class="gx">
+      <h2>Trouve l’intrus</h2>
+      <p class="muted" id="in-lead">Quatre cartes : trois ont un point commun (extension, rareté ou époque), une seule n’a rien à voir. Laquelle ?</p>
+      <div id="in-state" aria-live="polite"></div>
+      <div id="in-body"></div>
     </section>
   </div>
 
@@ -575,17 +597,19 @@ import { mascotSvg } from '../lib/mascot';
     import { formatPrice, getSet } from '../lib/tcgdex';
     import { mascotSvg } from '../lib/mascot';
     import { el, url, holoCard, toast, status } from '../lib/ui';
+    import { dailyCard, makePrediction, resolvePending, todayPred, predictions, stats as predStats, DIR_LABEL, COINS_OK as P_OK, COINS_KO as P_KO, type Dir, type Pred } from '../lib/predict';
+    import { buildRound, daily as intrusDaily, saveDaily as saveIntrus, answer as intrusAnswer, stats as intrusStats, COINS_OK as I_OK, COINS_KO as I_KO, type Round, type Daily as IntrusDaily } from '../lib/intrus';
 
     const $ = (id: string) => document.getElementById(id)!;
     const fmt = (v?: number, u: 'EUR' | 'USD' = 'EUR') => (v === undefined ? '—' : formatPrice(v, u));
 
     /* ---------- Onglets internes ---------- */
     // Vues : les trois jeux du jour, le choix d'entraînement, et chaque jeu en entraînement (sans gain).
-    type Panel = 'mystery' | 'booster' | 'duel' | 'train';
+    type Panel = 'mystery' | 'booster' | 'duel' | 'predict' | 'intrus' | 'train';
     type View = Panel | 'train-mystery' | 'train-booster' | 'train-duel';
-    const PANELS: Panel[] = ['mystery', 'booster', 'duel', 'train'];
+    const PANELS: Panel[] = ['mystery', 'booster', 'duel', 'predict', 'intrus', 'train'];
     const HASH: Record<string, View> = {
-      '#mystere': 'mystery', '#booster': 'booster', '#duel': 'duel', '#entrainement': 'train',
+      '#mystere': 'mystery', '#booster': 'booster', '#duel': 'duel', '#prediction': 'predict', '#intrus': 'intrus', '#entrainement': 'train',
       '#entrainement-mystere': 'train-mystery', '#entrainement-booster': 'train-booster', '#entrainement-duel': 'train-duel',
     };
     const GAME: Record<string, string> = { mystery: 'Carte mystère', booster: 'Booster', duel: 'Duel' };
@@ -602,10 +626,12 @@ import { mascotSvg } from '../lib/mascot';
         $('tb-game').textContent = GAME[panel];
         ($('tb-back') as HTMLAnchorElement).href = panel === 'mystery' ? '#mystere' : `#${panel}`;
       }
-      $('hero-coti').innerHTML = mascotSvg(panel === 'booster' ? 'wow' : panel === 'duel' ? 'think' : panel === 'train' ? 'happy' : 'wink', 150);
+      $('hero-coti').innerHTML = mascotSvg(panel === 'booster' ? 'wow' : panel === 'duel' || panel === 'predict' ? 'think' : panel === 'train' || panel === 'intrus' ? 'happy' : 'wink', 150);
       if (panel === 'mystery') window.dispatchEvent(new CustomEvent('defi:mystery', { detail: { train: training } }));
       if (panel === 'booster') boosterView(training);
       if (panel === 'duel') duelView(training ? 'train' : 'daily');
+      if (panel === 'predict' && !booted.predict) { booted.predict = true; void initPredict(); }
+      if (panel === 'intrus' && !booted.intrus) { booted.intrus = true; void initIntrus(); }
       refreshStatus();
     }
     window.addEventListener('hashchange', () => { show(fromHash()); window.scrollTo({ top: $('modes').offsetTop - 80, behavior: 'smooth' }); });
@@ -617,6 +643,10 @@ import { mascotSvg } from '../lib/mascot';
       $('st-booster').textContent = !b ? 'à ouvrir' : b.claimed ? 'carte gagnée' : 'ouvert';
       const dd = getDaily();
       $('st-duel').textContent = !dd?.answered ? 'à jouer' : dd.ok ? (dd.claimed ? 'carte gagnée' : 'gagné') : 'perdu';
+      const tp = todayPred();
+      $('st-predict').textContent = !tp ? 'à jouer' : tp.res ? (tp.res.ok ? 'bien vu' : 'résolue') : 'choix fait';
+      const di = intrusDaily();
+      $('st-intrus').textContent = !di?.picked ? 'à jouer' : di.ok ? 'gagné' : 'perdu';
       const hit = b?.opened && !bxTrain && pulled.length === 10 ? hitLevel(pulled[9].card) : undefined;
       syncToday({ boosterOpened: !!b?.opened, boosterClaimed: !!b?.claimed, hit, duel: dd?.answered ? (dd.ok ? 'ok' : 'ko') : undefined, duelClaimed: !!dd?.claimed });
       renderWeek();
@@ -919,6 +949,113 @@ import { mascotSvg } from '../lib/mascot';
       };
       tick();
       setInterval(tick, 1000);
+    }
+
+    /* ---------- Prédiction du jour ---------- */
+    async function initPredict() {
+      const state = $('pr-state');
+      state.replaceChildren(status('On prépare la carte du jour…'));
+      let pool: Quote[] = [];
+      try { pool = (await loadMarket()).quotes; } catch { /* rien */ }
+      if (!pool.length) { state.replaceChildren(el('p', { class: 'muted' }, ['Les cotes ne sont pas disponibles pour le moment. Réessaie dans un instant.'])); booted.predict = false; return; }
+      const fresh = await resolvePending().catch(() => [] as Pred[]);
+      for (const p of fresh) toast(`${p.name} : ${p.res!.ok ? 'bien vu' : 'raté'}, +${p.res!.coins} Éclats`);
+      state.replaceChildren();
+      renderPredict(pool);
+      refreshStatus();
+    }
+    const signed = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1).replace('.', ',')} %`;
+    function renderPredict(pool: Quote[]) {
+      const body = $('pr-body');
+      const mine = todayPred();
+      const q = mine ? (pool.find((x) => x.id === mine.id) ?? null) : dailyCard(pool);
+      const name = mine?.name ?? q?.name ?? '';
+      if (!q && !mine) { body.replaceChildren(el('p', { class: 'muted' }, ['Pas assez de cotes fiables aujourd’hui pour la prédiction.'])); return; }
+      const dirBtn = (dir: Dir, label: string, cls: string) => {
+        const b = el('button', { type: 'button', class: `gx-btn ${cls}`, 'aria-pressed': mine?.dir === dir ? 'true' : 'false' }, [label]);
+        b.disabled = !!mine;
+        if (!mine && q) b.addEventListener('click', async () => {
+          body.querySelectorAll('button').forEach((x) => ((x as HTMLButtonElement).disabled = true));
+          const made = await makePrediction(q, dir);
+          if (made) toast('Prédiction enregistrée : résultat après le prochain relevé des cotes.');
+          renderPredict(pool); refreshStatus();
+        });
+        return b;
+      };
+      const info = mine
+        ? (mine.res
+          ? `Résultat : ${DIR_LABEL[mine.res.real].toLowerCase()} (${signed(mine.res.chg)}). ${mine.res.ok ? `Bien vu, +${mine.res.coins} Éclats !` : `Raté, +${mine.res.coins} Éclats de consolation.`}`
+          : `Ton choix : ${DIR_LABEL[mine.dir].toLowerCase()}. Le résultat tombe après le prochain relevé des cotes (en général le lendemain matin) : reviens voir !`)
+        : `Cote de départ : ${fmt(q!.price)}. “Stable” veut dire moins de 1 % d’écart. Bonne réponse : +${P_OK} Éclats, sinon +${P_KO}.`;
+      body.replaceChildren(el('div', { class: 'gx-card' }, [
+        el('div', { class: 'gx-pic' }, [holoCard(mine?.image ?? q?.image, name)]),
+        el('div', { class: 'gx-side' }, [
+          el('p', { class: 'gx-k' }, ['Carte du jour']),
+          el('h3', {}, [name]),
+          el('p', { class: 'muted small' }, [mine?.setName ?? q?.setName ?? '']),
+          el('p', { class: 'gx-info' }, [info]),
+          el('div', { class: 'gx-btns' }, [dirBtn('up', 'Elle monte', 'up'), dirBtn('flat', 'Stable', 'flat'), dirBtn('down', 'Elle baisse', 'down')]),
+        ]),
+      ]));
+      const past = predictions().filter((p) => p.day !== todayNumber()).sort((a, b) => b.day - a.day).slice(0, 6);
+      const st = predStats();
+      $('pr-hist').replaceChildren(
+        ...(st.played || past.length ? [el('h3', { class: 'gx-h' }, ['Tes dernières prédictions']), el('p', { class: 'muted small' }, [`Bien vu : ${st.won} sur ${st.played} · série en cours : ${st.streak} · record : ${st.best}`])] : []),
+        ...(past.length ? [el('ul', { class: 'gx-list' }, past.map((p) => el('li', {}, [
+          el('strong', {}, [p.name]),
+          el('span', { class: 'muted small' }, [`${DIR_LABEL[p.dir]} · ${p.res ? `${DIR_LABEL[p.res.real].toLowerCase()} (${signed(p.res.chg)})` : 'en attente du relevé'}`]),
+          el('span', { class: p.res ? (p.res.ok ? 'gx-ok' : 'gx-ko') : 'muted small' }, [p.res ? (p.res.ok ? `Bien vu +${p.res.coins}` : `Raté +${p.res.coins}`) : '…']),
+        ])))] : []),
+      );
+    }
+
+    /* ---------- Trouve l'intrus ---------- */
+    let intrusPool: Quote[] = [];
+    async function initIntrus() {
+      const state = $('in-state');
+      state.replaceChildren(status('On bat les cartes…'));
+      try { intrusPool = (await loadMarket()).quotes; } catch { /* rien */ }
+      let d = intrusDaily();
+      if (!d) {
+        const round = buildRound(intrusPool, todayNumber() * 31 + 7);
+        if (!round) { state.replaceChildren(el('p', { class: 'muted' }, ['Pas assez de cartes aujourd’hui pour ce jeu. Réessaie plus tard.'])); booted.intrus = false; return; }
+        d = { day: todayNumber(), round };
+        saveIntrus(d);
+      }
+      state.replaceChildren();
+      renderIntrus(d.round, d, false);
+      refreshStatus();
+    }
+    function renderIntrus(round: Round, d: IntrusDaily | null, practice: boolean, pickedId?: string) {
+      const body = $('in-body');
+      const picked = practice ? pickedId : d?.picked;
+      const cards = round.ids.map((id) => intrusPool.find((q) => q.id === id)).filter((q): q is Quote => !!q);
+      const grid = el('div', { class: 'in-grid' }, cards.map((q) => {
+        const cls = ['in-card', picked ? (q.id === round.odd ? 'odd' : 'trio') : '', picked === q.id ? 'mine' : ''].join(' ');
+        const b = el('button', { type: 'button', class: cls, 'aria-label': `${q.name}, choisir comme intrus` }, [holoCard(q.image, q.name), el('span', { class: 'in-name' }, [q.name])]);
+        b.disabled = !!picked;
+        if (!picked) b.addEventListener('click', () => {
+          grid.querySelectorAll('button').forEach((x) => ((x as HTMLButtonElement).disabled = true));
+          if (practice) { renderIntrus(round, null, true, q.id); return; }
+          const next = intrusAnswer(d!, q.id);
+          renderIntrus(round, next, false); refreshStatus();
+        });
+        return b;
+      }));
+      const ok = picked === round.odd;
+      const msg = !picked ? el('p', { class: 'gx-info' }, [practice ? 'Entraînement : rien à gagner, juste pour le plaisir.' : `Une manche par jour : +${I_OK} Éclats si tu trouves, +${I_KO} sinon.`])
+        : el('div', { class: `gx-res ${ok ? 'ok' : 'ko'}` }, [
+          el('strong', {}, [ok ? 'Bien vu !' : 'Raté, ce sera pour la prochaine.']),
+          el('span', {}, [`${round.rule} L’intrus : ${cards.find((q) => q.id === round.odd)?.name ?? ''}. ${round.oddWhy}.`]),
+          practice ? null : el('span', { class: 'muted small' }, [`+${ok ? I_OK : I_KO} Éclats`]),
+        ]);
+      const again = picked ? el('button', { type: 'button', class: 'btn' }, ['Une manche d’entraînement (sans gain)']) : null;
+      again?.addEventListener('click', () => {
+        const r = buildRound(intrusPool, Math.floor(Math.random() * 1e9));
+        if (r) renderIntrus(r, null, true);
+      });
+      const st = intrusStats();
+      body.replaceChildren(grid, msg, ...(again ? [again] : []), el('p', { class: 'muted small' }, [`Trouvés : ${st.won} sur ${st.played} · série : ${st.streak} · record : ${st.best}`]));
     }
 
     /* ---------- Duel ---------- */

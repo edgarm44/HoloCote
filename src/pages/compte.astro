@@ -45,9 +45,15 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
     </form>
   </section>
 
+  <section class="panel ac-theme" aria-labelledby="th-h">
+    <h2 id="th-h">Thème de couleur</h2>
+    <p class="muted small">Change l’ambiance de tout le site. Ton choix reste sur cet appareil.</p>
+    <div class="th-grid" id="th-grid" role="radiogroup" aria-label="Thème de couleur"></div>
+  </section>
+
   <section class="ac-stats" aria-label="Résumé">
     <a class="tile" href="../collection/"><span class="t-v" id="t-cards">0</span><span class="t-l">cartes au classeur</span></a>
-    <a class="tile" href="#succes"><span class="t-v" id="t-badges">0</span><span class="t-l">succès (+25 XP chacun)</span></a>
+    <a class="tile" href="#succes"><span class="t-v" id="t-badges">0</span><span class="t-l">succès (+25 XP et des Éclats)</span></a>
     <a class="tile" href="../defi/#semaine"><span class="t-v" id="t-streak">0</span><span class="t-l">jours d'affilée au Défi</span></a>
     <a class="tile" href="#quetes"><span class="t-v" id="t-quests">0</span><span class="t-l">jours de quêtes terminées</span></a>
   </section>
@@ -93,6 +99,7 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
       <h2 id="succes-h">Succès</h2>
       <p class="muted"><strong id="bd-count">0</strong> débloqués sur <span id="bd-total">0</span>. Remplis ton classeur, joue au Défi et fais tes quêtes pour les obtenir.</p>
     </div>
+    <div class="bd-claim" id="bd-claim" hidden><span id="bd-claim-t"></span><button type="button" class="btn btn-primary" id="bd-claim-all">Tout récupérer</button></div>
     <div id="bd-groups"></div>
   </section>
 
@@ -140,7 +147,7 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
   <p class="notice">Ton pseudo, ton avatar, tes quêtes et tes succès sont gardés uniquement dans ce navigateur, jamais envoyés. Si tu effaces les données du site sans sauvegarde, ils disparaissent.</p>
 
   <script>
-    import { computeBadges } from '../lib/badges';
+    import { computeBadges, claimBadge, claimAllBadges } from '../lib/badges';
     import { CHEST_XP, CHEST_COINS, todayQuests, questDays, claimQuest, chestState, openChest, rewardText, pendingRewards, rerolls, MAX_REROLLS } from '../lib/quests';
     import { streak } from '../lib/progress';
     import { countCards } from '../lib/collection';
@@ -383,6 +390,9 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
       $('bd-count').textContent = String(got);
       $('bd-total').textContent = String(all.length);
       $('t-badges').textContent = `${got}/${all.length}`;
+      const open = all.filter((b) => b.got && !b.claimed);
+      $('bd-claim').hidden = !open.length;
+      $('bd-claim-t').textContent = `${open.length} récompense${open.length > 1 ? 's' : ''} à récupérer : ${open.reduce((t, b) => t + b.reward, 0)} Éclats.`;
       const groups = [...new Set(all.map((b) => b.group))];
       $('bd-groups').replaceChildren(...groups.map((g) => el('div', { class: 'bd-group' }, [
         el('h3', {}, [g]),
@@ -393,10 +403,39 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
             el('span', { class: 'muted small' }, [b.hint]),
             !b.got && b.progress ? el('span', { class: 'bd-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(b.progress[1]), 'aria-valuenow': String(b.progress[0]), 'aria-label': `${b.name} : ${b.progress[0]} sur ${b.progress[1]}` }, [el('i', { style: `width:${(b.progress[0] / b.progress[1]) * 100}%` }), el('em', {}, [`${b.progress[0]}/${b.progress[1]}`])]) : null,
           ]),
-          b.got ? el('span', { class: 'bd-ok' }, [el('span', { 'aria-hidden': 'true' }, ['✓']), el('span', { class: 'sr-only' }, ['débloqué'])]) : el('span', { class: 'sr-only' }, ['à débloquer']),
+          b.got
+            ? (b.claimed
+              ? el('span', { class: 'bd-ok' }, [el('span', { 'aria-hidden': 'true' }, ['✓']), el('span', { class: 'sr-only' }, ['débloqué, récompense récupérée'])])
+              : (() => { const k = el('button', { type: 'button', class: 'bd-get', 'aria-label': `Récupérer ${b.reward} Éclats pour le succès ${b.name}` }, [`+${b.reward}`]); k.addEventListener('click', () => { const n = claimBadge(b.id); if (n) toast(`${b.name} : +${n} Éclats`); renderBadges(); }); return k; })())
+            : el('span', { class: 'bd-rw', title: 'Récompense' }, [`+${b.reward}`, el('span', { class: 'sr-only' }, [' Éclats à gagner'])]),
         ]))),
       ])));
     }
+
+    const THEMES_UI: { id: string; name: string; sw: string }[] = [
+      { id: 'neon', name: 'Néon', sw: 'linear-gradient(115deg, #3ef0ff, #8a7bff, #ff4fd8, #ffd25a)' },
+      { id: 'aurore', name: 'Aurore', sw: 'linear-gradient(115deg, #3dffa8, #3ef0ff, #3ea6ff, #e8ff6a)' },
+      { id: 'braise', name: 'Braise', sw: 'linear-gradient(115deg, #ffd25a, #ff8a3d, #ff4f6d, #c04bff)' },
+      { id: 'ocean', name: 'Océan', sw: 'linear-gradient(115deg, #3ef0ff, #4f7bff, #8a7bff, #7af0c6)' },
+      { id: 'royal', name: 'Royal', sw: 'linear-gradient(115deg, #8a7bff, #c04bff, #ff4fd8, #ffd25a)' },
+    ];
+    function renderThemes() {
+      let cur = 'neon';
+      try { cur = localStorage.getItem('holocote.theme.v1') || 'neon'; } catch { /* rien */ }
+      $('th-grid').replaceChildren(...THEMES_UI.map((t) => {
+        const b = el('button', { type: 'button', class: 'th-opt', role: 'radio', 'aria-checked': String(t.id === cur) }, [el('span', { class: 'th-sw', style: `--sw:${t.sw}` }), t.name]);
+        b.addEventListener('click', () => {
+          try { localStorage.setItem('holocote.theme.v1', t.id); } catch { /* rien */ }
+          if (t.id === 'neon') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t.id);
+          renderThemes(); renderBadges();
+          window.dispatchEvent(new CustomEvent('holocote:progress'));
+        });
+        return b;
+      }));
+    }
+    renderThemes();
+
+    $('bd-claim-all').addEventListener('click', () => { const n = claimAllBadges(); if (n) toast(`+${n} Éclats récupérés`); renderBadges(); });
 
     function renderAll() {
       $('t-cards').textContent = String(countCards());
@@ -648,6 +687,9 @@ const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'non
     #bd-groups :global(h3) { margin: 18px 0 10px; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
     #bd-groups :global(.bd-grid) { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
     #bd-groups :global(.bd) { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); }
+    .bd-claim { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 0; padding: 12px 16px; border-radius: 16px; background: rgba(61, 255, 168, 0.1); border: 1px solid rgba(61, 255, 168, 0.4); font-weight: 700; }
+    #bd-groups :global(.bd-get) { margin-left: auto; padding: 6px 12px; border-radius: 999px; border: 0; background: linear-gradient(90deg, #3dffa8, #3ef0ff); color: #04121a; font: inherit; font-weight: 800; cursor: pointer; animation: pulseg 1.6s ease-in-out infinite; }
+    #bd-groups :global(.bd-rw) { margin-left: auto; font-size: 0.75rem; font-weight: 800; color: var(--cyan); opacity: 0.8; white-space: nowrap; }
     #bd-groups :global(.bd:not(.got) .bd-ic) { filter: grayscale(1); opacity: 0.35; }
     #bd-groups :global(.bd:not(.got) strong) { color: var(--muted); }
     #bd-groups :global(.bd.got) { border-color: rgba(255, 210, 90, 0.45); box-shadow: 0 0 22px rgba(255, 210, 90, 0.1); }
