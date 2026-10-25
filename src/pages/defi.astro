@@ -153,7 +153,7 @@ import { mascotSvg } from '../lib/mascot';
           <span class="pack-foil" aria-hidden="true"></span>
           <span class="pack-top" aria-hidden="true"></span>
           <span class="pack-coti" aria-hidden="true" set:html={mascotSvg('wow', 70)} />
-          <span class="pack-brand">HoloCote</span>
+          <span class="pack-brand">HoloDex</span>
           <span class="pack-set" id="bx-pack-set"></span>
           <span class="pack-n">10 cartes</span>
           <span class="pack-cta">Touche pour ouvrir</span>
@@ -483,7 +483,7 @@ import { mascotSvg } from '../lib/mascot';
     $('share').addEventListener('click', async () => {
       const used = rec.guesses.length;
       const line = rec.guesses.map((g) => (g && isRight(g, mc.answer) ? '■' : '□')).join('');
-      const text = `HoloCote · Défi du jour n° ${today}\n${rec.won ? used : 'X'}/${MAX_TRIES}  ${line}\n${location.origin}${url('/defi/')}`;
+      const text = `HoloDex · Défi du jour n° ${today}\n${rec.won ? used : 'X'}/${MAX_TRIES}  ${line}\n${location.origin}${url('/defi/')}`;
       try {
         if (navigator.share) { await navigator.share({ text }); return; }
         await navigator.clipboard.writeText(text);

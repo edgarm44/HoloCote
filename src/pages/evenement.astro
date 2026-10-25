@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 ---
-<Base title="Événement" active="event" description="Chaque week-end, un événement HoloCote : 5 boosters d'une extension à thème à ouvrir, et la dernière carte de chacun rejoint ton classeur.">
+<Base title="Événement" active="event" description="Chaque week-end, un événement HoloDex : 5 boosters d'une extension à thème à ouvrir, et la dernière carte de chacun rejoint ton classeur.">
   <section class="ev" id="ev" data-decor="vintage">
     <div class="ev-bg" aria-hidden="true"></div>
     <div class="ev-decor" id="ev-decor" aria-hidden="true"></div>
@@ -106,7 +106,7 @@ import Base from '../layouts/Base.astro';
       b.append(
         el('span', { class: 'ep-foil', 'aria-hidden': 'true' }),
         el('span', { class: 'ep-top', 'aria-hidden': 'true' }),
-        el('span', { class: 'ep-brand' }, ['HoloCote']),
+        el('span', { class: 'ep-brand' }, ['HoloDex']),
         el('span', { class: 'ep-set' }, [theme.setName]),
         el('span', { class: 'ep-year' }, [theme.year]),
         el('span', { class: 'ep-n' }, [label ?? (state === 'bonus' ? 'Bonus' : `${i + 1} / ${EVENT_BOOSTERS}`)]),

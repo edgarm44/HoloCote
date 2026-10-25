@@ -1,4 +1,4 @@
-// Éclats : la monnaie du jeu HoloCote, gagnée avec les quêtes du jour, le coffre et les niveaux,
+// Éclats : la monnaie du jeu HoloDex, gagnée avec les quêtes du jour, le coffre et les niveaux,
 // dépensée dans la boutique. Aucune valeur réelle : rien ne s'achète avec de l'argent, rien ne s'échange.
 
 import { todayNumber } from './mystery';

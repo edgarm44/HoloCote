@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import { avatarSvg } from '../lib/avatar';
 const DEF = { palette: 'holo', acc: 'none', aura: 'none', pose: 'wave', bg: 'none', pet: 'none' };
 ---
-<Base title="Mon compte" active="account" description="Ton personnage, ton niveau, tes quêtes du jour et tes succès HoloCote. Sans e-mail, sans mot de passe : tout reste dans ton navigateur.">
+<Base title="Mon compte" active="account" description="Ton personnage, ton niveau, tes quêtes du jour et tes succès HoloDex. Sans e-mail, sans mot de passe : tout reste dans ton navigateur.">
   <section class="ac-hero">
     <div class="ac-stage">
       <div class="ac-avatar" id="ac-avatar" set:html={avatarSvg(DEF, 'happy', 170)} />

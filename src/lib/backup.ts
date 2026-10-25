@@ -96,7 +96,7 @@ async function parse(input: string): Promise<Backup> {
     return { app: 'holocote-backup', version: 1, at: Date.now(), data: { 'holocote.collection.v1': json } };
   }
   const b = d as Partial<Backup>;
-  if (!b || b.app !== 'holocote-backup' || !b.data || typeof b.data !== 'object') throw new Error('Ce n’est pas une sauvegarde HoloCote.');
+  if (!b || b.app !== 'holocote-backup' || !b.data || typeof b.data !== 'object') throw new Error('Ce n’est pas une sauvegarde HoloDex.');
   const data: Record<string, string> = {};
   for (const [k, v] of Object.entries(b.data)) {
     if (/^holocote\.[\w.]{1,60}$/.test(k) && !SKIP.test(k) && typeof v === 'string' && v.length < 1_500_000) data[k] = v;

@@ -1,5 +1,5 @@
 ---
-// Logo HoloCote : une carte holographique traversée par une courbe de cote qui monte,
+// Logo HoloDex : une carte holographique traversée par une courbe de cote qui monte,
 // avec un éclat en coin. Le mot-symbole reprend le reflet irisé.
 interface Props { size?: number; withText?: boolean; class?: string }
 const { size = 34, withText = true, class: cls = '' } = Astro.props;
@@ -28,7 +28,7 @@ const id = `hc${Math.random().toString(36).slice(2, 8)}`;
     </g>
     <path d="M41 4.5 L42.4 8.6 L46.5 10 L42.4 11.4 L41 15.5 L39.6 11.4 L35.5 10 L39.6 8.6 Z" fill="#fff" />
   </svg>
-  {withText && <span class="hc-word">HoloCote</span>}
+  {withText && <span class="hc-word">HoloDex</span>}
 </span>
 
 <style>

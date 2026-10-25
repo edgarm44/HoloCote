@@ -227,7 +227,7 @@ const popular = [
       $('near').replaceChildren();
       $('dym').hidden = true;
       $('summary').textContent = '';
-      state.replaceChildren(status('Recherche en cours… (la première fois, HoloCote charge la liste de toutes les cartes)'));
+      state.replaceChildren(status('Recherche en cours… (la première fois, HoloDex charge la liste de toutes les cartes)'));
       const r = await smartSearch(q, lang, 400);
       if (my !== seq) return;
       state.replaceChildren();

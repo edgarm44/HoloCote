@@ -1,4 +1,4 @@
-// Service worker minimal de HoloCote : il sert uniquement à afficher les notifications d'alertes de prix
+// Service worker minimal de HoloDex : il sert uniquement à afficher les notifications d'alertes de prix
 // (obligatoire sur Android). Il ne met rien en cache et n'intercepte aucune requête.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));

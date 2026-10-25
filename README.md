@@ -1,4 +1,4 @@
-# HoloCote
+# HoloDex
 
 Site de fan non officiel : cote et rareté des cartes à collectionner Pokémon, scanner gratuit, collection privée.
 
@@ -36,7 +36,7 @@ src/
   lib/condition.ts        états de carte et coefficients
   lib/collection.ts       stockage local, export / import
   lib/scan.ts             OCR et recherche des candidats
-  lib/market.ts           cours, variations, indice HoloCote (page Marché)
+  lib/market.ts           cours, variations, indice HoloDex (page Marché)
 ```
 
 ## Cadre légal

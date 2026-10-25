@@ -1,5 +1,5 @@
 // Classement des classeurs : ta collection face à des rivaux FICTIFS.
-// Les rivaux sont inventés par HoloCote (pseudos, classeurs) et présentés comme tels sur la page ;
+// Les rivaux sont inventés par HoloDex (pseudos, classeurs) et présentés comme tels sur la page ;
 // leurs cartes sont de vraies cartes et leur valeur est calculée avec les cotes du jour.
 // Identifiants de cartes vérifiés dans la base TCGdex (copie du 3 octobre 2026).
 

@@ -4,7 +4,7 @@ import Base from '../layouts/Base.astro';
 <Base title="Boutique" active="shop" description="Dépense tes Éclats, gagnés avec les quêtes du jour : relances de booster, seconde chance, boosters d'événement, skins de compte et objets exclusifs. Aucun achat réel.">
   <section class="sh-hero">
     <div>
-      <p class="eyebrow">Boutique HoloCote</p>
+      <p class="eyebrow">Boutique HoloDex</p>
       <h1>Dépense tes <span class="holo-text">Éclats.</span></h1>
       <p class="muted sh-lead">Les Éclats se gagnent en jouant : quêtes du jour, coffre quotidien et passage de niveau. Ici, rien ne s'achète avec de l'argent réel.</p>
     </div>
@@ -87,7 +87,7 @@ import Base from '../layouts/Base.astro';
       })) },
       { title: 'Skins de booster', text: 'Change l’allure de ton booster du jour dans le Défi.', offers: PACKS.map((p) => ({
         id: p.id, name: `Booster ${p.name}`, icon: '', price: p.price, desc: 'Apparence du paquet.',
-        preview: () => `<span class="pk-pv" data-skin="${p.id}"><b>HoloCote</b></span>`,
+        preview: () => `<span class="pk-pv" data-skin="${p.id}"><b>HoloDex</b></span>`,
         state: () => ({ ok: true, owned: owns(p.id), equipped: skins().pack === p.id }),
         buy: () => { grantSkin(p.id); equip('pack', p.id); },
         equip: () => equip('pack', skins().pack === p.id ? '' : p.id),

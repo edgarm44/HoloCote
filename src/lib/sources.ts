@@ -1,8 +1,8 @@
 // Cote multi-sources : on recoupe plusieurs sources publiques au lieu d'une seule.
 //  - Cardmarket (marché européen, en euros) et TCGplayer (marché américain, en dollars) via TCGdex ;
 //  - les mêmes places de marché via l'API pokemontcg.io (copie indépendante, mise à jour chaque jour) ;
-//  - le relevé quotidien HoloCote (data/history.json), qui fait ce recoupement chaque matin.
-// La cote HoloCote suit la règle de consensus.ts : Cardmarket d'abord (euros), TCGplayer converti seulement en secours.
+//  - le relevé quotidien HoloDex (data/history.json), qui fait ce recoupement chaque matin.
+// La cote HoloDex suit la règle de consensus.ts : Cardmarket d'abord (euros), TCGplayer converti seulement en secours.
 
 import type { Card } from './tcgdex';
 import { USD_TO_EUR } from './rarity';

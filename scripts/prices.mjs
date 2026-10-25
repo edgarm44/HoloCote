@@ -159,7 +159,7 @@ for (const [id, e] of Object.entries(hist.cards)) {
   if (last && last[0] === e.c[0]) last[1] = v;
 }
 if (indexN) {
-  const e = hist.cards._index ?? { n: 'Indice HoloCote (somme des cotes du Marché)', p: [] };
+  const e = hist.cards._index ?? { n: 'Indice HoloDex (somme des cotes du Marché)', p: [] };
   e.p = [...e.p.filter(([d]) => d !== day), [day, Math.round(index)]].slice(-MAX_POINTS);
   hist.cards._index = e;
 }

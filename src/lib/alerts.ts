@@ -4,7 +4,7 @@
 //   - plafond : le cours monte à un prix fixé ou plus ;
 //   - variation : le cours a bougé de plus de X % depuis la dernière alerte vue.
 // Les cours sont vérifiés à chaque visite (au plus toutes les 30 minutes). Si l'utilisateur
-// l'autorise, une notification du navigateur s'affiche aussi (tant qu'un onglet HoloCote est ouvert).
+// l'autorise, une notification du navigateur s'affiche aussi (tant qu'un onglet HoloDex est ouvert).
 
 import { getFavorites, setRefPrices, setTargets, type Favorite } from './favorites';
 import { getCard, priceFor, type Lang } from './tcgdex';
@@ -161,7 +161,7 @@ export function checkAlerts(force = false): Promise<PriceAlert[]> {
     const fresh = alerts.filter((a) => !st.notified.includes(a.key));
     if (s.notify && fresh.length && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       const fmt = (v: number, u: 'EUR' | 'USD') => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: u }).format(v);
-      await showNotification(fresh.length === 1 ? 'Alerte HoloCote' : `${fresh.length} alertes HoloCote`, {
+      await showNotification(fresh.length === 1 ? 'Alerte HoloDex' : `${fresh.length} alertes HoloDex`, {
         body: fresh.slice(0, 3).map((a) => alertText(a, fmt)).join('\n'),
         icon: new URL(`${BASE}/favicon.svg`, location.href).href,
         tag: 'holocote-alerts',

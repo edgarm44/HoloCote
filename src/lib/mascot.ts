@@ -1,4 +1,4 @@
-// Coti, la mascotte originale de HoloCote : une petite carte holographique vivante.
+// Coti, la mascotte originale de HoloDex : une petite carte holographique vivante.
 // Dessin 100 % original (aucun personnage existant), utilisable côté Astro (set:html) et côté navigateur.
 
 export type Mood = 'happy' | 'wow' | 'sad' | 'think' | 'wink';
@@ -32,7 +32,7 @@ export function faceParts(mood: Mood) {
   return { eyes, mouth, extra, cheeks };
 }
 
-export function mascotSvg(mood: Mood = 'happy', size = 120, label = 'Coti, la mascotte de HoloCote'): string {
+export function mascotSvg(mood: Mood = 'happy', size = 120, label = 'Coti, la mascotte de HoloDex'): string {
   const id = `coti${++uid}`;
   const { eyes, mouth, extra, cheeks } = faceParts(mood);
   return `<svg class="coti coti-${mood}" viewBox="0 0 124 140" width="${size}" height="${Math.round(size * 140 / 124)}" role="img" aria-label="${label}">

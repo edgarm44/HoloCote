@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 ---
-<Base title="Marché" active="market" description="Le cours des cartes à collectionner, façon bourse : hausses, baisses, indice HoloCote.">
+<Base title="Marché" active="market" description="Le cours des cartes à collectionner, façon bourse : hausses, baisses, indice HoloDex.">
   <section class="mk-head">
     <div>
       <h1 class="mk-title">Le Marché.</h1>
@@ -10,7 +10,7 @@ import Base from '../layouts/Base.astro';
     </div>
     <div class="panel index-card" id="index-card">
       <div class="index-top">
-        <span class="index-label">Indice HoloCote</span>
+        <span class="index-label">Indice HoloDex</span>
         <span class="live"><span class="pulse"></span><span id="live-text">Cotes Cardmarket</span></span>
       </div>
       <div class="index-row">
@@ -52,7 +52,7 @@ import Base from '../layouts/Base.astro';
   <section class="panel chart-panel" id="chart-panel" hidden>
     <div class="cp-head">
       <div>
-        <h2 id="cp-title">Indice HoloCote</h2>
+        <h2 id="cp-title">Indice HoloDex</h2>
         <p class="muted small" id="cp-sub">Toutes les cartes suivies, base 100 = moyenne 30 jours.</p>
       </div>
       <div class="cp-actions">
@@ -138,7 +138,7 @@ import Base from '../layouts/Base.astro';
   </section>
 
   <p class="notice">
-    Cours = cote HoloCote, identique à la fiche carte : médiane de la tendance, du prix moyen de vente et des moyennes 7 et 30 jours de Cardmarket
+    Cours = cote HoloDex, identique à la fiche carte : médiane de la tendance, du prix moyen de vente et des moyennes 7 et 30 jours de Cardmarket
     (en euros, version normale, toutes langues et tous états confondus). Variation 7 j = moyenne des 7 derniers jours comparée à celle des 30 jours.
     Les mini-graphiques relient ces repères (moyenne 30 j, moyenne 7 j, cours) : ce n'est pas un historique jour par jour.
     Un « ? » signale une cote incertaine (repères Cardmarket très écartés) : ces cartes sont exclues du Duel et des Opportunités. Ce n'est pas un conseil d'investissement.
@@ -226,7 +226,7 @@ import Base from '../layouts/Base.astro';
       if (chartState.kind === 'index') {
         const pts = indexPoints();
         if (!pts) return;
-        $('cp-title').textContent = 'Indice HoloCote';
+        $('cp-title').textContent = 'Indice HoloDex';
         $('cp-sub').textContent = 'Toutes les cartes suivies, base 100 = moyenne 30 jours.';
         $('cp-index').hidden = true;
         ($('cp-open') as HTMLAnchorElement).hidden = true;

@@ -44,7 +44,7 @@ import Base from '../layouts/Base.astro';
           </div>
           <p class="hist-chg" data-slot="hist-chg"></p>
           <div class="hist-chart" data-slot="hist-chart"></div>
-          <p class="hist-legend muted small"><span class="lg-real"></span> relevés HoloCote <span class="lg-ref"></span> repères Cardmarket (moyennes 30 et 7 jours)</p>
+          <p class="hist-legend muted small"><span class="lg-real"></span> relevés HoloDex <span class="lg-ref"></span> repères Cardmarket (moyennes 30 et 7 jours)</p>
           <p class="muted small" data-slot="hist-note"></p>
         </div>
 
@@ -89,8 +89,8 @@ import Base from '../layouts/Base.astro';
         return;
       }
 
-      document.title = `${card.name} · HoloCote`;
-      document.querySelector('meta[name="description"]')?.setAttribute('content', `${card.name} (${card.set.name}) : rareté, cote estimée et versions de la carte Pokémon sur HoloCote.`);
+      document.title = `${card.name} · HoloDex`;
+      document.querySelector('meta[name="description"]')?.setAttribute('content', `${card.name} (${card.set.name}) : rareté, cote estimée et versions de la carte Pokémon sur HoloDex.`);
       const node = (document.getElementById('tpl') as HTMLTemplateElement).content.cloneNode(true) as DocumentFragment;
       const slot = (name: string) => node.querySelector(`[data-slot="${name}"]`) as HTMLElement;
 
@@ -107,7 +107,7 @@ import Base from '../layouts/Base.astro';
       const vb = valueBadge(eur);
       slot('badges').append(
         el('span', { class: `badge tier-${tier}`, title: 'Rareté officielle' }, [card.rarity ?? tierLabel[tier]]),
-        el('span', { class: `badge value-${vb.level}`, title: 'Badge HoloCote basé sur la cote' }, [vb.label]),
+        el('span', { class: `badge value-${vb.level}`, title: 'Badge HoloDex basé sur la cote' }, [vb.label]),
       );
 
       if (price) {
@@ -124,7 +124,7 @@ import Base from '../layouts/Base.astro';
       } else {
         slot('price').textContent = 'Cote indisponible';
         slot('price').classList.add('none');
-        slot('price-note').textContent = "Aucune vente récente connue pour cette carte : HoloCote préfère ne rien afficher plutôt qu'un prix inventé. Essaie la version dans l'autre langue.";
+        slot('price-note').textContent = "Aucune vente récente connue pour cette carte : HoloDex préfère ne rien afficher plutôt qu'un prix inventé. Essaie la version dans l'autre langue.";
       }
 
       const facts = slot('facts');
@@ -173,12 +173,12 @@ import Base from '../layouts/Base.astro';
       ])));
       const n = mp.sources.length;
       if (mp.consensus && n >= 2) {
-        // La cote affichée suit la règle de HoloCote : Cardmarket d'abord, TCGplayer seulement en secours.
+        // La cote affichée suit la règle de HoloDex : Cardmarket d'abord, TCGplayer seulement en secours.
         const main = view.querySelector('[data-slot="price"]') as HTMLElement;
         main.textContent = formatPrice(mp.consensus, 'EUR');
         main.classList.remove('none');
         main.after(el('p', { class: 'multi-tag' }, [mp.n && mp.n >= 2 ? 'Cote : moyenne de 2 relevés Cardmarket' : mp.uncertain ? 'Cote TCGplayer converti : indicative' : `Cote Cardmarket, recoupée avec ${n - 1} autre${n > 2 ? 's' : ''} source${n > 2 ? 's' : ''}`]));
-        slot('srcs-lead').textContent = `HoloCote retient la cote Cardmarket (marché européen, en euros), recoupée avec une 2ᵉ source quand elle concorde à 50 % près. TCGplayer (marché américain, 1 $ = ${mp.fx.toFixed(2).replace('.', ',')} €) sert de repère et de secours : ses prix planchers sont plus élevés pour les cartes à quelques centimes.${mp.spread && mp.spread > 1.6 ? ' Attention : les sources sont très éloignées les unes des autres, la cote est incertaine.' : ''}`;
+        slot('srcs-lead').textContent = `HoloDex retient la cote Cardmarket (marché européen, en euros), recoupée avec une 2ᵉ source quand elle concorde à 50 % près. TCGplayer (marché américain, 1 $ = ${mp.fx.toFixed(2).replace('.', ',')} €) sert de repère et de secours : ses prix planchers sont plus élevés pour les cartes à quelques centimes.${mp.spread && mp.spread > 1.6 ? ' Attention : les sources sont très éloignées les unes des autres, la cote est incertaine.' : ''}`;
       } else {
         slot('srcs-lead').textContent = 'Une seule source publie un prix pour cette carte : la cote est à prendre avec prudence.';
       }
@@ -214,10 +214,10 @@ import Base from '../layouts/Base.astro';
       box.querySelectorAll<HTMLButtonElement>('.hist-range button').forEach((b) => b.addEventListener('click', () => draw(Number(b.dataset.days))));
       const real = points.length;
       (box.querySelector('[data-slot="hist-note"]') as HTMLElement).textContent = published
-        ? `HoloCote relève la cote de cette carte chaque matin depuis le ${dateOf(points[0].day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}. Passe la souris sur un point pour voir sa valeur.`
+        ? `HoloDex relève la cote de cette carte chaque matin depuis le ${dateOf(points[0].day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}. Passe la souris sur un point pour voir sa valeur.`
         : real > 1
-          ? `Relevés faits par ton navigateur à chacune de tes visites (${real} jours). Les cartes du Marché sont en plus relevées chaque matin par HoloCote.`
-          : 'Cette carte n’est pas encore dans le relevé quotidien HoloCote : ton navigateur note sa cote à chacune de tes visites pour construire sa courbe. En attendant, les repères Cardmarket montrent la tendance du mois.';
+          ? `Relevés faits par ton navigateur à chacune de tes visites (${real} jours). Les cartes du Marché sont en plus relevées chaque matin par HoloDex.`
+          : 'Cette carte n’est pas encore dans le relevé quotidien HoloDex : ton navigateur note sa cote à chacune de tes visites pour construire sa courbe. En attendant, les repères Cardmarket montrent la tendance du mois.';
       draw(0);
       box.hidden = false;
     }

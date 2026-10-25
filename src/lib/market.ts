@@ -1,4 +1,4 @@
-// « Marché » HoloCote : cours des cartes façon bourse.
+// « Marché » HoloDex : cours des cartes façon bourse.
 // Source : cotes Cardmarket fournies par TCGdex. TCGdex ne publie pas d'historique
 // jour par jour : on dispose de repères (moyenne 30 jours, moyenne 7 jours, cours actuel).
 // La moyenne de la veille n'est pas utilisée : sur données réelles elle varie du simple
@@ -14,7 +14,7 @@ export interface Quote {
   image?: string;
   setName?: string;
   rarity?: string;
-  price: number;          // cours HoloCote (même calcul que la fiche carte)
+  price: number;          // cours HoloDex (même calcul que la fiche carte)
   avg30?: number;
   avg7?: number;
   low?: number;           // plus bas prix proposé à la vente (Cardmarket)
@@ -538,7 +538,7 @@ function readCache(): Market | null {
 }
 
 /**
- * Indice HoloCote : base 100 = valeur moyenne des cartes suivies sur 30 jours.
+ * Indice HoloDex : base 100 = valeur moyenne des cartes suivies sur 30 jours.
  * Indice = somme des cours actuels / somme des moyennes 30 jours x 100.
  */
 function computeIndex(quotes: Quote[]): Market['index'] {
